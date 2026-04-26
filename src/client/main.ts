@@ -363,7 +363,10 @@ class Game {
     requestAnimationFrame(this.loop)
 
     const now = performance.now()
-    const dt = now - this.lastTime
+    // Cap dt at 200ms — prevents spiral of death after tab switch or rendering spike.
+    // Without this cap, a single slow frame (e.g. explosion render) queues 10+ sim ticks
+    // and the game appears to fast-forward / shots explode instantly.
+    const dt = Math.min(now - this.lastTime, 200)
     this.lastTime = now
 
     if (this.appState !== 'playing') return
@@ -371,9 +374,17 @@ class Game {
     this.gameTime += dt / 1000
     this.accumulator += dt
 
-    while (this.accumulator >= this.tickInterval) {
+    // Max 3 ticks per render frame. Prevents sim from running faster than realtime
+    // when rendering is slow — at the cost of minor slow-motion on very long frame spikes.
+    let ticks = 0
+    while (this.accumulator >= this.tickInterval && ticks < 3) {
       this.accumulator -= this.tickInterval
       this.tick()
+      ticks++
+    }
+    // Drain leftover accumulator if we hit the cap so it doesn't compound next frame
+    if (this.accumulator > this.tickInterval) {
+      this.accumulator = this.accumulator % this.tickInterval
     }
 
     this.render()

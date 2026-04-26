@@ -56,8 +56,9 @@ export class GameCamera {
       }
     }
 
-    // Faster tracking for projectile, smooth return for character
-    const speed = this.mode === 'projectile' ? 0.10 : 0.05
+    // Projectile tracking needs to be snappy — bazooka travels ~6 Three.js units/tick.
+    // Impact dwell and character follow can be slower and more cinematic.
+    const speed = this.mode === 'projectile' ? 0.20 : 0.05
     const goalPos = this.target.clone().add(this.offset)
     this.currentPos.lerp(goalPos, speed)
     this.camera.position.copy(this.currentPos)
