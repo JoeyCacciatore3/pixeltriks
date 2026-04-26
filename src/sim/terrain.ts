@@ -4,41 +4,54 @@ import type { PRNG } from './prng'
 export function generateTerrain(prng: PRNG): Float32Array {
   const size = TERRAIN_SIZE
   const heightmap = new Float32Array(size * size)
-  const octaves = 5
 
-  const phases: number[] = []
-  const freqs: number[] = []
-  const amps: number[] = []
+  // Low-frequency base shape (broad hills/valleys)
+  const basePhases = Array.from({ length: 4 }, () => prng.next() * Math.PI * 2)
+  const basePhasesZ = Array.from({ length: 4 }, () => prng.next() * Math.PI * 2)
+  const baseFreqs = [1.0, 1.8, 2.6, 3.4]
+  const baseAmps = [1.0, 0.5, 0.28, 0.15]
 
-  for (let i = 0; i < octaves; i++) {
-    phases.push(prng.next() * Math.PI * 2)
-    freqs.push((i + 1) * 1.5)
-    amps.push(1 / (i + 1))
-  }
+  // High-frequency ridges (sharp peaks using abs(sin))
+  const ridgePhases = Array.from({ length: 3 }, () => prng.next() * Math.PI * 2)
+  const ridgePhasesZ = Array.from({ length: 3 }, () => prng.next() * Math.PI * 2)
+  const ridgeFreqs = [4.0, 6.5, 9.0]
+  const ridgeAmps = [0.22, 0.12, 0.06]
 
-  const phasesZ: number[] = []
-  for (let i = 0; i < octaves; i++) {
-    phasesZ.push(prng.next() * Math.PI * 2)
-  }
+  // Plateau mask — random flat areas mixed with the noise
+  const plateauPhase = prng.next() * Math.PI * 2
 
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
       const nx = x / size
       const nz = z / size
+
+      // Base rolling hills (fBm)
       let h = 0
-      for (let i = 0; i < octaves; i++) {
-        h += Math.sin(nx * Math.PI * 2 * freqs[i] + phases[i]) * amps[i]
-        h += Math.sin(nz * Math.PI * 2 * freqs[i] + phasesZ[i]) * amps[i] * 0.5
+      for (let i = 0; i < 4; i++) {
+        h += Math.sin(nx * Math.PI * 2 * baseFreqs[i] + basePhases[i]) * baseAmps[i]
+        h += Math.sin(nz * Math.PI * 2 * baseFreqs[i] + basePhasesZ[i]) * baseAmps[i] * 0.6
       }
 
-      const edgeFalloff = Math.min(
-        nx, nz, 1 - nx, 1 - nz
-      ) * 4
-      const clampedFalloff = Math.min(edgeFalloff, 1)
+      // Sharp ridges (abs(sin) creates V-shaped peaks and flat valleys)
+      let ridge = 0
+      for (let i = 0; i < 3; i++) {
+        ridge += (1 - Math.abs(Math.sin(nx * Math.PI * ridgeFreqs[i] + ridgePhases[i]))) * ridgeAmps[i]
+        ridge += (1 - Math.abs(Math.sin(nz * Math.PI * ridgeFreqs[i] + ridgePhasesZ[i]))) * ridgeAmps[i] * 0.5
+      }
 
-      const baseline = TERRAIN_HEIGHT_SCALE * 0.55
-      const amplitude = TERRAIN_HEIGHT_SCALE * 0.22
-      heightmap[z * size + x] = (baseline + h * amplitude) * clampedFalloff
+      // Plateau effect: smooth out some areas using a low-freq mask
+      const plateauMask = (Math.sin(nx * Math.PI * 2.5 + plateauPhase) + 1) * 0.5
+      const combinedH = h + ridge * (0.6 + plateauMask * 0.4)
+
+      // Island edge falloff — steeper curve for dramatic cliff edges
+      const ex = Math.min(nx, 1 - nx) * 3.5
+      const ez = Math.min(nz, 1 - nz) * 3.5
+      const edgeFalloff = Math.min(1, ex) * Math.min(1, ez)
+      const steepEdge = edgeFalloff * edgeFalloff  // steeper cliffs at map edge
+
+      const baseline = TERRAIN_HEIGHT_SCALE * 0.50
+      const amplitude = TERRAIN_HEIGHT_SCALE * 0.32
+      heightmap[z * size + x] = (baseline + combinedH * amplitude) * steepEdge
     }
   }
 
@@ -86,7 +99,7 @@ export function explodeTerrain(
       const dz = z - cz
       const dist = Math.sqrt(dx * dx + dz * dz)
       if (dist <= radius) {
-        const falloff = 1 - dist / radius
+        const falloff = (1 - dist / radius) ** 2
         heightmap[z * size + x] -= depth * falloff
         if (heightmap[z * size + x] < 0) {
           heightmap[z * size + x] = 0

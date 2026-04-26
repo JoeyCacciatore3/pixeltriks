@@ -1,4 +1,4 @@
-import { GRAVITY, TERRAIN_SIZE, KNOCKBACK_MAX } from '@shared/constants'
+import { GRAVITY, TERRAIN_SIZE, KNOCKBACK_MAX, CHAR_SPEED } from '@shared/constants'
 import type { WorldState, GameInput, WeaponKind, Character } from '@shared/types'
 import { WEAPONS } from '@shared/types'
 import { getHeight } from './terrain'
@@ -14,14 +14,36 @@ const NOISE: Record<Difficulty, { angle: number; power: number }> = {
 }
 
 const PROJECTILE_WEAPONS: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'dynamite']
-const ANGLE_SAMPLES = 36
 const POWER_SAMPLES = 5
 const MAX_SIM_TICKS = 300
+
+// Analytically solves the two launch angles needed to hit target at (dx, dy) at given speed.
+// dx = horizontal distance (positive), dy = target.y - spawnY in y-down coords (positive = target below spawn).
+// gravity = GRAVITY * weapon.gravityMul. Returns 0, 1, or 2 valid angles.
+function solveAngles(dx: number, dy: number, speed: number, gravity: number): number[] {
+  if (dx <= 0) return []
+  if (gravity <= 0) {
+    // No arc: aim directly at target
+    return [-Math.atan2(dy, dx)]
+  }
+  const k = gravity * dx * dx / (2 * speed * speed)
+  const discriminant = dx * dx - 4 * k * (k - dy)
+  if (discriminant < 0) return []
+  const sqrtD = Math.sqrt(discriminant)
+  const angles: number[] = []
+  for (const sign of [-1, 1] as const) {
+    const u = (dx + sign * sqrtD) / (2 * k)
+    const a = Math.atan(u)
+    if (Number.isFinite(a)) angles.push(a)
+  }
+  return angles
+}
 
 interface ShotCandidate {
   weapon: WeaponKind
   angle: number
   power: number
+  azimuth: number
   score: number
 }
 
@@ -29,6 +51,7 @@ interface MoveCandidate {
   targetX: number
   score: number
   steps: number
+  needsJump?: boolean
 }
 
 export function computeAIInput(
@@ -59,11 +82,15 @@ export function computeAIInput(
 
     if (bestMove.score > shotScore * 0.5 || shotScore <= 0) {
       const dir = bestMove.targetX > char.x ? 1 : -1
+      if (bestMove.needsJump && char.grounded) {
+        return { jump: true }
+      }
       return { moveDirection: dir as -1 | 1 }
     }
   }
 
-  const azimuth = nearestEnemy.x > char.x ? 0 : Math.PI
+  // Azimuth for airstrike: face toward nearest enemy
+  const airstrikeAz = nearestEnemy.x > char.x ? 0 : Math.PI
 
   if (useAirstrike && bestAirstrike) {
     const noise = NOISE[difficulty]
@@ -74,7 +101,7 @@ export function computeAIInput(
           bestAirstrike.power + prng.nextFloat(-noise.power, noise.power)
         )),
         weapon: 'airstrike',
-        azimuth,
+        azimuth: airstrikeAz,
       },
     }
   }
@@ -88,7 +115,7 @@ export function computeAIInput(
           bestShot.power + prng.nextFloat(-noise.power, noise.power)
         )),
         weapon: bestShot.weapon,
-        azimuth,
+        azimuth: bestShot.azimuth,
       },
     }
   }
@@ -107,21 +134,36 @@ function findBestShot(
 ): ShotCandidate | null {
   let best: ShotCandidate | null = null
   const enemies = world.characters.filter(c => c.team !== char.team && c.alive)
-  const nearDist = dist(char, findNearest(char, enemies))
+  if (enemies.length === 0) return null
+  const nearestEnemy = findNearest(char, enemies)
+  const nearDist = dist(char, nearestEnemy)
+  const spawnY = char.y - 4
 
   for (const weapon of PROJECTILE_WEAPONS) {
     if (weapon === 'dynamite' && nearDist > 12) continue
     if (weapon === 'shotgun' && nearDist > 40) continue
 
-    for (let ai = 0; ai < ANGLE_SAMPLES; ai++) {
-      const angle = (ai / ANGLE_SAMPLES) * Math.PI - Math.PI / 2
+    const config = WEAPONS[weapon]
+    const gravity = GRAVITY * config.gravityMul
+
+    for (const target of enemies) {
+      const ddx = target.x - char.x
+      const ddz = target.z - char.z
+      const dx = Math.sqrt(ddx * ddx + ddz * ddz)
+      if (dx < 0.5) continue
+      const dy = target.y - spawnY
+      const az = Math.atan2(ddz, ddx)
 
       for (let pi = 1; pi <= POWER_SAMPLES; pi++) {
         const power = (pi / POWER_SAMPLES) * 100
-        const score = simulateShot(char, angle, power, weapon, world)
+        const speed = config.speed * (power / 100)
+        const angles = solveAngles(dx, dy, speed, gravity)
 
-        if (!best || score > best.score) {
-          best = { weapon, angle, power, score }
+        for (const angle of angles) {
+          const score = simulateShot(char, angle, power, weapon, az, world)
+          if (!best || score > best.score) {
+            best = { weapon, angle, power, azimuth: az, score }
+          }
         }
       }
     }
@@ -135,29 +177,35 @@ function simulateShot(
   angle: number,
   power: number,
   weapon: WeaponKind,
+  azimuth: number,
   world: WorldState
 ): number {
   const config = WEAPONS[weapon]
   const speed = config.speed * (power / 100)
-  const enemies = world.characters.filter(c => c.team !== shooter.team && c.alive)
-  const nearest = enemies.length > 0 ? findNearest(shooter, enemies) : null
-  const az = nearest && nearest.x > shooter.x ? 0 : Math.PI
   const hSpeed = Math.cos(-angle) * speed
 
   let px = shooter.x
-  let py = shooter.y - 1
+  let py = shooter.y - 4  // match createProjectile spawn height
   let pz = shooter.z
-  let vx = Math.cos(az) * hSpeed
+  let vx = Math.cos(azimuth) * hSpeed
   let vy = Math.sin(-angle) * speed
-  let vz = Math.sin(az) * hSpeed
+  let vz = Math.sin(azimuth) * hSpeed
   let bounces = config.bounces
   let fuse = config.fuseTime
+  const gravity = GRAVITY * config.gravityMul
+  let grace = 4
 
   for (let t = 0; t < MAX_SIM_TICKS; t++) {
-    vy += GRAVITY * config.gravityMul
+    if (grace > 0) grace--
+    vy += gravity
     px += vx
     py += vy
     pz += vz
+
+    if (config.drag) {
+      vx *= (1 - config.drag)
+      vz *= (1 - config.drag)
+    }
 
     if (fuse > 0) {
       fuse--
@@ -167,19 +215,19 @@ function simulateShot(
     }
 
     const gh = getHeight(world.heightmap, px, pz)
-    if (py >= gh) {
+    if (py >= gh && grace <= 0) {
       if (bounces > 0) {
         py = gh
-        vy = -vy * 0.5
-        vx *= 0.7
-        vz *= 0.7
+        vy = -vy * 0.6
+        vx *= 0.8
+        vz *= 0.8
         bounces--
       } else {
         return scoreImpact(px, py, pz, config.damage, config.radius / 5, shooter, world)
       }
     }
 
-    if (px < 0 || px > TERRAIN_SIZE || pz < 0 || pz > TERRAIN_SIZE || py < world.waterLevel) {
+    if (px < 0 || px > TERRAIN_SIZE || pz < 0 || pz > TERRAIN_SIZE) {
       return 0
     }
 
@@ -224,7 +272,7 @@ function scoreAirstrike(
     }
 
     if (!best || totalScore > best.score) {
-      best = { weapon: 'airstrike', angle: 0, power, score: totalScore }
+      best = { weapon: 'airstrike', angle: 0, power, azimuth: 0, score: totalScore }
     }
   }
 
@@ -255,6 +303,12 @@ function evaluateMovement(
     if (tx < 5 || tx > TERRAIN_SIZE - 5) continue
 
     const th = getHeight(world.heightmap, tx, char.z)
+    const currentH = getHeight(world.heightmap, char.x, char.z)
+    // Check if first step toward this target is blocked by terrain
+    const stepX = char.x + Math.sign(tx - char.x) * CHAR_SPEED
+    const stepH = getHeight(world.heightmap, stepX, char.z)
+    const needsJump = stepH - currentH > 4  // CLIMB_MAX analog
+
     let score = 0
 
     score += th * 0.3
@@ -276,7 +330,7 @@ function evaluateMovement(
 
     const steps = Math.abs(tx - char.x)
     if (!best || score > best.score) {
-      best = { targetX: tx, score, steps }
+      best = { targetX: tx, score, steps, needsJump }
     }
   }
 
@@ -296,7 +350,7 @@ function scoreImpact(
     const d = distPos(x, y, z, c)
     if (d >= effectRadius) continue
 
-    const falloff = 1 - d / effectRadius
+    const falloff = (1 - d / effectRadius) ** 2
     const dmg = Math.floor(baseDamage * falloff)
 
     if (c.team !== shooter.team) {

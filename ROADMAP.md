@@ -8,21 +8,24 @@
 
 | System | Status | Notes |
 |--------|--------|-------|
-| Sim engine | ✅ Complete | 29 tests passing, deterministic, server-authoritative |
+| Sim engine | ✅ Complete | 33 tests passing, deterministic, server-authoritative |
 | Three.js renderer | ✅ Functional | terrain, chars, projectiles, explosions, water, sky, aim |
 | Turn system | ✅ Working | 25s aim, 4s between_turns dwell, sudden death, game_over |
-| Weapons (6) | ✅ Balanced | craterMul + knockbackMul differentiation, head-level spawn |
+| Weapons (6) | ✅ Balanced | craterMul + knockbackMul differentiation, head-level spawn, shotgun drag |
 | Controls | ✅ Working | WASD 4-dir move, Arrow aim (azimuth+elevation), Space charge/fire |
 | Active char indicator | ✅ Working | Bobbing yellow cone above active character |
-| Floating damage labels | ✅ Working | CSS DOM overlay, projected from world coords |
-| AI opponent | ✅ Working | 3 difficulty levels, trajectory search, azimuth-aware |
+| Floating damage labels | ✅ Working | CSS DOM overlay, projected from world coords, scale-punch animation |
+| AI opponent | ✅ Upgraded | Analytical ballistic solver, quadratic scoring, stuck detection + jump |
+| Camera | ✅ Upgraded | Trauma-based screen shake, 2s impact dwell state machine |
+| HUD | ✅ Upgraded | Power bar (gradient + pulse), turn banner animation |
 | WebSocket multiplayer | ✅ Working | room create/join, server-authoritative tick loop |
 | Quickplay (auto-match) | ✅ Complete | queue → match → 15s fallback to AI |
 | GitHub Actions auto-deploy | ✅ Complete | push to main → CF Pages deploy automatically |
 | pixeltriks.com domain | ✅ Live | CNAME active, CF Pages custom domain |
 | Mobile touch controls | ✅ Rebuilt | 4-dir move d-pad + aim d-pad + FIRE + JUMP |
+| Terrain generation | ✅ Upgraded | Multi-octave ridges via abs(sin()), steeper edges, dramatic peaks |
 | Portal/webring | ❌ Missing | Vibe Jam requirement |
-| Bundle size | ✅ ~124KB gz | well under 200KB target |
+| Bundle size | ✅ ~143KB gz | well under 200KB target |
 
 ---
 
@@ -109,7 +112,7 @@ const wsUrl = import.meta.env.VITE_WS_URL
 **Explosions:**
 - [ ] Particle burst feels impactful (40-60 particles, orange/red)
 - [ ] Point light flash on explosion
-- [ ] Screen shake on large explosions
+- [x] Screen shake on large explosions (trauma²-based, decays 0.88×/frame)
 
 **Water:**
 - [ ] Animated shader (time-based wave offset)
@@ -123,9 +126,9 @@ const wsUrl = import.meta.env.VITE_WS_URL
 
 **UI:**
 - [ ] Weapon selector visually clear (Tab cycles, shows icon/name)
-- [ ] Power charge feedback (visual/audio as space held)
+- [x] Power charge feedback (power bar: gradient green→red, pulse at max)
 - [x] Damage floaters (+number above character, color-coded enemy/friendly)
-- [ ] Turn transition overlay ("YOUR TURN" / "ENEMY'S TURN")
+- [x] Turn transition overlay ("YOUR TURN" / "ENEMY'S TURN" — animated banner)
 
 ### Day 4 — Apr 29 — Portal + Mobile + Cross-Browser
 

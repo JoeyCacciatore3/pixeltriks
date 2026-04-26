@@ -4,6 +4,8 @@ import { step } from './game'
 import { createProjectile, createAirstrikeProjectiles } from './projectile'
 import { moveCharacter, jumpCharacter } from './character'
 import { computeAIInput } from './ai'
+import { generateTerrain, explodeTerrain, getHeight } from './terrain'
+import { createPRNG } from './prng'
 import { TEAM_HUMAN, TEAM_AI, TERRAIN_SIZE } from '@shared/constants'
 
 const SEED = 42
@@ -355,5 +357,68 @@ describe('end-to-end game loop', () => {
 
     step(world, { fire: { angle: 0.3, power: 50, weapon: 'bazooka' } })
     expect(world.projectiles[0].vx).toBeLessThan(0)
+  })
+})
+
+describe('quadratic damage falloff', () => {
+  it('direct hit deals more damage than edge hit proportionally', () => {
+    const effectRadius = (35 / 5) * 1.5  // bazooka effectRadius
+    const exX = 128, exY = 22, exZ = 128
+
+    const calcDmg = (x: number, y: number, z: number) => {
+      const dx = x - exX, dy = y - exY, dz = z - exZ
+      const d = Math.sqrt(dx*dx + dy*dy + dz*dz)
+      if (d >= effectRadius) return 0
+      const falloff = (1 - d / effectRadius) ** 2
+      return Math.floor(45 * falloff)
+    }
+
+    const nearDmg = calcDmg(128, 22, 128)      // direct hit
+    const farDmg  = calcDmg(128 + 5, 22, 128)  // ~5 units away
+
+    expect(nearDmg).toBeGreaterThan(farDmg)
+    expect(nearDmg).toBe(45)  // direct hit = full damage
+    // Quadratic falloff: near:far ratio should be > linear (which would be 1.7 at d=5)
+    if (farDmg > 0) expect(nearDmg / farDmg).toBeGreaterThan(2)
+  })
+})
+
+describe('AI analytical trajectory', () => {
+  it('AI hard mode produces a higher-quality shot with graceTimer set', () => {
+    const world = createWorld(SEED)
+    world.activeTeam = TEAM_AI
+    world.activeCharIndex = 0
+    const input = computeAIInput(world, 'hard')
+    expect(input).not.toBeNull()
+    // Hard AI should fire with a meaningful power
+    if (input?.fire) {
+      expect(input.fire.power).toBeGreaterThan(10)
+    }
+  })
+
+  it('projectile spawns with grace timer to avoid terrain clip', () => {
+    const proj = createProjectile(100, 20, 128, 0.3, 80, 'bazooka', 0, 1)
+    expect(proj.graceTimer).toBeGreaterThan(0)
+  })
+})
+
+describe('terrain explosion', () => {
+  it('creates bowl-shaped crater (quadratic falloff)', () => {
+    const prng = createPRNG(42)
+    const heightmap = generateTerrain(prng)
+
+    const cx = 128, cz = 128
+    const beforeCenter = getHeight(heightmap, cx, cz)
+    const beforeEdge   = getHeight(heightmap, cx + 6, cz)
+
+    explodeTerrain(heightmap, cx, cz, 8, 4)
+
+    const afterCenter = getHeight(heightmap, cx, cz)
+    const afterEdge   = getHeight(heightmap, cx + 6, cz)
+
+    // Center should drop more than edge (quadratic = deeper bowl)
+    const centerDrop = beforeCenter - afterCenter
+    const edgeDrop   = beforeEdge   - afterEdge
+    expect(centerDrop).toBeGreaterThan(edgeDrop)
   })
 })

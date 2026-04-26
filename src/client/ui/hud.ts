@@ -15,10 +15,15 @@ export class HUD {
   private timer: HTMLElement
   private teamHP: HTMLElement
   private weaponDisplay: HTMLElement
+  private powerBarWrap: HTMLElement
+  private powerBarFill: HTMLElement
+  private turnBanner: HTMLElement
   private gameOverOverlay: HTMLElement
   private controlsHint: HTMLElement
   private gameOverShown = false
   private floatLabels: FloatLabel[] = []
+  private lastTurn = -1
+  private lastTeam = -1
   onRestart: (() => void) | null = null
 
   constructor() {
@@ -40,6 +45,22 @@ export class HUD {
     this.weaponDisplay.className = 'hud-weapon'
     this.el.appendChild(this.weaponDisplay)
 
+    // Power bar
+    this.powerBarWrap = document.createElement('div')
+    this.powerBarWrap.className = 'hud-power-wrap'
+    this.powerBarWrap.style.display = 'none'
+    this.el.appendChild(this.powerBarWrap)
+
+    this.powerBarFill = document.createElement('div')
+    this.powerBarFill.className = 'hud-power-fill'
+    this.powerBarWrap.appendChild(this.powerBarFill)
+
+    // Turn announcement banner
+    this.turnBanner = document.createElement('div')
+    this.turnBanner.className = 'turn-banner'
+    this.turnBanner.style.display = 'none'
+    document.body.appendChild(this.turnBanner)
+
     this.gameOverOverlay = document.createElement('div')
     this.gameOverOverlay.className = 'game-over'
     this.gameOverOverlay.style.display = 'none'
@@ -51,6 +72,16 @@ export class HUD {
     this.el.appendChild(this.controlsHint)
   }
 
+  showTurnBanner(teamName: string, isHuman: boolean): void {
+    this.turnBanner.textContent = isHuman ? 'YOUR TURN' : `${teamName} TURN`
+    this.turnBanner.style.color = isHuman ? '#3a8fff' : '#ff4a3a'
+    this.turnBanner.style.display = 'flex'
+    this.turnBanner.classList.remove('turn-banner-anim')
+    void this.turnBanner.offsetWidth  // force reflow
+    this.turnBanner.classList.add('turn-banner-anim')
+    setTimeout(() => { this.turnBanner.style.display = 'none' }, 1800)
+  }
+
   spawnDamageLabel(screenX: number, screenY: number, amount: number, isEnemy: boolean): void {
     const el = document.createElement('div')
     el.className = 'damage-float'
@@ -58,7 +89,13 @@ export class HUD {
     el.style.left = `${screenX}px`
     el.style.top = `${screenY}px`
     el.style.color = isEnemy ? '#ff4444' : '#ffaa00'
+    // Scale punch on spawn — CSS transition handles return to 1.0
+    el.style.transform = 'translateX(-50%) scale(1.5)'
+    el.style.transition = 'transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
     document.body.appendChild(el)
+    requestAnimationFrame(() => {
+      el.style.transform = 'translateX(-50%) scale(1.0)'
+    })
     this.floatLabels.push({ el, life: 0, x: screenX, y: screenY })
   }
 
@@ -108,6 +145,35 @@ export class HUD {
       <span class="weapon-name">${input.getSelectedWeapon().toUpperCase()}</span>
     `
 
+    // Power bar — only show while charging
+    const isCharging = input.isCharging()
+    if (isCharging) {
+      const pct = input.getChargePower()
+      this.powerBarWrap.style.display = 'block'
+      this.powerBarFill.style.width = `${pct}%`
+      // Green → yellow → red gradient based on charge
+      const r = Math.round(pct < 50 ? (pct / 50) * 255 : 255)
+      const g = Math.round(pct < 50 ? 220 : Math.max(0, (1 - (pct - 50) / 50) * 220))
+      this.powerBarFill.style.background = `rgb(${r},${g},0)`
+      // Pulse at max
+      if (pct >= 98) {
+        this.powerBarFill.style.boxShadow = `0 0 8px rgb(${r},${g},0)`
+      } else {
+        this.powerBarFill.style.boxShadow = 'none'
+      }
+    } else {
+      this.powerBarWrap.style.display = 'none'
+    }
+
+    // Turn announcement: fire on turn/team change
+    if (world.turn !== this.lastTurn || world.activeTeam !== this.lastTeam) {
+      this.lastTurn = world.turn
+      this.lastTeam = world.activeTeam
+      if (world.phase === 'aiming') {
+        this.showTurnBanner(teamName, world.activeTeam === TEAM_HUMAN)
+      }
+    }
+
     if (world.phase === 'game_over' && !this.gameOverShown) {
       this.gameOverShown = true
       const humansAlive = world.characters.filter(c => c.team === TEAM_HUMAN && c.alive).length
@@ -135,5 +201,7 @@ export class HUD {
   reset(): void {
     this.gameOverShown = false
     this.gameOverOverlay.style.display = 'none'
+    this.lastTurn = -1
+    this.lastTeam = -1
   }
 }

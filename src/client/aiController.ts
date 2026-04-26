@@ -11,12 +11,15 @@ export class AIController {
   private moveTarget: number | null = null
   private moveDir: -1 | 1 = 1
   private difficulty: 'easy' | 'medium' | 'hard' = 'medium'
+  private lastCharX = 0
+  private stuckTicks = 0
 
   reset(): void {
     this.phase = 'done'
     this.timer = 0
     this.plan = null
     this.moveTarget = null
+    this.stuckTicks = 0
   }
 
   startTurn(): void {
@@ -70,7 +73,7 @@ export class AIController {
         }
 
         const atTarget = Math.abs(char.x - this.moveTarget) < 2
-        if (atTarget || !char.grounded) {
+        if (atTarget) {
           this.plan = computeAIInput(world, this.difficulty)
           if (this.plan?.fire) {
             this.phase = 'aiming'
@@ -81,6 +84,20 @@ export class AIController {
             this.plan = { endTurn: true }
           }
           return null
+        }
+
+        // Stuck detection: if position hasn't changed in 4 ticks, jump
+        if (char.grounded) {
+          if (Math.abs(char.x - this.lastCharX) < 0.1) {
+            this.stuckTicks++
+            if (this.stuckTicks >= 4) {
+              this.stuckTicks = 0
+              return { jump: true }
+            }
+          } else {
+            this.stuckTicks = 0
+          }
+          this.lastCharX = char.x
         }
 
         return { moveDirection: this.moveDir }

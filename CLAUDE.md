@@ -75,6 +75,10 @@ src/
 - Team B (AI): `#ff4a3a` red
 - Accent/explosion: `#ffaa22` orange
 
+**Terrain generation:** Multi-octave: 4 low-freq base octaves (smooth hills) + 3 high-freq ridge octaves via `(1 - Math.abs(Math.sin(...)))` for sharp peaks. Steep edge falloff (`edgeFalloff²`). Quadratic crater bowl: `(1 - dist/radius)²` depth falloff.
+
+**Camera:** Trauma²-based screen shake — `mag = trauma² * 6px`, decays at 0.88×/frame. Impact dwell: 120-tick state machine locks camera on impact point before returning to character follow.
+
 **Rendering approach:**
 - `MeshToonMaterial` with `flatShading: true` for characters
 - Vertex colors on terrain (`geometry.setAttribute('color', ...)`)
@@ -107,14 +111,19 @@ src/
 | Teleport  | 18    | 0      | 0      | none   | none      | Relocate character          |
 | Dynamite  | 2     | 50     | 70     | 2.0×   | 1.8×      | Dropped at feet, huge blast |
 
-Crater radius = `(weaponRadius / 5) * craterMul`. Damage falloff radius = `(weaponRadius / 5) * 1.5`.
-Projectiles spawn at head-level (4 sim units above character feet) for line-of-sight over terrain.
+Crater radius = `(weaponRadius / 5) * craterMul`. Damage falloff radius = `(weaponRadius / 5) * 1.5`. **Falloff is quadratic**: `(1 - dist/radius)²` — rewards direct hits, punishes edge hits.
+
+Projectiles spawn at head-level (4 sim units above character feet) for line-of-sight over terrain. **Grace timer = 4 ticks** on every projectile — terrain collision skipped for 4 steps after spawn, prevents clipping on steep slopes.
+
+**Shotgun drag**: `vx *= (1 - 0.04)` per tick limits effective range naturally (no gravity, needs drag to stop).
+
+**Bounce attenuation**: `vy *= 0.6`, `vx *= 0.8` per bounce.
 
 **Teams:** 3 characters per team, 100 HP each.
 
 **Power-ups:** Airdropped crates every 5s (max 3 on map). Contents: extra time, skip turn, double damage, health pack, bomb trap.
 
-**AI:** 36 angles × 5 power levels × 4 weapons = 720 candidates/turn. Noise-based difficulty (easy ±0.4 rad, hard ±0.05 rad).
+**AI:** Analytical ballistic trajectory solver: `solveAngles(dx,dy,speed,gravity)` → quadratic solution returns ≤2 exact launch angles per target×power sample. 5 power levels × up to 2 angles × 4 weapons × N enemies ≈ 40–80 precise candidates/turn (down from 720 blind samples). Noise-based difficulty (easy ±0.35 rad/±25 power, medium ±0.12/±8, hard ±0.04/±2). Stuck detection in AIController: if position delta < 0.1 for 4 ticks while grounded, issues `{ jump: true }` to unstick.
 
 ---
 

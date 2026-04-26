@@ -511,13 +511,11 @@ class Game {
     if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {
       const proj = this.world.projectiles[0]
       this.gameCamera.followProjectile(proj.x, proj.y, proj.z, this.world.heightmap)
-    } else if (this.world.phase === 'resolving') {
-      this.gameCamera.returnToCharacter()
+    } else if (this.world.phase === 'resolving' || this.world.phase === 'between_turns' || this.world.phase === 'aiming') {
+      // Let camera return naturally (dwell handles itself in onImpact)
       if (activeChar) {
         this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
       }
-    } else if (activeChar) {
-      this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
     }
 
     const isAiming = this.world.phase === 'aiming'

@@ -30,6 +30,7 @@ export function createProjectile(
     bouncesLeft: config.bounces,
     fuseTimer: config.fuseTime,
     active: true,
+    graceTimer: 4,
   }
 }
 
@@ -70,10 +71,17 @@ export function stepProjectile(
 
   const config = WEAPONS[proj.weapon]
 
+  if (proj.graceTimer !== undefined && proj.graceTimer > 0) proj.graceTimer--
+
   proj.vy += GRAVITY * config.gravityMul
   proj.x += proj.vx
   proj.y += proj.vy
   proj.z += proj.vz
+
+  if (config.drag) {
+    proj.vx *= (1 - config.drag)
+    proj.vz *= (1 - config.drag)
+  }
 
   if (config.fuseTime > 0) {
     proj.fuseTimer--
@@ -85,12 +93,12 @@ export function stepProjectile(
 
   const groundH = getHeight(world.heightmap, proj.x, proj.z)
 
-  if (proj.y >= groundH) {
+  if (proj.y >= groundH && (proj.graceTimer ?? 0) <= 0) {
     if (proj.bouncesLeft > 0) {
       proj.y = groundH
-      proj.vy = -proj.vy * 0.5
-      proj.vx *= 0.7
-      proj.vz *= 0.7
+      proj.vy = -proj.vy * 0.6
+      proj.vx *= 0.8
+      proj.vz *= 0.8
       proj.bouncesLeft--
     } else {
       detonateProjectile(proj, world, explosions, damages)
@@ -98,9 +106,7 @@ export function stepProjectile(
     return
   }
 
-  const isDescending = proj.vy > 0
-  if ((!isDescending && proj.y < world.waterLevel) ||
-      proj.x < 0 || proj.x > 256 ||
+  if (proj.x < 0 || proj.x > 256 ||
       proj.z < 0 || proj.z > 256) {
     proj.active = false
     return
@@ -159,7 +165,7 @@ function detonateProjectile(
     const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
 
     if (dist < effectRadius) {
-      const falloff = 1 - dist / effectRadius
+      const falloff = (1 - dist / effectRadius) ** 2
       const dmg = Math.floor(config.damage * falloff)
       char.hp -= dmg
       damages.push({ charId: char.id, amount: dmg, source: 'projectile' })
