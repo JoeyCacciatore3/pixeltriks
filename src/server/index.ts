@@ -116,30 +116,39 @@ function gameTick(room: Room): void {
 
   if (room.world.phase === 'aiming') {
     input = room.pendingInputs.get(activeTeam) ?? null
-    room.pendingInputs.delete(activeTeam)
+
+    if (input) {
+      if (input.fire || input.endTurn) {
+        // One-shot action consumed — clear it
+        room.pendingInputs.delete(activeTeam)
+      } else {
+        // Sticky movement: keep applying last movement/jump input until new one
+        // arrives or turn ends. Prevents jitter from client-server tick rate mismatch.
+        room.pendingInputs.set(activeTeam, {
+          ...input,
+          jump: false, // jump is a one-shot impulse, clear after applying
+        })
+      }
+    }
   }
 
   const events = step(room.world, input)
 
+  if (events.turnAdvanced) {
+    // Clear stale input when turn advances — new player's input starts fresh
+    room.pendingInputs.clear()
+  }
+
+  // Broadcast every tick during active movement (clients need position at 20Hz
+  // to render smoothly without predicting). Every 6 ticks otherwise.
+  const hasMovement = !!(input?.moveDirection || input?.moveZDirection)
   if (events.turnAdvanced || events.gameOver || events.explosions.length > 0 ||
-      room.world.tick % 6 === 0) {
+      hasMovement || room.world.tick % 6 === 0) {
     broadcast(room, {
       type: 'state',
       world: serializeWorld(room.world),
       tick: room.world.tick,
     })
-  }
-
-  if (input) {
-    for (const p of room.players) {
-      if (p.team !== activeTeam) {
-        send(p.ws, {
-          type: 'opponent_input',
-          input,
-          tick: room.world.tick,
-        })
-      }
-    }
   }
 }
 

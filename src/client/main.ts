@@ -48,11 +48,9 @@ class Game {
   private isMultiplayer = false
   private localTeam = 0
   private lastWeapon: string = 'bazooka'
-  private lastChargePlaying = false
   private lastTimerWarning = -1
   private prevAlive = new Set<number>()
   private pendingDamageLabels: { charId: number; amount: number; isEnemy: boolean }[] = []
-  private pendingOpponentInput: GameInput | null = null
 
   private weaponPicker: WeaponPicker | null = null
 
@@ -195,10 +193,6 @@ class Game {
       case 'input_ack':
         break
 
-      case 'opponent_input':
-        this.pendingOpponentInput = event.input
-        break
-
       case 'opponent_disconnected':
         if (this.appState === 'playing' && this.isMultiplayer) {
           this.showDisconnectMessage()
@@ -234,14 +228,12 @@ class Game {
 
   private applyServerState(state: SerializedWorld): void {
     if (!this.world) return
-    // Drop only truly ancient state (>2s old). The server uses a self-correcting
-    // tick loop but can still drift a few ticks behind rAF — a 3-tick threshold
-    // was dropping all server state within 30s. 120 ticks = 2 full seconds.
-    if (state.tick < this.world.tick - 120) return
 
-    const tickDelta = state.tick - this.world.tick
+    const prevPhase = this.world.phase
 
-    // Always apply authoritative game state
+    // Server is fully authoritative — overwrite all mutable world state.
+    // tick, characters, projectiles all come from server truth.
+    this.world.tick = state.tick
     this.world.phase = state.phase as GamePhase
     this.world.turn = state.turn
     this.world.activeTeam = state.activeTeam
@@ -257,14 +249,18 @@ class Game {
     this.world.projectiles = state.projectiles
     this.world.blindboxes = state.blindboxes
 
-    // Sync tick to server — but never rewind. Rewinding would re-trigger explosion
-    // events and double-fire audio/particles for ticks we already processed locally.
-    if (tickDelta > 0) {
-      this.world.tick = state.tick
+    // During aiming phase we skip local step(), so we handle turn-transition events
+    // here that would normally come from step() events in tick().
+    if (prevPhase === 'aiming' && state.phase !== 'aiming') {
+      // Local player fired or turn timed out — weapon picker was confirmed
+      this.input.resetWeaponConfirm()
+      this.weaponPicker?.hide()
     }
 
-    // Re-render terrain only when server is meaningfully ahead (missed explosions).
-    if (tickDelta > 3) {
+    // Bump terrainVersion when a phase transition occurs — client will run step()
+    // in the new phase to carve terrain from explosions. This forces the renderer
+    // to re-read the heightmap.
+    if (prevPhase !== state.phase) {
       this.terrainVersion++
     }
   }
@@ -309,7 +305,6 @@ class Game {
     this.aiController.reset()
     this.lastAITeamActive = false
     this.lastWeapon = 'bazooka'
-    this.lastChargePlaying = false
     this.lastTimerWarning = -1
 
     this.createPortal()
@@ -427,17 +422,24 @@ class Game {
 
     if (this.world.phase === 'aiming') {
       if (this.isMultiplayer) {
-        const isLocalTurn = this.world.activeTeam === this.localTeam
-        if (isLocalTurn) {
-          input = this.input.getInput()
-          if (input && (input.fire || input.moveDirection || input.moveZDirection || input.jump || input.endTurn)) {
-            this.net?.sendInput(input, this.world.tick)
+        // Server-authoritative during multiplayer aiming.
+        // Read input only to send it — do NOT apply to local step().
+        // Server broadcasts state every tick when movement is active (20Hz),
+        // so character positions stay smooth without local prediction.
+        if (this.world.activeTeam === this.localTeam) {
+          const rawInput = this.input.getInput()
+          if (rawInput) {
+            this.net?.sendInput(rawInput, this.world.tick)
+            // Trigger audio immediately — don't wait for server roundtrip
+            if (rawInput.fire) audio.fire(rawInput.fire.weapon)
+            if (rawInput.jump) audio.jump()
           }
-        } else {
-          // Feed opponent input received from server into local prediction
-          input = this.pendingOpponentInput
-          this.pendingOpponentInput = null
         }
+        // Skip step() — applyServerState drives world forward during aiming
+        this.updateAudio()
+        this.hud.update(this.world, this.input)
+        this.checkPortal()
+        return
       } else {
         const isAITurn = this.world.activeTeam === TEAM_AI
 
@@ -454,8 +456,8 @@ class Game {
       }
     }
 
-    // Always advance sim locally — client-side prediction in multiplayer,
-    // authoritative in solo. Server state reconciles drift every ~100ms.
+    // Solo: always run step(). Multiplayer: run step() during firing/resolving/between_turns
+    // (deterministic — no user input, so both client and server stay in sync).
     const events = step(this.world, input)
 
     if (input?.fire) audio.fire(input.fire.weapon)
@@ -515,6 +517,12 @@ class Game {
       audio.gameOver(teamAlive > 0)
     }
 
+    this.updateAudio()
+    this.hud.update(this.world, this.input)
+    this.checkPortal()
+  }
+
+  private updateAudio(): void {
     const currentWeapon = this.input.getSelectedWeapon()
     if (currentWeapon !== this.lastWeapon) {
       audio.weaponSwitch()
@@ -534,16 +542,8 @@ class Game {
     }
 
     if (this.input.isCharging()) {
-      if (!this.lastChargePlaying) {
-        this.lastChargePlaying = true
-      }
       audio.chargeLoop(this.input.getChargePower())
-    } else {
-      this.lastChargePlaying = false
     }
-
-    this.hud.update(this.world, this.input)
-    this.checkPortal()
   }
 
   private checkPortal(): void {
