@@ -9,12 +9,13 @@ import { getHeight } from './terrain'
 export function moveCharacter(
   char: Character,
   direction: -1 | 0 | 1,
-  world: WorldState
+  world: WorldState,
+  zDir: -1 | 0 | 1 = 0
 ): void {
   if (!char.alive || !char.grounded) return
 
   const nx = char.x + direction * CHAR_SPEED
-  const nz = char.z
+  const nz = char.z + zDir * CHAR_SPEED
 
   if (nx < 1 || nx > TERRAIN_SIZE - 2) return
   if (nz < 1 || nz > TERRAIN_SIZE - 2) return
@@ -25,8 +26,9 @@ export function moveCharacter(
   if (targetH - currentH > CLIMB_MAX) return
 
   char.x = nx
+  char.z = nz
   char.y = targetH
-  char.facing = direction
+  if (direction !== 0) char.facing = direction
 }
 
 export function jumpCharacter(char: Character, moveDir: number = 0): void {
@@ -102,7 +104,8 @@ export function applyKnockback(
   ex: number,
   ey: number,
   ez: number,
-  radius: number
+  radius: number,
+  forceMul: number = 1
 ): void {
   const dx = char.x - ex
   const dy = char.y - ey
@@ -113,7 +116,7 @@ export function applyKnockback(
   if (dist >= effectRadius || dist === 0) return
 
   const falloff = 1 - dist / effectRadius
-  const force = falloff * KNOCKBACK_MAX
+  const force = falloff * KNOCKBACK_MAX * forceMul
   const angle = Math.atan2(dy, Math.sqrt(dx * dx + dz * dz))
   const horizontalAngle = Math.atan2(dz, dx)
 

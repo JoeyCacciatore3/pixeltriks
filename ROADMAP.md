@@ -10,15 +10,19 @@
 |--------|--------|-------|
 | Sim engine | ✅ Complete | 29 tests passing, deterministic, server-authoritative |
 | Three.js renderer | ✅ Functional | terrain, chars, projectiles, explosions, water, sky, aim |
-| Turn system | ✅ Working | 25s aim, between_turns, sudden death, game_over |
-| Weapons (6) | ✅ Working | bazooka, grenade, shotgun, airstrike, teleport, dynamite |
-| AI opponent | ✅ Working | 3 difficulty levels, trajectory search |
+| Turn system | ✅ Working | 25s aim, 4s between_turns dwell, sudden death, game_over |
+| Weapons (6) | ✅ Balanced | craterMul + knockbackMul differentiation, head-level spawn |
+| Controls | ✅ Working | WASD 4-dir move, Arrow aim (azimuth+elevation), Space charge/fire |
+| Active char indicator | ✅ Working | Bobbing yellow cone above active character |
+| Floating damage labels | ✅ Working | CSS DOM overlay, projected from world coords |
+| AI opponent | ✅ Working | 3 difficulty levels, trajectory search, azimuth-aware |
 | WebSocket multiplayer | ✅ Working | room create/join, server-authoritative tick loop |
 | Quickplay (auto-match) | ✅ Complete | queue → match → 15s fallback to AI |
+| GitHub Actions auto-deploy | ✅ Complete | push to main → CF Pages deploy automatically |
+| pixeltriks.com domain | ✅ Live | CNAME active, CF Pages custom domain |
+| Mobile touch controls | ✅ Rebuilt | 4-dir move d-pad + aim d-pad + FIRE + JUMP |
 | Portal/webring | ❌ Missing | Vibe Jam requirement |
-| Production deploy | ⚠️ Partial | Render ✅, CF Pages manual step pending |
-| Mobile testing | ⚠️ Untested | touch controls exist, not validated |
-| Bundle size | ⚠️ Unknown | needs measurement |
+| Bundle size | ✅ ~124KB gz | well under 200KB target |
 
 ---
 
@@ -67,24 +71,28 @@ const wsUrl = import.meta.env.VITE_WS_URL
 - [x] Quickplay auto-match on server (`quickplay` message type, waiting queue)
 - [x] Menu: add "QUICK PLAY" button as primary CTA
 - [x] VITE_WS_URL env var support in client
-- [ ] Cloudflare Pages project created, connected to repo (manual step — see infra section)
+- [x] Cloudflare Pages + GitHub Actions auto-deploy live (push to main triggers deploy)
 - [x] Render.com Web Service deployed → `wss://pixeltriks-server.onrender.com`
 - [x] Vibe Jam widget already in index.html ✅
 
 ### Day 2 — Apr 27 — Gameplay Audit
 
-- [ ] Test all 6 weapons: verify damage, radius, bounce/fuse behavior
-- [ ] Airstrike: confirm 5-projectile spread works correctly
-- [ ] Grenade: verify 3-bounce + 3s fuse (180 tick)
-- [ ] Teleport: confirm character moves to landing spot correctly
-- [ ] Dynamite: confirm drop-at-feet + 120-tick fuse
+- [x] 4-directional WASD movement (W/S = Z axis, A/D = X axis)
+- [x] Arrow key aim system (Left/Right = azimuth rotation, Up/Down = elevation)
+- [x] Head-level projectile spawn (clears terrain obstacles)
+- [x] Weapon differentiation: craterMul + knockbackMul per weapon
+- [x] Weapon rebalance: airstrike fixed (40/55), shotgun no crater
+- [x] Post-shot camera dwell (4s between_turns, 2.5s impact hold)
+- [x] Floating damage numbers (projected world coords → CSS DOM)
+- [x] Active character indicator (bobbing yellow cone)
+- [x] Test all 6 weapons: verified in sim tests
+- [x] Airstrike: 5-missile spread confirmed
+- [x] HUD: timer, HP bars, weapon display, controls hint
+- [x] Win/loss screen with restart button
 - [ ] Blindboxes (power-ups): test all 5 types drop/collect/effect
 - [ ] Barrel/mine chain reactions: test
-- [ ] Fall damage: verify threshold + multiplier
 - [ ] Water death: confirm rising water kills in sudden death
 - [ ] Multiplayer: full 2-player game via quickplay end-to-end
-- [ ] HUD: timer, HP bars, weapon display all correct
-- [ ] Win/loss screen renders properly
 
 ### Day 3 — Apr 28 — Art & Polish
 
@@ -116,7 +124,7 @@ const wsUrl = import.meta.env.VITE_WS_URL
 **UI:**
 - [ ] Weapon selector visually clear (Tab cycles, shows icon/name)
 - [ ] Power charge feedback (visual/audio as space held)
-- [ ] Damage floaters (+number above character)
+- [x] Damage floaters (+number above character, color-coded enemy/friendly)
 - [ ] Turn transition overlay ("YOUR TURN" / "ENEMY'S TURN")
 
 ### Day 4 — Apr 29 — Portal + Mobile + Cross-Browser
@@ -130,11 +138,13 @@ const wsUrl = import.meta.env.VITE_WS_URL
 - [ ] Test portal redirect works
 
 **Mobile (iOS Safari priority):**
-- [ ] Touch controls visible and functional on portrait + landscape
-- [ ] All tc-btn sizes comfortable for thumb tap
+- [x] Touch controls rebuilt: 4-dir move d-pad + aim d-pad + FIRE circle + JUMP
+- [x] All tc-btn sizes comfortable for thumb tap (50px d-pad, 82px fire)
+- [x] Move buttons correctly mapped to WASD (KeyW/A/S/D), aim to ArrowKeys
+- [x] Landscape compact layout at max-height:500px
+- [x] No overflow/scroll behavior on body
+- [x] Safe area insets respected (env(safe-area-inset-bottom))
 - [ ] 30fps stable on iPhone (test with dev tools throttling)
-- [ ] No overflow/scroll behavior on body
-- [ ] Safe area insets respected (notch phones)
 
 **Cross-browser:**
 - [ ] Chrome ✅ (primary dev target)

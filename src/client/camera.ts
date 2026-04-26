@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { TERRAIN_CELL_SIZE } from '@shared/constants'
+import { getHeight } from '@sim/terrain'
 
 type CameraMode = 'character' | 'projectile' | 'impact'
 
@@ -20,32 +21,35 @@ export class GameCamera {
     this.currentPos.copy(this.camera.position)
   }
 
-  followTarget(x: number, y: number, z: number): void {
+  followTarget(x: number, simY: number, z: number, heightmap: Float32Array): void {
     if (this.mode === 'impact') return
+    const groundH = getHeight(heightmap, x, z)
     this.target.set(
       (x - 128) * TERRAIN_CELL_SIZE,
-      y * TERRAIN_CELL_SIZE,
+      (2 * groundH - simY) * TERRAIN_CELL_SIZE,
       (z - 128) * TERRAIN_CELL_SIZE
     )
   }
 
-  followProjectile(x: number, y: number, z: number): void {
+  followProjectile(x: number, simY: number, z: number, heightmap: Float32Array): void {
     this.mode = 'projectile'
+    const groundH = getHeight(heightmap, x, z)
     this.target.set(
       (x - 128) * TERRAIN_CELL_SIZE,
-      y * TERRAIN_CELL_SIZE,
+      (2 * groundH - simY) * TERRAIN_CELL_SIZE,
       (z - 128) * TERRAIN_CELL_SIZE
     )
   }
 
-  onImpact(x: number, y: number, z: number): void {
+  onImpact(x: number, simY: number, z: number, heightmap: Float32Array): void {
     this.mode = 'impact'
+    const groundH = getHeight(heightmap, x, z)
     this.target.set(
       (x - 128) * TERRAIN_CELL_SIZE,
-      y * TERRAIN_CELL_SIZE,
+      (2 * groundH - simY) * TERRAIN_CELL_SIZE,
       (z - 128) * TERRAIN_CELL_SIZE
     )
-    this.impactTimer = 60
+    this.impactTimer = 150
   }
 
   returnToCharacter(): void {

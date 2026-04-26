@@ -2,6 +2,13 @@ import type { WorldState } from '@shared/types'
 import { TEAM_HUMAN, TEAM_AI, AIM_PHASE_DURATION, TICK_RATE } from '@shared/constants'
 import type { InputManager } from '../input'
 
+interface FloatLabel {
+  el: HTMLElement
+  life: number
+  x: number
+  y: number
+}
+
 export class HUD {
   private el: HTMLElement
   private turnInfo: HTMLElement
@@ -11,6 +18,7 @@ export class HUD {
   private gameOverOverlay: HTMLElement
   private controlsHint: HTMLElement
   private gameOverShown = false
+  private floatLabels: FloatLabel[] = []
   onRestart: (() => void) | null = null
 
   constructor() {
@@ -39,8 +47,34 @@ export class HUD {
 
     this.controlsHint = document.createElement('div')
     this.controlsHint.className = 'hud-controls'
-    this.controlsHint.innerHTML = 'A/D Move | W/S Aim | Space Fire | Tab Weapon | J Jump | Enter End Turn'
+    this.controlsHint.innerHTML = 'WASD Move | Arrows Aim | Space Fire | Tab Weapon | J Jump | Enter End Turn'
     this.el.appendChild(this.controlsHint)
+  }
+
+  spawnDamageLabel(screenX: number, screenY: number, amount: number, isEnemy: boolean): void {
+    const el = document.createElement('div')
+    el.className = 'damage-float'
+    el.textContent = `-${amount}`
+    el.style.left = `${screenX}px`
+    el.style.top = `${screenY}px`
+    el.style.color = isEnemy ? '#ff4444' : '#ffaa00'
+    document.body.appendChild(el)
+    this.floatLabels.push({ el, life: 0, x: screenX, y: screenY })
+  }
+
+  tickFloats(): void {
+    for (let i = this.floatLabels.length - 1; i >= 0; i--) {
+      const f = this.floatLabels[i]
+      f.life++
+      f.y -= 1.2
+      const opacity = Math.max(0, 1 - f.life / 60)
+      f.el.style.top = `${f.y}px`
+      f.el.style.opacity = String(opacity)
+      if (f.life >= 60) {
+        f.el.remove()
+        this.floatLabels.splice(i, 1)
+      }
+    }
   }
 
   update(world: WorldState, input: InputManager): void {

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Projectile } from '@shared/types'
 import { TERRAIN_CELL_SIZE } from '@shared/constants'
+import { getHeight } from '@sim/terrain'
 
 export class ProjectileRenderer {
   private group: THREE.Group
@@ -11,7 +12,7 @@ export class ProjectileRenderer {
     scene.add(this.group)
   }
 
-  update(projectiles: Projectile[]): void {
+  update(projectiles: Projectile[], heightmap: Float32Array): void {
     const activeIds = new Set<number>()
 
     for (let i = 0; i < projectiles.length; i++) {
@@ -30,9 +31,10 @@ export class ProjectileRenderer {
         this.group.add(mesh)
       }
 
+      const groundH = getHeight(heightmap, proj.x, proj.z)
       mesh.position.set(
         (proj.x - 128) * TERRAIN_CELL_SIZE,
-        proj.y * TERRAIN_CELL_SIZE,
+        (2 * groundH - proj.y) * TERRAIN_CELL_SIZE,
         (proj.z - 128) * TERRAIN_CELL_SIZE
       )
     }

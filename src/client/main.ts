@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { createWorld, getActiveCharacter, step } from '@sim/index'
-import { TICK_RATE, TEAM_AI, AIM_PHASE_DURATION } from '@shared/constants'
+import { createWorld, getActiveCharacter, step, getHeight } from '@sim/index'
+import { TICK_RATE, TEAM_AI, TEAM_HUMAN, AIM_PHASE_DURATION, TERRAIN_CELL_SIZE } from '@shared/constants'
 import { AIController } from './aiController'
 import type { WorldState, GameInput, GamePhase } from '@shared/types'
 import type { SerializedWorld } from '@shared/net'
@@ -49,6 +49,7 @@ class Game {
   private lastChargePlaying = false
   private lastTimerWarning = -1
   private prevAlive = new Set<number>()
+  private pendingDamageLabels: { charId: number; amount: number; isEnemy: boolean }[] = []
 
   private appState: AppState = 'menu'
   private net: NetClient | null = null
@@ -99,7 +100,7 @@ class Game {
             <button id="btn-join" class="menu-btn small">JOIN</button>
           </div>
         </div>
-        <p class="menu-footer">A/D Move | W/S Aim | Space Fire | Tab Weapon</p>
+        <p class="menu-footer">WASD Move | Arrows Aim | Space Fire | Tab Weapon</p>
       </div>
     `
     document.body.appendChild(this.menuEl)
@@ -388,7 +389,7 @@ class Game {
         const isLocalTurn = this.world.activeTeam === this.localTeam
         if (isLocalTurn) {
           input = this.input.getInput()
-          if (input && (input.fire || input.moveDirection || input.jump || input.endTurn)) {
+          if (input && (input.fire || input.moveDirection || input.moveZDirection || input.jump || input.endTurn)) {
             this.net?.sendInput(input, this.world.tick)
           }
         }
@@ -421,9 +422,9 @@ class Game {
       if (events.explosions.length > 0) {
         this.terrainVersion++
         for (const exp of events.explosions) {
-          this.explosionRenderer.spawn(exp)
+          this.explosionRenderer.spawn(exp, this.world.heightmap)
           this.gameCamera.shake(exp.radius * 0.15)
-          this.gameCamera.onImpact(exp.x, exp.y, exp.z)
+          this.gameCamera.onImpact(exp.x, exp.y, exp.z, this.world.heightmap)
           audio.explosion(exp.radius)
         }
       }
@@ -433,6 +434,11 @@ class Game {
           audio.waterSplash()
         } else {
           audio.damage(dmg.amount)
+        }
+        const dmgChar = this.world.characters.find(c => c.id === dmg.charId)
+        if (dmgChar) {
+          const isEnemy = dmgChar.team !== TEAM_HUMAN
+          this.pendingDamageLabels.push({ charId: dmg.charId, amount: dmg.amount, isEnemy })
         }
       }
 
@@ -494,23 +500,24 @@ class Game {
 
   private render(): void {
     this.terrainRenderer.update(this.world.heightmap, this.terrainVersion)
-    this.characterRenderer.update(this.world.characters)
-    this.projectileRenderer.update(this.world.projectiles)
-    this.explosionRenderer.update()
-    this.waterRenderer.update(this.world.waterLevel, this.gameTime)
 
     const activeChar = getActiveCharacter(this.world)
 
+    this.characterRenderer.update(this.world.characters, activeChar?.id ?? -1, this.world.heightmap, this.gameTime)
+    this.projectileRenderer.update(this.world.projectiles, this.world.heightmap)
+    this.explosionRenderer.update()
+    this.waterRenderer.update(this.world.waterLevel, this.gameTime)
+
     if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {
       const proj = this.world.projectiles[0]
-      this.gameCamera.followProjectile(proj.x, proj.y, proj.z)
+      this.gameCamera.followProjectile(proj.x, proj.y, proj.z, this.world.heightmap)
     } else if (this.world.phase === 'resolving') {
       this.gameCamera.returnToCharacter()
       if (activeChar) {
-        this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z)
+        this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
       }
     } else if (activeChar) {
-      this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z)
+      this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
     }
 
     const isAiming = this.world.phase === 'aiming'
@@ -519,9 +526,14 @@ class Game {
       this.world.activeTeam === this.localTeam
     ) && (this.isMultiplayer || this.world.activeTeam !== TEAM_AI)
 
+    if (isLocalAiming && activeChar) {
+      this.characterRenderer.setAzimuth(activeChar.id, this.input.getAimAzimuth())
+    }
+
     this.aimRenderer.update(
       activeChar,
       this.input.getAimAngle(),
+      this.input.getAimAzimuth(),
       this.input.getChargePower(),
       this.input.isCharging(),
       isLocalAiming,
@@ -529,6 +541,29 @@ class Game {
     )
 
     this.gameCamera.update()
+
+    // Spawn damage labels using projected screen coords (after camera update)
+    if (this.pendingDamageLabels.length > 0) {
+      for (const label of this.pendingDamageLabels) {
+        const char = this.world.characters.find(c => c.id === label.charId)
+        if (char) {
+          const groundH = getHeight(this.world.heightmap, char.x, char.z)
+          const worldPos = new THREE.Vector3(
+            (char.x - 128) * TERRAIN_CELL_SIZE,
+            (2 * groundH - char.y) * TERRAIN_CELL_SIZE + 3,
+            (char.z - 128) * TERRAIN_CELL_SIZE
+          )
+          worldPos.project(this.gameCamera.camera)
+          const sx = (worldPos.x * 0.5 + 0.5) * window.innerWidth
+          const sy = (-worldPos.y * 0.5 + 0.5) * window.innerHeight
+          this.hud.spawnDamageLabel(sx, sy, label.amount, label.isEnemy)
+        }
+      }
+      this.pendingDamageLabels = []
+    }
+
+    this.hud.tickFloats()
+
     this.renderer.render(this.scene, this.gameCamera.camera)
   }
 }

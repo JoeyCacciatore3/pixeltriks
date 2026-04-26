@@ -63,6 +63,8 @@ export function computeAIInput(
     }
   }
 
+  const azimuth = nearestEnemy.x > char.x ? 0 : Math.PI
+
   if (useAirstrike && bestAirstrike) {
     const noise = NOISE[difficulty]
     return {
@@ -72,6 +74,7 @@ export function computeAIInput(
           bestAirstrike.power + prng.nextFloat(-noise.power, noise.power)
         )),
         weapon: 'airstrike',
+        azimuth,
       },
     }
   }
@@ -85,6 +88,7 @@ export function computeAIInput(
           bestShot.power + prng.nextFloat(-noise.power, noise.power)
         )),
         weapon: bestShot.weapon,
+        azimuth,
       },
     }
   }
@@ -135,12 +139,17 @@ function simulateShot(
 ): number {
   const config = WEAPONS[weapon]
   const speed = config.speed * (power / 100)
+  const enemies = world.characters.filter(c => c.team !== shooter.team && c.alive)
+  const nearest = enemies.length > 0 ? findNearest(shooter, enemies) : null
+  const az = nearest && nearest.x > shooter.x ? 0 : Math.PI
+  const hSpeed = Math.cos(-angle) * speed
 
   let px = shooter.x
   let py = shooter.y - 1
   let pz = shooter.z
-  let vx = Math.cos(-angle) * speed * shooter.facing
+  let vx = Math.cos(az) * hSpeed
   let vy = Math.sin(-angle) * speed
+  let vz = Math.sin(az) * hSpeed
   let bounces = config.bounces
   let fuse = config.fuseTime
 
@@ -148,6 +157,7 @@ function simulateShot(
     vy += GRAVITY * config.gravityMul
     px += vx
     py += vy
+    pz += vz
 
     if (fuse > 0) {
       fuse--
@@ -162,6 +172,7 @@ function simulateShot(
         py = gh
         vy = -vy * 0.5
         vx *= 0.7
+        vz *= 0.7
         bounces--
       } else {
         return scoreImpact(px, py, pz, config.damage, config.radius / 5, shooter, world)

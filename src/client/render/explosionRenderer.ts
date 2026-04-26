@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { ExplosionEvent } from '@shared/types'
 import { TERRAIN_CELL_SIZE } from '@shared/constants'
+import { getHeight } from '@sim/terrain'
 
 interface ActiveExplosion {
   particles: THREE.Points
@@ -18,7 +19,7 @@ export class ExplosionRenderer {
     scene.add(this.group)
   }
 
-  spawn(event: ExplosionEvent): void {
+  spawn(event: ExplosionEvent, heightmap: Float32Array): void {
     const count = 40
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count * 3)
@@ -57,10 +58,11 @@ export class ExplosionRenderer {
       depthWrite: false,
     })
 
+    const groundH = getHeight(heightmap, event.x, event.z)
     const particles = new THREE.Points(geom, mat)
     particles.position.set(
       (event.x - 128) * TERRAIN_CELL_SIZE,
-      event.y * TERRAIN_CELL_SIZE,
+      (2 * groundH - event.y) * TERRAIN_CELL_SIZE,
       (event.z - 128) * TERRAIN_CELL_SIZE
     )
 

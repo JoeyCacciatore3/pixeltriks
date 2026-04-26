@@ -54,6 +54,7 @@ export class AimRenderer {
   update(
     char: Character | null,
     angle: number,
+    azimuth: number,
     power: number,
     isCharging: boolean,
     visible: boolean,
@@ -64,17 +65,20 @@ export class AimRenderer {
     if (!char || !visible) return
 
     const cx = (char.x - 128) * TERRAIN_CELL_SIZE
-    const cy = char.y * TERRAIN_CELL_SIZE + 1.5
+    const cy = char.y * TERRAIN_CELL_SIZE + 2.0
     const cz = (char.z - 128) * TERRAIN_CELL_SIZE
 
     const config = WEAPONS[weapon]
     const previewPower = isCharging ? power : 50
     const speed = config.speed * (previewPower / 100)
+    const hSpeed = Math.cos(angle) * speed * TERRAIN_CELL_SIZE
 
     let px = 0
     let py = 0
-    let vx = Math.cos(-angle) * speed * char.facing * TERRAIN_CELL_SIZE
-    let vy = Math.sin(-angle) * speed * TERRAIN_CELL_SIZE
+    let pz = 0
+    let vx = Math.cos(azimuth) * hSpeed
+    let vy = Math.sin(angle) * speed * TERRAIN_CELL_SIZE
+    let vz = Math.sin(azimuth) * hSpeed
 
     const positions = this.line.geometry.attributes.position as THREE.BufferAttribute
     const dummy = new THREE.Object3D()
@@ -82,15 +86,16 @@ export class AimRenderer {
     const dotInterval = Math.max(1, Math.floor(PREVIEW_STEPS / PREVIEW_DOTS))
 
     for (let i = 0; i < PREVIEW_STEPS; i++) {
-      vy += GRAVITY * config.gravityMul * TERRAIN_CELL_SIZE
+      vy -= GRAVITY * config.gravityMul * TERRAIN_CELL_SIZE
 
       px += vx
       py += vy
+      pz += vz
 
-      positions.setXYZ(i, cx + px, cy + py, cz)
+      positions.setXYZ(i, cx + px, cy + py, cz + pz)
 
       if (i > 0 && i % dotInterval === 0 && dotIdx < PREVIEW_DOTS) {
-        dummy.position.set(cx + px, cy + py, cz)
+        dummy.position.set(cx + px, cy + py, cz + pz)
         dummy.updateMatrix()
         this.dots.setMatrixAt(dotIdx, dummy.matrix)
         dotIdx++

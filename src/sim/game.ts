@@ -56,16 +56,18 @@ function handleAimingPhase(
   }
 
   if (input) {
-    if (input.moveDirection) {
-      moveCharacter(char, input.moveDirection, world)
+    if (input.moveDirection || input.moveZDirection) {
+      moveCharacter(char, input.moveDirection ?? 0, world, input.moveZDirection ?? 0)
     }
     if (input.jump) {
       jumpCharacter(char, input.moveDirection || 0)
     }
     if (input.fire) {
       if (input.fire.weapon === 'airstrike') {
-        const targetX = char.x + char.facing * (input.fire.power / 100) * 80
-        const projs = createAirstrikeProjectiles(targetX, char.z, char.id)
+        const az = input.fire.azimuth ?? (char.facing > 0 ? 0 : Math.PI)
+        const targetX = char.x + Math.cos(az) * (input.fire.power / 100) * 80
+        const targetZ = char.z + Math.sin(az) * (input.fire.power / 100) * 80
+        const projs = createAirstrikeProjectiles(targetX, targetZ, char.id)
         world.projectiles.push(...projs)
       } else {
         const config = WEAPONS[input.fire.weapon]
@@ -81,7 +83,8 @@ function handleAimingPhase(
             input.fire.power,
             input.fire.weapon,
             char.id,
-            char.facing
+            char.facing,
+            input.fire.azimuth
           )
           world.projectiles.push(proj)
         }

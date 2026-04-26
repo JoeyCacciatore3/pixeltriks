@@ -15,7 +15,7 @@ export const TERRAIN_CELL_SIZE = 0.5
 // Game
 export const TICK_RATE = 60
 export const AIM_PHASE_DURATION = 25 * TICK_RATE
-export const BETWEEN_TURNS_DURATION = 1.5 * TICK_RATE
+export const BETWEEN_TURNS_DURATION = 4 * TICK_RATE
 export const SUDDEN_DEATH_TURN = 20
 export const STARTING_HP = 100
 export const TEAM_SIZE = 3

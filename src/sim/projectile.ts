@@ -11,17 +11,20 @@ export function createProjectile(
   x: number, y: number, z: number,
   angle: number, power: number,
   weapon: WeaponKind, owner: number,
-  facing: number = 1
+  facing: number = 1,
+  azimuth?: number
 ): Projectile {
   const config = WEAPONS[weapon]
   const speed = config.speed * (power / 100)
   const elevationAngle = -angle
+  const az = azimuth ?? (facing > 0 ? 0 : Math.PI)
+  const hSpeed = Math.cos(elevationAngle) * speed
 
   return {
-    x, y: y - 1, z,
-    vx: Math.cos(elevationAngle) * speed * facing,
+    x, y: y - 4, z,
+    vx: Math.cos(az) * hSpeed,
     vy: Math.sin(elevationAngle) * speed,
-    vz: 0,
+    vz: Math.sin(az) * hSpeed,
     weapon,
     owner,
     bouncesLeft: config.bounces,
@@ -133,8 +136,11 @@ function detonateProjectile(
   }
 
   const scaledRadius = config.radius / 5
+  const craterRadius = scaledRadius * config.craterMul
 
-  explodeTerrain(world.heightmap, proj.x, proj.z, scaledRadius, scaledRadius * 0.3)
+  if (craterRadius > 0) {
+    explodeTerrain(world.heightmap, proj.x, proj.z, craterRadius, craterRadius * 0.3)
+  }
 
   explosions.push({
     x: proj.x,
@@ -157,7 +163,7 @@ function detonateProjectile(
       const dmg = Math.floor(config.damage * falloff)
       char.hp -= dmg
       damages.push({ charId: char.id, amount: dmg, source: 'projectile' })
-      applyKnockback(char, proj.x, proj.y, proj.z, scaledRadius)
+      applyKnockback(char, proj.x, proj.y, proj.z, scaledRadius, config.knockbackMul)
     }
   }
 }

@@ -5,12 +5,13 @@ const WEAPON_ORDER: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'airstrike'
 export class InputManager {
   private keys = new Set<string>()
   private touchKeys = new Set<string>()
-  private aimAngle = 0
+  private aimAngle = 0          // elevation (up/down)
+  private aimAzimuth = 0        // horizontal direction in radians (0 = right, π = left)
   private charging = false
   private chargeStart = 0
   private selectedWeapon: WeaponKind = 'bazooka'
   private weaponIndex = 0
-  private pendingFire: { angle: number; power: number; weapon: WeaponKind } | null = null
+  private pendingFire: { angle: number; power: number; weapon: WeaponKind; azimuth: number } | null = null
   private pendingEndTurn = false
   private pendingJump = false
 
@@ -20,6 +21,10 @@ export class InputManager {
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+      e.preventDefault()
+    }
+
     this.keys.add(e.code)
 
     if (e.code === 'Space' && !this.charging) {
@@ -31,11 +36,11 @@ export class InputManager {
       this.cycleWeapon(1)
     }
 
-    if (e.code === 'Enter') {
+    if (e.code === 'Enter' && !e.shiftKey) {
       this.pendingEndTurn = true
     }
 
-    if (e.code === 'KeyJ') {
+    if (e.code === 'KeyJ' || (e.code === 'Enter' && e.shiftKey)) {
       this.pendingJump = true
     }
   }
@@ -63,6 +68,7 @@ export class InputManager {
       angle: this.aimAngle,
       power: Math.max(10, power),
       weapon: this.selectedWeapon,
+      azimuth: this.aimAzimuth,
     }
   }
 
@@ -87,6 +93,10 @@ export class InputManager {
     }
   }
 
+  setAimAzimuth(az: number): void {
+    this.aimAzimuth = az
+  }
+
   private isPressed(code: string): boolean {
     return this.keys.has(code) || this.touchKeys.has(code)
   }
@@ -94,17 +104,25 @@ export class InputManager {
   getInput(): GameInput {
     const input: GameInput = {}
 
-    if (this.isPressed('ArrowLeft') || this.isPressed('KeyA')) {
-      input.moveDirection = -1
-    } else if (this.isPressed('ArrowRight') || this.isPressed('KeyD')) {
-      input.moveDirection = 1
-    }
+    // WASD = 4-directional movement
+    const xDir = this.isPressed('KeyA') ? -1 : this.isPressed('KeyD') ? 1 : 0
+    const zDir = this.isPressed('KeyW') ? -1 : this.isPressed('KeyS') ? 1 : 0
 
-    if (this.isPressed('ArrowUp') || this.isPressed('KeyW')) {
+    if (xDir !== 0) input.moveDirection = xDir as -1 | 1
+    if (zDir !== 0) input.moveZDirection = zDir as -1 | 1
+
+    // Arrow keys = aim direction
+    if (this.isPressed('ArrowUp')) {
       this.aimAngle = Math.min(this.aimAngle + 0.03, Math.PI / 2)
     }
-    if (this.isPressed('ArrowDown') || this.isPressed('KeyS')) {
+    if (this.isPressed('ArrowDown')) {
       this.aimAngle = Math.max(this.aimAngle - 0.03, -Math.PI * 0.4)
+    }
+    if (this.isPressed('ArrowLeft')) {
+      this.aimAzimuth = this.aimAzimuth - 0.04
+    }
+    if (this.isPressed('ArrowRight')) {
+      this.aimAzimuth = this.aimAzimuth + 0.04
     }
 
     if (this.pendingJump) {
@@ -127,6 +145,10 @@ export class InputManager {
 
   getAimAngle(): number {
     return this.aimAngle
+  }
+
+  getAimAzimuth(): number {
+    return this.aimAzimuth
   }
 
   getChargePower(): number {

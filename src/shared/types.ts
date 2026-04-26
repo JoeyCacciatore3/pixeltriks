@@ -2,21 +2,24 @@ export type WeaponKind = 'bazooka' | 'grenade' | 'shotgun' | 'airstrike' | 'tele
 
 export interface WeaponConfig {
   speed: number
-  radius: number
+  radius: number      // damage falloff radius (sim units, divided by 5 = scaled)
   damage: number
   gravityMul: number
   bounces: number
   fuseTime: number
   shots: number
+  craterMul: number   // terrain crater = (radius/5) * craterMul; 0 = no terrain damage
+  knockbackMul: number // scales KNOCKBACK_MAX force on hit chars
 }
 
 export const WEAPONS: Record<WeaponKind, WeaponConfig> = {
-  bazooka:   { speed: 12, radius: 35, damage: 45, gravityMul: 1,   bounces: 0, fuseTime: 0,   shots: 1 },
-  grenade:   { speed: 10, radius: 30, damage: 40, gravityMul: 1,   bounces: 3, fuseTime: 180, shots: 1 },
-  shotgun:   { speed: 20, radius: 15, damage: 25, gravityMul: 0,   bounces: 0, fuseTime: 0,   shots: 2 },
-  airstrike: { speed: 14, radius: 25, damage: 30, gravityMul: 1.5, bounces: 0, fuseTime: 0,   shots: 5 },
-  teleport:  { speed: 18, radius: 0,  damage: 0,  gravityMul: 1,   bounces: 0, fuseTime: 0,   shots: 1 },
-  dynamite:  { speed: 2,  radius: 50, damage: 70, gravityMul: 1,   bounces: 0, fuseTime: 120, shots: 1 },
+  //                          spd  rad  dmg  grav  bnc  fuse  sht  crater  kbk
+  bazooka:   { speed: 12, radius: 35, damage: 45, gravityMul: 1,   bounces: 0, fuseTime: 0,   shots: 1, craterMul: 1.0, knockbackMul: 1.0 },
+  grenade:   { speed: 10, radius: 30, damage: 40, gravityMul: 1,   bounces: 3, fuseTime: 180, shots: 1, craterMul: 0.7, knockbackMul: 1.3 },
+  shotgun:   { speed: 20, radius: 14, damage: 30, gravityMul: 0,   bounces: 0, fuseTime: 0,   shots: 2, craterMul: 0.0, knockbackMul: 0.4 },
+  airstrike: { speed: 14, radius: 40, damage: 55, gravityMul: 1.5, bounces: 0, fuseTime: 0,   shots: 5, craterMul: 1.3, knockbackMul: 0.7 },
+  teleport:  { speed: 18, radius: 0,  damage: 0,  gravityMul: 1,   bounces: 0, fuseTime: 0,   shots: 1, craterMul: 0.0, knockbackMul: 0.0 },
+  dynamite:  { speed: 2,  radius: 50, damage: 70, gravityMul: 1,   bounces: 0, fuseTime: 120, shots: 1, craterMul: 2.0, knockbackMul: 1.8 },
 }
 
 export type BlindboxContent = 'extraTime' | 'skipTurn' | 'doubleDamage' | 'healthPack' | 'bombTrap'
@@ -25,8 +28,9 @@ export type GamePhase = 'aiming' | 'firing' | 'resolving' | 'between_turns' | 'g
 
 export interface GameInput {
   moveDirection?: -1 | 0 | 1
+  moveZDirection?: -1 | 0 | 1
   jump?: boolean
-  fire?: { angle: number; power: number; weapon: WeaponKind }
+  fire?: { angle: number; power: number; weapon: WeaponKind; azimuth?: number }
   endTurn?: boolean
 }
 

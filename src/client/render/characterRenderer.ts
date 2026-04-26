@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Character } from '@shared/types'
 import { TERRAIN_CELL_SIZE, TEAM_HUMAN } from '@shared/constants'
+import { getHeight } from '@sim/terrain'
 
 const HUMAN_COLOR = 0x3388ff
 const AI_COLOR = 0xff3333
@@ -10,13 +11,22 @@ export class CharacterRenderer {
   private group: THREE.Group
   private meshes: Map<number, THREE.Group> = new Map()
   private hpBars: Map<number, THREE.Mesh> = new Map()
+  private indicator: THREE.Mesh
+  private charAzimuths: Map<number, number> = new Map()
 
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group()
     scene.add(this.group)
+
+    const coneGeom = new THREE.ConeGeometry(0.35, 0.7, 6)
+    coneGeom.rotateX(Math.PI)
+    const coneMat = new THREE.MeshBasicMaterial({ color: 0xffff00 })
+    this.indicator = new THREE.Mesh(coneGeom, coneMat)
+    this.indicator.visible = false
+    scene.add(this.indicator)
   }
 
-  update(characters: Character[]): void {
+  update(characters: Character[], activeCharId: number, heightmap: Float32Array, time: number): void {
     for (const char of characters) {
       let charGroup = this.meshes.get(char.id)
 
@@ -26,14 +36,17 @@ export class CharacterRenderer {
         this.group.add(charGroup)
       }
 
+      const groundH = getHeight(heightmap, char.x, char.z)
+      const posY = (2 * groundH - char.y) * TERRAIN_CELL_SIZE + 1
       charGroup.position.set(
         (char.x - 128) * TERRAIN_CELL_SIZE,
-        char.y * TERRAIN_CELL_SIZE + 1,
+        posY,
         (char.z - 128) * TERRAIN_CELL_SIZE
       )
 
       charGroup.visible = char.alive
-      charGroup.rotation.y = char.facing > 0 ? 0 : Math.PI
+      const az = this.charAzimuths.get(char.id) ?? (char.facing > 0 ? 0 : Math.PI)
+      charGroup.rotation.y = -az
 
       const hpBar = this.hpBars.get(char.id)
       if (hpBar) {
@@ -50,7 +63,25 @@ export class CharacterRenderer {
           }
         })
       }
+
+      if (char.id === activeCharId && char.alive) {
+        const bob = Math.sin(time * 3) * 0.3
+        this.indicator.visible = true
+        this.indicator.position.set(
+          (char.x - 128) * TERRAIN_CELL_SIZE,
+          posY + 3.5 + bob,
+          (char.z - 128) * TERRAIN_CELL_SIZE
+        )
+      }
     }
+  }
+
+  setAzimuth(charId: number, azimuth: number): void {
+    this.charAzimuths.set(charId, azimuth)
+  }
+
+  hideIndicator(): void {
+    this.indicator.visible = false
   }
 
   private createCharacterMesh(char: Character): THREE.Group {

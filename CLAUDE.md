@@ -87,17 +87,28 @@ src/
 
 ## Game Design
 
-**Turn flow:** 25s aim phase → fire → projectile resolves → terrain deforms → knockback settles → 1.5s pause → next turn. Sudden death (rising water) after turn 20.
+**Turn flow:** 25s aim phase → fire → projectile resolves → terrain deforms → knockback settles → 4s pause → next turn. Sudden death (rising water) after turn 20.
+
+**Controls:**
+- `WASD` — move character in 4 directions (W/S = forward/back on Z axis, A/D = strafe X axis)
+- `Arrow keys` — aim (Left/Right = rotate azimuth, Up/Down = elevation angle)
+- `Space` — hold to charge power, release to fire
+- `Tab` — cycle weapons
+- `J` — jump
+- `Enter` — end turn
 
 **Weapons (6 types):**
-| Weapon    | Speed | Radius | Damage | Notes                        |
-|-----------|-------|--------|--------|------------------------------|
-| Bazooka   | 12    | 35     | 45     | Arc trajectory               |
-| Grenade   | 10    | 30     | 40     | 3 bounces, 3s fuse           |
-| Shotgun   | 20    | 15     | 25     | Hitscan, 2 shots             |
-| Airstrike | 14    | 40     | 55     | Fast, high damage            |
-| Teleport  | 18    | 0      | 0      | Relocate character           |
-| Dynamite  | 2     | 50     | 70     | Dropped at feet, huge blast  |
+| Weapon    | Speed | Radius | Damage | Crater | Knockback | Notes                       |
+|-----------|-------|--------|--------|--------|-----------|-----------------------------|
+| Bazooka   | 12    | 35     | 45     | 1.0×   | 1.0×      | Arc trajectory, all-rounder |
+| Grenade   | 10    | 30     | 40     | 0.7×   | 1.3×      | 3 bounces, 3s fuse          |
+| Shotgun   | 20    | 14     | 30     | none   | 0.4×      | Hitscan, 2 shots, no crater |
+| Airstrike | 14    | 40     | 55     | 1.3×   | 0.7×      | 5 missiles, large craters   |
+| Teleport  | 18    | 0      | 0      | none   | none      | Relocate character          |
+| Dynamite  | 2     | 50     | 70     | 2.0×   | 1.8×      | Dropped at feet, huge blast |
+
+Crater radius = `(weaponRadius / 5) * craterMul`. Damage falloff radius = `(weaponRadius / 5) * 1.5`.
+Projectiles spawn at head-level (4 sim units above character feet) for line-of-sight over terrain.
 
 **Teams:** 3 characters per team, 100 HP each.
 
