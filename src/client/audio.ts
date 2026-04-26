@@ -4,11 +4,14 @@ class AudioEngine {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private unlocked = false
-  private musicGain: GainNode | null = null
-  private musicOsc: OscillatorNode | null = null
-  private musicLfo: OscillatorNode | null = null
+  private bgMusic: HTMLAudioElement | null = null
 
   constructor() {
+    // Pre-load music before user interaction so it's ready to play immediately
+    this.bgMusic = new Audio('/bg-music.mp3')
+    this.bgMusic.loop = true
+    this.bgMusic.volume = 0.30
+
     const unlock = () => {
       if (this.unlocked) return
       this.unlocked = true
@@ -16,12 +19,14 @@ class AudioEngine {
       this.master = this.ctx.createGain()
       this.master.gain.value = 0.5
       this.master.connect(this.ctx.destination)
-      this.startAmbientMusic()
+      this.bgMusic!.play().catch(() => {})
       window.removeEventListener('keydown', unlock)
       window.removeEventListener('click', unlock)
+      window.removeEventListener('touchstart', unlock)
     }
     window.addEventListener('keydown', unlock)
     window.addEventListener('click', unlock)
+    window.addEventListener('touchstart', unlock)
   }
 
   private get t(): number {
@@ -187,44 +192,8 @@ class AudioEngine {
     }
   }
 
-  private startAmbientMusic(): void {
-    if (!this.ctx || !this.master) return
-
-    this.musicGain = this.ctx.createGain()
-    this.musicGain.gain.value = 0.03
-
-    const lfo = this.ctx.createOscillator()
-    lfo.type = 'sine'
-    lfo.frequency.value = 0.15
-    this.musicLfo = lfo
-
-    const lfoGain = this.ctx.createGain()
-    lfoGain.gain.value = 15
-
-    lfo.connect(lfoGain)
-
-    const osc = this.ctx.createOscillator()
-    osc.type = 'triangle'
-    osc.frequency.value = 65
-    lfoGain.connect(osc.frequency)
-    this.musicOsc = osc
-
-    const filter = this.ctx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 200
-    filter.Q.value = 2
-
-    osc.connect(filter)
-    filter.connect(this.musicGain)
-    this.musicGain.connect(this.master)
-
-    osc.start()
-    lfo.start()
-  }
-
   dispose(): void {
-    this.musicOsc?.stop()
-    this.musicLfo?.stop()
+    this.bgMusic?.pause()
     this.ctx?.close()
   }
 }
