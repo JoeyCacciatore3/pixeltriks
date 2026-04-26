@@ -4,6 +4,7 @@ import { emptyEvents, getActiveCharacter, hashWorld } from './world'
 import { moveCharacter, jumpCharacter, applyCharacterPhysics } from './character'
 import { createProjectile, createAirstrikeProjectiles, stepProjectile } from './projectile'
 import { advanceTurn, isAllSettled, updatePhaseTimer } from './turn'
+import { stepBlindboxes } from './blindbox'
 
 export function step(world: WorldState, input: GameInput | null): StepEvents {
   const events = emptyEvents()
@@ -11,6 +12,8 @@ export function step(world: WorldState, input: GameInput | null): StepEvents {
   if (world.phase === 'game_over') return events
 
   world.tick++
+
+  stepBlindboxes(world, events)
 
   switch (world.phase) {
     case 'aiming':

@@ -170,6 +170,11 @@ class AudioEngine {
     osc.stop(this.t + 0.05)
   }
 
+  pickup(): void {
+    this.tone(880, 0.08, 0.12, 'sine')
+    setTimeout(() => this.tone(1320, 0.12, 0.12, 'sine'), 80)
+  }
+
   gameOver(humanWon: boolean): void {
     if (humanWon) {
       const notes = [523, 659, 784, 1047]

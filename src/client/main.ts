@@ -11,6 +11,7 @@ import { ExplosionRenderer } from './render/explosionRenderer'
 import { WaterRenderer } from './render/waterRenderer'
 import { SkyRenderer } from './render/skyRenderer'
 import { AimRenderer } from './render/aimRenderer'
+import { BlindboxRenderer } from './render/blindboxRenderer'
 import { GameCamera } from './camera'
 import { InputManager } from './input'
 import { HUD } from './ui/hud'
@@ -32,6 +33,7 @@ class Game {
   private explosionRenderer!: ExplosionRenderer
   private waterRenderer!: WaterRenderer
   private aimRenderer!: AimRenderer
+  private blindboxRenderer!: BlindboxRenderer
   private input!: InputManager
   private hud!: HUD
 
@@ -325,6 +327,7 @@ class Game {
       Object.assign(this.world.characters[i], state.characters[i])
     }
     this.world.projectiles = state.projectiles
+    this.world.blindboxes = state.blindboxes
 
     // Sync tick to server — but never rewind. Rewinding would re-trigger explosion
     // events and double-fire audio/particles for ticks we already processed locally.
@@ -350,6 +353,7 @@ class Game {
       this.waterRenderer = new WaterRenderer(this.scene)
       new SkyRenderer(this.scene)
       this.aimRenderer = new AimRenderer(this.scene)
+      this.blindboxRenderer = new BlindboxRenderer(this.scene)
       this.renderersInitialized = true
     }
 
@@ -530,14 +534,23 @@ class Game {
     for (const dmg of events.damageDealt) {
       if (dmg.source === 'water') {
         audio.waterSplash()
+      } else if (dmg.source === 'heal') {
+        audio.pickup()
       } else {
         audio.damage(dmg.amount)
       }
       const dmgChar = this.world.characters.find(c => c.id === dmg.charId)
       if (dmgChar) {
         const isEnemy = dmgChar.team !== this.localTeam
-        this.pendingDamageLabels.push({ charId: dmg.charId, amount: dmg.amount, isEnemy })
+        // negative amount signals a heal — render as green "+X" label
+        const labelAmount = dmg.source === 'heal' ? -dmg.amount : dmg.amount
+        this.pendingDamageLabels.push({ charId: dmg.charId, amount: labelAmount, isEnemy })
       }
+    }
+
+    if (events.blindboxPicked && events.blindboxPicked !== 'healthPack') {
+      // healthPack already plays via the heal DamageEvent above
+      audio.pickup()
     }
 
     for (const c of this.world.characters) {
@@ -618,6 +631,7 @@ class Game {
     this.characterRenderer.update(this.world.characters, activeChar?.id ?? -1, this.world.heightmap, this.gameTime)
     this.projectileRenderer.update(this.world.projectiles, this.world.heightmap)
     this.explosionRenderer.update()
+    this.blindboxRenderer.update(this.world.blindboxes, this.world.heightmap, this.gameTime)
     this.waterRenderer.update(this.world.waterLevel, this.gameTime)
 
     if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {

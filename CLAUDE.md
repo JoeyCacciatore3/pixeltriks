@@ -121,7 +121,7 @@ Projectiles spawn at head-level (4 sim units above character feet) for line-of-s
 
 **Teams:** 3 characters per team, 100 HP each.
 
-**Power-ups:** ⚠️ Defined in types (Blindbox, EnvObject) but not yet implemented — no spawn, collection, or effect logic in sim/. Constants `BLINDBOX_INTERVAL`, `BLINDBOX_MAX` exist but do nothing. Planned: airdropped crates every 5s (max 3), barrel/mine chain reactions.
+**Power-ups:** ✅ Airdropped crates every `BLINDBOX_INTERVAL` ticks (5s), max 3 on map. Parachute fall (0.3× gravity), collected when character walks within 5 sim units. 5 types: `healthPack` (+30 HP, green label), `extraTime` (+10s aim phase), `skipTurn` (force between_turns), `doubleDamage` (explosion at crate, 25 dmg), `bombTrap` (explosion at collector's feet, 40 dmg). EnvObject (barrels/mines) — types defined, no sim logic yet.
 
 **AI:** Analytical ballistic trajectory solver: `solveAngles(dx,dy,speed,gravity)` → quadratic solution returns ≤2 exact launch angles per target×power sample. 5 power levels × up to 2 angles × 4 weapons × N enemies ≈ 40–80 precise candidates/turn (down from 720 blind samples). Noise-based difficulty (easy ±0.35 rad/±25 power, medium ±0.12/±8, hard ±0.04/±2). Stuck detection in AIController: if position delta < 0.1 for 4 ticks while grounded, issues `{ jump: true }` to unstick.
 

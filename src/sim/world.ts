@@ -97,6 +97,7 @@ export function emptyEvents(): StepEvents {
     turnAdvanced: false,
     gameOver: false,
     damageDealt: [],
+    blindboxPicked: null,
   }
 }
 

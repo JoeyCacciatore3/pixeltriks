@@ -20,7 +20,8 @@ export class ExplosionRenderer {
   }
 
   spawn(event: ExplosionEvent, heightmap: Float32Array): void {
-    const count = 40
+    const scale = Math.min(event.radius / 35, 1.5)
+    const count = Math.floor(20 + scale * 50)  // 20–95 particles based on size
     const positions = new Float32Array(count * 3)
     const velocities = new Float32Array(count * 3)
     const colors = new Float32Array(count * 3)
@@ -28,7 +29,7 @@ export class ExplosionRenderer {
     for (let i = 0; i < count; i++) {
       const theta = Math.random() * Math.PI * 2
       const phi = Math.random() * Math.PI
-      const speed = 0.1 + Math.random() * 0.3
+      const speed = (0.08 + Math.random() * 0.25) * (0.5 + scale * 0.5)
 
       positions[i * 3] = 0
       positions[i * 3 + 1] = 0
@@ -50,7 +51,7 @@ export class ExplosionRenderer {
     geom.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3))
 
     const mat = new THREE.PointsMaterial({
-      size: 0.4,
+      size: 0.2 + scale * 0.35,
       vertexColors: true,
       transparent: true,
       opacity: 1,
@@ -66,7 +67,8 @@ export class ExplosionRenderer {
       (event.z - 128) * TERRAIN_CELL_SIZE
     )
 
-    const light = new THREE.PointLight(0xff6600, 5, 20)
+    const lightRange = 10 + scale * 20
+    const light = new THREE.PointLight(0xff6600, 3 + scale * 4, lightRange)
     light.position.copy(particles.position)
 
     this.group.add(particles)
@@ -76,7 +78,7 @@ export class ExplosionRenderer {
       particles,
       light,
       life: 0,
-      maxLife: 60,
+      maxLife: Math.floor(50 + scale * 40),
     })
   }
 

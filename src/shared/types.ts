@@ -110,6 +110,7 @@ export interface StepEvents {
   turnAdvanced: boolean
   gameOver: boolean
   damageDealt: DamageEvent[]
+  blindboxPicked: BlindboxContent | null
 }
 
 export interface ExplosionEvent {
@@ -123,5 +124,5 @@ export interface ExplosionEvent {
 export interface DamageEvent {
   charId: number
   amount: number
-  source: 'projectile' | 'fall' | 'object' | 'water' | 'bombTrap'
+  source: 'projectile' | 'fall' | 'object' | 'water' | 'bombTrap' | 'heal'
 }

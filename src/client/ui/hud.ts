@@ -85,10 +85,11 @@ export class HUD {
   spawnDamageLabel(screenX: number, screenY: number, amount: number, isEnemy: boolean): void {
     const el = document.createElement('div')
     el.className = 'damage-float'
-    el.textContent = `-${amount}`
+    const isHeal = amount < 0
+    el.textContent = isHeal ? `+${Math.abs(amount)}` : `-${amount}`
     el.style.left = `${screenX}px`
     el.style.top = `${screenY}px`
-    el.style.color = isEnemy ? '#ff4444' : '#ffaa00'
+    el.style.color = isHeal ? '#44ff88' : (isEnemy ? '#ff4444' : '#ffaa00')
     // Scale punch on spawn — CSS transition handles return to 1.0
     el.style.transform = 'translateX(-50%) scale(1.5)'
     el.style.transition = 'transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94)'

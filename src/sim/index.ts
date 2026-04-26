@@ -6,3 +6,4 @@ export { createProjectile, createAirstrikeProjectiles, stepProjectile } from './
 export { advanceTurn, isAllSettled, updatePhaseTimer } from './turn'
 export { step } from './game'
 export { computeAIInput } from './ai'
+export { stepBlindboxes } from './blindbox'

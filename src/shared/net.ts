@@ -28,6 +28,7 @@ export interface SerializedWorld {
   phaseTimer: number
   characters: WorldState['characters']
   projectiles: WorldState['projectiles']
+  blindboxes: WorldState['blindboxes']
   waterLevel: number
   seed: number
   prngState: number
@@ -44,6 +45,7 @@ export function serializeWorld(w: WorldState): SerializedWorld {
     phaseTimer: w.phaseTimer,
     characters: w.characters.map(c => ({ ...c })),
     projectiles: w.projectiles.map(p => ({ ...p })),
+    blindboxes: w.blindboxes.map(b => ({ ...b })),
     waterLevel: w.waterLevel,
     seed: w.seed,
     prngState: w.prngState,
