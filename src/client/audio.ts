@@ -4,6 +4,7 @@ class AudioEngine {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private unlocked = false
+  private musicStarted = false
   private bgMusic: HTMLAudioElement | null = null
 
   constructor() {
@@ -12,29 +13,42 @@ class AudioEngine {
     this.bgMusic.volume = 0.30
     this.bgMusic.preload = 'auto'
 
-    // Passive listeners as a fallback — explicit start() calls are preferred
-    const unlock = () => this.start()
-    window.addEventListener('keydown', unlock, { once: true })
-    window.addEventListener('click', unlock, { once: true })
-    window.addEventListener('touchstart', unlock, { once: true })
+    // Re-register gesture listeners until music actually starts.
+    // { once: true } + re-registration means we keep retrying on every gesture
+    // until bgMusic.play() resolves — handles the case where the first attempt
+    // fails due to autoplay policy (e.g. 15s fallback starts game with no prior gesture).
+    const tryStart = () => {
+      this.start()
+      if (!this.musicStarted) {
+        window.addEventListener('keydown', tryStart, { once: true, passive: true })
+        window.addEventListener('click', tryStart, { once: true, passive: true })
+        window.addEventListener('touchstart', tryStart, { once: true, passive: true })
+      }
+    }
+    window.addEventListener('keydown', tryStart, { once: true, passive: true })
+    window.addEventListener('click', tryStart, { once: true, passive: true })
+    window.addEventListener('touchstart', tryStart, { once: true, passive: true })
   }
 
   start(): void {
-    if (this.unlocked) return
-    this.unlocked = true
-
-    this.ctx = new AudioContext()
-    // Resume in case browser suspended it
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {})
+    // AudioContext created once — guarded by unlocked
+    if (!this.unlocked) {
+      this.unlocked = true
+      this.ctx = new AudioContext()
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {})
+      }
+      this.master = this.ctx.createGain()
+      this.master.gain.value = 0.5
+      this.master.connect(this.ctx.destination)
     }
-    this.master = this.ctx.createGain()
-    this.master.gain.value = 0.5
-    this.master.connect(this.ctx.destination)
 
-    if (this.bgMusic) {
-      this.bgMusic.play().catch((err) => {
-        console.warn('[audio] bgMusic.play() failed:', err)
+    // Music retried on every start() call until it actually plays
+    if (this.bgMusic && !this.musicStarted) {
+      this.bgMusic.play().then(() => {
+        this.musicStarted = true
+      }).catch((err) => {
+        console.warn('[audio] bgMusic.play() failed — will retry on next gesture:', err)
       })
     }
   }

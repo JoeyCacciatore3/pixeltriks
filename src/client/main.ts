@@ -167,6 +167,7 @@ class Game {
         this.net = null
         this.hideMenu()
         this.isMultiplayer = false
+        audio.start()
         this.initGame(Date.now())
         break
 
