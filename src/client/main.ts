@@ -197,9 +197,9 @@ class Game {
         break
 
       case 'opponent_disconnected':
-        if (this.appState === 'playing') {
+        if (this.appState === 'playing' && this.isMultiplayer) {
           this.showDisconnectMessage()
-        } else {
+        } else if (this.appState === 'lobby') {
           this.updateLobby('Opponent disconnected')
         }
         break
@@ -211,7 +211,7 @@ class Game {
         break
 
       case 'disconnected':
-        if (this.appState === 'playing') {
+        if (this.appState === 'playing' && this.isMultiplayer) {
           this.showDisconnectMessage()
         }
         break
