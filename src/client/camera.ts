@@ -12,7 +12,7 @@ export class GameCamera {
   private trauma = 0         // 0–1, drives quadratic shake
   private mode: CameraMode = 'character'
   private impactTimer = 0
-  private readonly IMPACT_DWELL = 120  // 2s at 60fps — player sees explosion result
+  private readonly IMPACT_DWELL = 150  // 2.5s at 60fps — player sees explosion result
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000)
@@ -56,9 +56,9 @@ export class GameCamera {
       }
     }
 
-    // Projectile tracking needs to be snappy — bazooka travels ~6 Three.js units/tick.
-    // Impact dwell and character follow can be slower and more cinematic.
-    const speed = this.mode === 'projectile' ? 0.20 : 0.05
+    // Projectile: smooth enough to feel like a follow-cam, not a jump cut.
+    // Character/impact: slow cinematic drift back to active character.
+    const speed = this.mode === 'projectile' ? 0.12 : 0.05
     const goalPos = this.target.clone().add(this.offset)
     this.currentPos.lerp(goalPos, speed)
     this.camera.position.copy(this.currentPos)
