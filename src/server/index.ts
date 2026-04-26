@@ -1,0 +1,242 @@
+import { WebSocketServer, WebSocket } from 'ws'
+import { createWorld } from '../sim/index'
+import { step } from '../sim/game'
+import type { WorldState, GameInput } from '../shared/types'
+import type { ClientMessage, ServerMessage } from '../shared/net'
+import { serializeWorld } from '../shared/net'
+import { TICK_RATE } from '../shared/constants'
+
+interface Player {
+  ws: WebSocket
+  team: number
+  ready: boolean
+}
+
+interface Room {
+  code: string
+  players: Player[]
+  world: WorldState | null
+  status: 'waiting' | 'countdown' | 'playing' | 'finished'
+  tickInterval: ReturnType<typeof setInterval> | null
+  pendingInputs: Map<number, GameInput>
+}
+
+const rooms = new Map<string, Room>()
+const playerRooms = new Map<WebSocket, string>()
+
+function generateRoomCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let code = ''
+  for (let i = 0; i < 4; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return rooms.has(code) ? generateRoomCode() : code
+}
+
+function send(ws: WebSocket, msg: ServerMessage): void {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(msg))
+  }
+}
+
+function broadcast(room: Room, msg: ServerMessage): void {
+  for (const p of room.players) {
+    send(p.ws, msg)
+  }
+}
+
+function startCountdown(room: Room): void {
+  room.status = 'countdown'
+  let count = 3
+
+  const tick = (): void => {
+    broadcast(room, { type: 'countdown', seconds: count })
+    count--
+    if (count < 0) {
+      startGame(room)
+    } else {
+      setTimeout(tick, 1000)
+    }
+  }
+  tick()
+}
+
+function startGame(room: Room): void {
+  const seed = Date.now()
+  room.world = createWorld(seed)
+  room.status = 'playing'
+
+  for (const p of room.players) {
+    send(p.ws, {
+      type: 'game_start',
+      seed,
+      yourTeam: p.team,
+    })
+  }
+
+  room.tickInterval = setInterval(() => {
+    gameTick(room)
+  }, 1000 / TICK_RATE)
+}
+
+function gameTick(room: Room): void {
+  if (!room.world || room.world.phase === 'game_over') {
+    if (room.tickInterval) {
+      clearInterval(room.tickInterval)
+      room.tickInterval = null
+    }
+    room.status = 'finished'
+    if (room.world) {
+      broadcast(room, {
+        type: 'state',
+        world: serializeWorld(room.world),
+        tick: room.world.tick,
+      })
+    }
+    return
+  }
+
+  let input: GameInput | null = null
+  const activeTeam = room.world.activeTeam
+
+  if (room.world.phase === 'aiming') {
+    input = room.pendingInputs.get(activeTeam) ?? null
+    room.pendingInputs.delete(activeTeam)
+  }
+
+  const events = step(room.world, input)
+
+  if (events.turnAdvanced || events.gameOver || events.explosions.length > 0 ||
+      room.world.tick % 6 === 0) {
+    broadcast(room, {
+      type: 'state',
+      world: serializeWorld(room.world),
+      tick: room.world.tick,
+    })
+  }
+
+  if (input) {
+    for (const p of room.players) {
+      if (p.team !== activeTeam) {
+        send(p.ws, {
+          type: 'opponent_input',
+          input,
+          tick: room.world.tick,
+        })
+      }
+    }
+  }
+}
+
+function handleMessage(ws: WebSocket, data: string): void {
+  let msg: ClientMessage
+  try {
+    msg = JSON.parse(data)
+  } catch {
+    send(ws, { type: 'error', message: 'Invalid JSON' })
+    return
+  }
+
+  switch (msg.type) {
+    case 'create': {
+      const code = generateRoomCode()
+      const room: Room = {
+        code,
+        players: [{ ws, team: 0, ready: false }],
+        world: null,
+        status: 'waiting',
+        tickInterval: null,
+        pendingInputs: new Map(),
+      }
+      rooms.set(code, room)
+      playerRooms.set(ws, code)
+      send(ws, { type: 'room_created', roomCode: code, team: 0 })
+      break
+    }
+
+    case 'join': {
+      const room = rooms.get(msg.roomCode.toUpperCase())
+      if (!room) {
+        send(ws, { type: 'error', message: 'Room not found' })
+        return
+      }
+      if (room.players.length >= 2) {
+        send(ws, { type: 'error', message: 'Room full' })
+        return
+      }
+      if (room.status !== 'waiting') {
+        send(ws, { type: 'error', message: 'Game already in progress' })
+        return
+      }
+
+      room.players.push({ ws, team: 1, ready: false })
+      playerRooms.set(ws, room.code)
+      send(ws, { type: 'room_created', roomCode: room.code, team: 1 })
+      broadcast(room, { type: 'player_joined', team: 1 })
+      break
+    }
+
+    case 'ready': {
+      const roomCode = playerRooms.get(ws)
+      if (!roomCode) return
+      const room = rooms.get(roomCode)
+      if (!room) return
+
+      const player = room.players.find(p => p.ws === ws)
+      if (player) player.ready = true
+
+      if (room.players.length === 2 && room.players.every(p => p.ready)) {
+        startCountdown(room)
+      }
+      break
+    }
+
+    case 'input': {
+      const roomCode = playerRooms.get(ws)
+      if (!roomCode) return
+      const room = rooms.get(roomCode)
+      if (!room || room.status !== 'playing' || !room.world) return
+
+      const player = room.players.find(p => p.ws === ws)
+      if (!player) return
+
+      if (room.world.activeTeam === player.team && room.world.phase === 'aiming') {
+        room.pendingInputs.set(player.team, msg.input)
+        send(ws, { type: 'input_ack', tick: msg.tick })
+      }
+      break
+    }
+  }
+}
+
+function handleDisconnect(ws: WebSocket): void {
+  const roomCode = playerRooms.get(ws)
+  if (!roomCode) return
+
+  const room = rooms.get(roomCode)
+  if (room) {
+    room.players = room.players.filter(p => p.ws !== ws)
+
+    if (room.players.length > 0) {
+      broadcast(room, { type: 'opponent_disconnected' })
+    }
+
+    if (room.players.length === 0) {
+      if (room.tickInterval) clearInterval(room.tickInterval)
+      rooms.delete(roomCode)
+    }
+  }
+
+  playerRooms.delete(ws)
+}
+
+const PORT = parseInt(process.env.PORT ?? '8080')
+const wss = new WebSocketServer({ port: PORT })
+
+wss.on('connection', (ws) => {
+  ws.on('message', (data) => handleMessage(ws, data.toString()))
+  ws.on('close', () => handleDisconnect(ws))
+  ws.on('error', () => handleDisconnect(ws))
+})
+
+console.log(`Pixeltriks: Humans vs AI server running on ws://localhost:${PORT}`)
