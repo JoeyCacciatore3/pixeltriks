@@ -17,8 +17,8 @@ interface Room {
   players: Player[]
   world: WorldState | null
   status: 'waiting' | 'countdown' | 'playing' | 'finished'
-  tickInterval: ReturnType<typeof setInterval> | null
   pendingInputs: Map<number, GameInput>
+  nextTickAt: number  // wall-clock target for next tick (self-correcting loop)
 }
 
 const rooms = new Map<string, Room>()
@@ -67,6 +67,8 @@ function startCountdown(room: Room): void {
   tick()
 }
 
+const TICK_MS = 1000 / TICK_RATE
+
 function startGame(room: Room): void {
   const seed = Date.now()
   room.world = createWorld(seed)
@@ -80,17 +82,24 @@ function startGame(room: Room): void {
     })
   }
 
-  room.tickInterval = setInterval(() => {
+  // Self-correcting tick loop: each tick schedules the next based on when it
+  // *should* have fired, not when it actually fired. Prevents cumulative drift
+  // that causes the server tick count to fall behind clients using rAF.
+  room.nextTickAt = Date.now() + TICK_MS
+  function tick() {
+    if (room.status !== 'playing') return
     gameTick(room)
-  }, 1000 / TICK_RATE)
+    if (room.status === 'playing') {
+      room.nextTickAt += TICK_MS
+      const delay = Math.max(0, room.nextTickAt - Date.now())
+      setTimeout(tick, delay)
+    }
+  }
+  setTimeout(tick, TICK_MS)
 }
 
 function gameTick(room: Room): void {
   if (!room.world || room.world.phase === 'game_over') {
-    if (room.tickInterval) {
-      clearInterval(room.tickInterval)
-      room.tickInterval = null
-    }
     room.status = 'finished'
     if (room.world) {
       broadcast(room, {
@@ -151,8 +160,9 @@ function handleMessage(ws: WebSocket, data: string): void {
         players: [{ ws, team: 0, ready: false }],
         world: null,
         status: 'waiting',
-        tickInterval: null,
+
         pendingInputs: new Map(),
+        nextTickAt: 0,
       }
       rooms.set(code, room)
       playerRooms.set(ws, code)
@@ -212,8 +222,9 @@ function handleMessage(ws: WebSocket, data: string): void {
           ],
           world: null,
           status: 'waiting',
-          tickInterval: null,
+  
           pendingInputs: new Map(),
+        nextTickAt: 0,
         }
         rooms.set(code, room)
         playerRooms.set(opponent, code)
@@ -231,8 +242,9 @@ function handleMessage(ws: WebSocket, data: string): void {
               players: [{ ws, team: 0, ready: true }],
               world: null,
               status: 'waiting',
-              tickInterval: null,
+      
               pendingInputs: new Map(),
+        nextTickAt: 0,
             }
             rooms.set(code, room)
             playerRooms.set(ws, code)
@@ -281,7 +293,7 @@ function handleDisconnect(ws: WebSocket): void {
     }
 
     if (room.players.length === 0) {
-      if (room.tickInterval) clearInterval(room.tickInterval)
+      room.status = 'finished'  // stops the self-correcting tick loop
       rooms.delete(roomCode)
     }
   }

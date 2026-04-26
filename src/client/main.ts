@@ -288,12 +288,14 @@ class Game {
 
   private applyServerState(state: SerializedWorld): void {
     if (!this.world) return
-    // Skip state that's more than 3 ticks behind our local sim
-    if (state.tick < this.world.tick - 3) return
+    // Drop only truly ancient state (>2s old). The server uses a self-correcting
+    // tick loop but can still drift a few ticks behind rAF — a 3-tick threshold
+    // was dropping all server state within 30s. 120 ticks = 2 full seconds.
+    if (state.tick < this.world.tick - 120) return
 
     const tickDelta = state.tick - this.world.tick
 
-    this.world.tick = state.tick
+    // Always apply authoritative game state
     this.world.phase = state.phase as GamePhase
     this.world.turn = state.turn
     this.world.activeTeam = state.activeTeam
@@ -308,9 +310,13 @@ class Game {
     }
     this.world.projectiles = state.projectiles
 
-    // Only force terrain re-render when server is meaningfully ahead of us
-    // (we missed ticks that may have contained explosions). Routine syncs at
-    // ±3 ticks don't change terrain — the local step() already handles that.
+    // Sync tick to server — but never rewind. Rewinding would re-trigger explosion
+    // events and double-fire audio/particles for ticks we already processed locally.
+    if (tickDelta > 0) {
+      this.world.tick = state.tick
+    }
+
+    // Re-render terrain only when server is meaningfully ahead (missed explosions).
     if (tickDelta > 3) {
       this.terrainVersion++
     }
