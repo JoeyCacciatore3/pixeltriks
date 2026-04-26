@@ -1,4 +1,4 @@
-import type { WorldState } from '@shared/types'
+import type { WorldState, Character } from '@shared/types'
 import { TEAM_HUMAN, TEAM_AI, AIM_PHASE_DURATION, TICK_RATE } from '@shared/constants'
 import type { InputManager } from '../input'
 
@@ -10,16 +10,27 @@ interface FloatLabel {
 }
 
 export class HUD {
-  private el: HTMLElement
-  private turnInfo: HTMLElement
-  private timer: HTMLElement
-  private teamHP: HTMLElement
+  private humanPanel: HTMLElement
+  private aiPanel: HTMLElement
+  private humanHpFill: HTMLElement
+  private humanHpGhost: HTMLElement
+  private humanHpLabel: HTMLElement
+  private humanDots: HTMLElement
+  private aiHpFill: HTMLElement
+  private aiHpGhost: HTMLElement
+  private aiHpLabel: HTMLElement
+  private aiDots: HTMLElement
+
+  private timerEl: HTMLElement
+  private phaseLabel: HTMLElement
+  private turnLabel: HTMLElement
   private weaponDisplay: HTMLElement
   private powerBarWrap: HTMLElement
   private powerBarFill: HTMLElement
   private turnBanner: HTMLElement
   private gameOverOverlay: HTMLElement
   private controlsHint: HTMLElement
+
   private gameOverShown = false
   private floatLabels: FloatLabel[] = []
   private lastTurn = -1
@@ -27,57 +38,96 @@ export class HUD {
   onRestart: (() => void) | null = null
 
   constructor() {
-    this.el = document.getElementById('hud')!
+    // ── Human team panel (top-left) ──
+    this.humanPanel = document.createElement('div')
+    this.humanPanel.className = 'team-panel team-panel-human'
+    this.humanPanel.innerHTML = `
+      <div class="team-name team-name-human">HUMANS</div>
+      <div class="team-hp-track">
+        <div class="team-hp-ghost"></div>
+        <div class="team-hp-fill"></div>
+        <div class="team-hp-label"></div>
+      </div>
+      <div class="team-dots"></div>
+    `
+    document.body.appendChild(this.humanPanel)
+    this.humanHpFill  = this.humanPanel.querySelector('.team-hp-fill')!
+    this.humanHpGhost = this.humanPanel.querySelector('.team-hp-ghost')!
+    this.humanHpLabel = this.humanPanel.querySelector('.team-hp-label')!
+    this.humanDots    = this.humanPanel.querySelector('.team-dots')!
 
-    this.turnInfo = document.createElement('div')
-    this.turnInfo.className = 'hud-turn'
-    this.el.appendChild(this.turnInfo)
+    // ── AI team panel (top-right) ──
+    this.aiPanel = document.createElement('div')
+    this.aiPanel.className = 'team-panel team-panel-ai'
+    this.aiPanel.innerHTML = `
+      <div class="team-name team-name-ai">AI BOTS</div>
+      <div class="team-hp-track">
+        <div class="team-hp-ghost"></div>
+        <div class="team-hp-fill"></div>
+        <div class="team-hp-label"></div>
+      </div>
+      <div class="team-dots"></div>
+    `
+    document.body.appendChild(this.aiPanel)
+    this.aiHpFill  = this.aiPanel.querySelector('.team-hp-fill')!
+    this.aiHpGhost = this.aiPanel.querySelector('.team-hp-ghost')!
+    this.aiHpLabel = this.aiPanel.querySelector('.team-hp-label')!
+    this.aiDots    = this.aiPanel.querySelector('.team-dots')!
 
-    this.timer = document.createElement('div')
-    this.timer.className = 'hud-timer'
-    this.el.appendChild(this.timer)
+    // ── Center timer panel (inside #hud) ──
+    const hud = document.getElementById('hud')!
+    const timerPanel = document.createElement('div')
+    timerPanel.className = 'timer-panel'
+    timerPanel.innerHTML = `
+      <div class="hud-phase-label"></div>
+      <div class="hud-timer">25</div>
+      <div class="hud-turn-label">TURN 1</div>
+    `
+    hud.appendChild(timerPanel)
+    this.phaseLabel = timerPanel.querySelector('.hud-phase-label')!
+    this.timerEl    = timerPanel.querySelector('.hud-timer')!
+    this.turnLabel  = timerPanel.querySelector('.hud-turn-label')!
 
-    this.teamHP = document.createElement('div')
-    this.teamHP.className = 'hud-teams'
-    this.el.appendChild(this.teamHP)
-
+    // ── Weapon display (fixed, centered below timer) ──
     this.weaponDisplay = document.createElement('div')
     this.weaponDisplay.className = 'hud-weapon'
-    this.el.appendChild(this.weaponDisplay)
+    document.body.appendChild(this.weaponDisplay)
 
-    // Power bar
+    // ── Power bar ──
     this.powerBarWrap = document.createElement('div')
     this.powerBarWrap.className = 'hud-power-wrap'
     this.powerBarWrap.style.display = 'none'
-    this.el.appendChild(this.powerBarWrap)
+    document.body.appendChild(this.powerBarWrap)
 
     this.powerBarFill = document.createElement('div')
     this.powerBarFill.className = 'hud-power-fill'
     this.powerBarWrap.appendChild(this.powerBarFill)
 
-    // Turn announcement banner
+    // ── Turn announcement banner ──
     this.turnBanner = document.createElement('div')
     this.turnBanner.className = 'turn-banner'
     this.turnBanner.style.display = 'none'
     document.body.appendChild(this.turnBanner)
 
+    // ── Game over overlay ──
     this.gameOverOverlay = document.createElement('div')
     this.gameOverOverlay.className = 'game-over'
     this.gameOverOverlay.style.display = 'none'
     document.body.appendChild(this.gameOverOverlay)
 
+    // ── Controls hint ──
     this.controlsHint = document.createElement('div')
     this.controlsHint.className = 'hud-controls'
-    this.controlsHint.innerHTML = 'WASD Move | Arrows Aim | Space Fire | Tab Weapon | J Jump | Enter End Turn'
-    this.el.appendChild(this.controlsHint)
+    this.controlsHint.innerHTML = 'WASD Move &nbsp;|&nbsp; Arrows Aim &nbsp;|&nbsp; Space Fire &nbsp;|&nbsp; Tab Weapon &nbsp;|&nbsp; J Jump &nbsp;|&nbsp; Enter End Turn'
+    document.body.appendChild(this.controlsHint)
   }
 
   showTurnBanner(teamName: string, isHuman: boolean): void {
-    this.turnBanner.textContent = isHuman ? 'YOUR TURN' : `${teamName} TURN`
+    this.turnBanner.textContent = isHuman ? 'YOUR TURN' : `${teamName}`
     this.turnBanner.style.color = isHuman ? '#3a8fff' : '#ff4a3a'
     this.turnBanner.style.display = 'flex'
     this.turnBanner.classList.remove('turn-banner-anim')
-    void this.turnBanner.offsetWidth  // force reflow
+    void this.turnBanner.offsetWidth
     this.turnBanner.classList.add('turn-banner-anim')
     setTimeout(() => { this.turnBanner.style.display = 'none' }, 1800)
   }
@@ -90,7 +140,6 @@ export class HUD {
     el.style.left = `${screenX}px`
     el.style.top = `${screenY}px`
     el.style.color = isHeal ? '#44ff88' : (isEnemy ? '#ff4444' : '#ffaa00')
-    // Scale punch on spawn — CSS transition handles return to 1.0
     el.style.transform = 'translateX(-50%) scale(1.5)'
     el.style.transition = 'transform 0.12s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
     document.body.appendChild(el)
@@ -116,87 +165,119 @@ export class HUD {
   }
 
   update(world: WorldState, input: InputManager): void {
-    const teamName = world.activeTeam === TEAM_HUMAN ? 'HUMANS' : 'AI BOTS'
-    const teamColor = world.activeTeam === TEAM_HUMAN ? '#38f' : '#f33'
+    const isHumanTurn = world.activeTeam === TEAM_HUMAN
 
-    this.turnInfo.innerHTML = `<span style="color:${teamColor}">${teamName}</span> — Turn ${world.turn + 1}`
-
+    // ── Timer ──
     if (world.phase === 'aiming') {
       const remaining = Math.ceil((AIM_PHASE_DURATION - world.phaseTimer) / TICK_RATE)
-      this.timer.textContent = `${remaining}s`
-      this.timer.style.color = remaining <= 5 ? '#f33' : '#fff'
+      this.timerEl.textContent = String(remaining)
+      this.phaseLabel.textContent = isHumanTurn ? 'YOUR TURN' : 'AI TURN'
+      if (remaining <= 5) {
+        this.timerEl.classList.add('timer-danger')
+      } else {
+        this.timerEl.classList.remove('timer-danger')
+      }
     } else {
-      this.timer.textContent = world.phase.replace('_', ' ').toUpperCase()
-      this.timer.style.color = '#aaa'
+      this.timerEl.textContent = world.phase === 'game_over' ? '' : '·'
+      this.phaseLabel.textContent = world.phase.replace('_', ' ').toUpperCase()
+      this.timerEl.classList.remove('timer-danger')
     }
+    this.turnLabel.textContent = `TURN ${world.turn + 1}`
 
-    const humanHP = world.characters
-      .filter(c => c.team === TEAM_HUMAN)
-      .reduce((sum, c) => sum + (c.alive ? c.hp : 0), 0)
-    const aiHP = world.characters
-      .filter(c => c.team === TEAM_AI)
-      .reduce((sum, c) => sum + (c.alive ? c.hp : 0), 0)
+    // ── Team panels ──
+    const humans = world.characters.filter(c => c.team === TEAM_HUMAN)
+    const ais    = world.characters.filter(c => c.team === TEAM_AI)
+    const humanHP = humans.reduce((s, c) => s + (c.alive ? c.hp : 0), 0)
+    const aiHP    = ais.reduce((s, c) => s + (c.alive ? c.hp : 0), 0)
 
-    this.teamHP.innerHTML = `
-      <span style="color:#38f">HUMANS: ${humanHP} HP</span>
-      <span style="color:#f33">AI: ${aiHP} HP</span>
-    `
+    this.updateTeamPanel(
+      this.humanPanel, this.humanHpFill, this.humanHpGhost, this.humanHpLabel, this.humanDots,
+      humans, humanHP, '#3a8fff', isHumanTurn
+    )
+    this.updateTeamPanel(
+      this.aiPanel, this.aiHpFill, this.aiHpGhost, this.aiHpLabel, this.aiDots,
+      ais, aiHP, '#ff4a3a', !isHumanTurn
+    )
 
-    this.weaponDisplay.innerHTML = `
-      <span class="weapon-name">${input.getSelectedWeapon().toUpperCase()}</span>
-    `
+    // ── Weapon ──
+    this.weaponDisplay.innerHTML = `<span style="letter-spacing:2px">${input.getSelectedWeapon().toUpperCase()}</span>`
 
-    // Power bar — only show while charging
+    // ── Power bar ──
     const isCharging = input.isCharging()
     if (isCharging) {
       const pct = input.getChargePower()
       this.powerBarWrap.style.display = 'block'
       this.powerBarFill.style.width = `${pct}%`
-      // Green → yellow → red gradient based on charge
       const r = Math.round(pct < 50 ? (pct / 50) * 255 : 255)
       const g = Math.round(pct < 50 ? 220 : Math.max(0, (1 - (pct - 50) / 50) * 220))
       this.powerBarFill.style.background = `rgb(${r},${g},0)`
-      // Pulse at max
-      if (pct >= 98) {
-        this.powerBarFill.style.boxShadow = `0 0 8px rgb(${r},${g},0)`
-      } else {
-        this.powerBarFill.style.boxShadow = 'none'
-      }
+      this.powerBarFill.style.boxShadow = pct >= 98
+        ? `0 0 10px rgb(${r},${g},0), 0 0 20px rgba(${r},${g},0,0.35)`
+        : 'none'
     } else {
       this.powerBarWrap.style.display = 'none'
     }
 
-    // Turn announcement: fire on turn/team change
+    // ── Turn announcement ──
     if (world.turn !== this.lastTurn || world.activeTeam !== this.lastTeam) {
       this.lastTurn = world.turn
       this.lastTeam = world.activeTeam
       if (world.phase === 'aiming') {
-        this.showTurnBanner(teamName, world.activeTeam === TEAM_HUMAN)
+        this.showTurnBanner(isHumanTurn ? 'HUMANS' : 'AI BOTS', isHumanTurn)
       }
     }
 
+    // ── Game over ──
     if (world.phase === 'game_over' && !this.gameOverShown) {
       this.gameOverShown = true
       const humansAlive = world.characters.filter(c => c.team === TEAM_HUMAN && c.alive).length
-      const winner = humansAlive > 0 ? 'HUMANS WIN!' : 'AI WINS!'
-      const winColor = humansAlive > 0 ? '#38f' : '#f33'
+      const winner    = humansAlive > 0 ? 'HUMANS WIN' : 'AI WINS'
+      const winColor  = humansAlive > 0 ? '#3a8fff' : '#ff4a3a'
       this.gameOverOverlay.style.display = 'flex'
       this.gameOverOverlay.innerHTML = `
         <h1 style="color:${winColor}">${winner}</h1>
-        <p>Press R or tap below to restart</p>
+        <p>Press R or tap to play again</p>
         <button class="restart-btn">PLAY AGAIN</button>
       `
       const btn = this.gameOverOverlay.querySelector('.restart-btn')
       if (btn) {
-        btn.addEventListener('click', () => {
-          if (this.onRestart) this.onRestart()
-        })
+        btn.addEventListener('click', () => { if (this.onRestart) this.onRestart() })
         btn.addEventListener('touchend', (e) => {
           e.preventDefault()
           if (this.onRestart) this.onRestart()
         })
       }
     }
+  }
+
+  private updateTeamPanel(
+    panel: HTMLElement,
+    fill: HTMLElement,
+    ghost: HTMLElement,
+    label: HTMLElement,
+    dots: HTMLElement,
+    chars: Character[],
+    hp: number,
+    color: string,
+    isActive: boolean
+  ): void {
+    const maxHP = chars.length * 100
+    const pct = maxHP > 0 ? Math.max(0, (hp / maxHP) * 100) : 0
+
+    fill.style.width = `${pct}%`
+    ghost.style.width = `${pct}%`
+
+    const hpColor = pct > 60 ? color : pct > 28 ? '#ffaa22' : '#ff3333'
+    fill.style.background = `linear-gradient(90deg, ${hpColor}99 0%, ${hpColor} 100%)`
+    fill.style.boxShadow  = `0 0 6px ${hpColor}66`
+
+    label.textContent = `${hp}`
+
+    panel.classList.toggle('team-active', isActive)
+
+    dots.innerHTML = chars.map(c =>
+      `<div class="char-dot${c.alive ? '' : ' dead'}" style="--dot-color:${c.alive ? color : '#333'}"></div>`
+    ).join('')
   }
 
   reset(): void {
