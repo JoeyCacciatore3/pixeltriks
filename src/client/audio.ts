@@ -7,26 +7,36 @@ class AudioEngine {
   private bgMusic: HTMLAudioElement | null = null
 
   constructor() {
-    // Pre-load music before user interaction so it's ready to play immediately
     this.bgMusic = new Audio('/bg-music.mp3')
     this.bgMusic.loop = true
     this.bgMusic.volume = 0.30
+    this.bgMusic.preload = 'auto'
 
-    const unlock = () => {
-      if (this.unlocked) return
-      this.unlocked = true
-      this.ctx = new AudioContext()
-      this.master = this.ctx.createGain()
-      this.master.gain.value = 0.5
-      this.master.connect(this.ctx.destination)
-      this.bgMusic!.play().catch(() => {})
-      window.removeEventListener('keydown', unlock)
-      window.removeEventListener('click', unlock)
-      window.removeEventListener('touchstart', unlock)
+    // Passive listeners as a fallback — explicit start() calls are preferred
+    const unlock = () => this.start()
+    window.addEventListener('keydown', unlock, { once: true })
+    window.addEventListener('click', unlock, { once: true })
+    window.addEventListener('touchstart', unlock, { once: true })
+  }
+
+  start(): void {
+    if (this.unlocked) return
+    this.unlocked = true
+
+    this.ctx = new AudioContext()
+    // Resume in case browser suspended it
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {})
     }
-    window.addEventListener('keydown', unlock)
-    window.addEventListener('click', unlock)
-    window.addEventListener('touchstart', unlock)
+    this.master = this.ctx.createGain()
+    this.master.gain.value = 0.5
+    this.master.connect(this.ctx.destination)
+
+    if (this.bgMusic) {
+      this.bgMusic.play().catch((err) => {
+        console.warn('[audio] bgMusic.play() failed:', err)
+      })
+    }
   }
 
   private get t(): number {

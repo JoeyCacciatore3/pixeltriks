@@ -127,6 +127,7 @@ class Game {
     document.body.appendChild(this.menuEl)
 
     document.getElementById('btn-solo')!.onclick = () => {
+      audio.start()
       this.net?.disconnect()
       this.net = null
       this.isMultiplayer = false
@@ -181,6 +182,7 @@ class Game {
 
       case 'game_start':
         this.localTeam = event.yourTeam
+        audio.start()
         this.hideMenu()
         this.initGame(event.seed)
         break
