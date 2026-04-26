@@ -77,7 +77,7 @@ src/
 
 **Terrain generation:** Multi-octave: 4 low-freq base octaves (smooth hills) + 3 high-freq ridge octaves via `(1 - Math.abs(Math.sin(...)))` for sharp peaks. Steep edge falloff (`edgeFalloff²`). Quadratic crater bowl: `(1 - dist/radius)²` depth falloff.
 
-**Camera:** Trauma²-based screen shake — `mag = trauma² * 6px`, decays at 0.88×/frame. Impact dwell: 120-tick state machine locks camera on impact point before returning to character follow.
+**Camera:** Critically damped spring follow (Unity SmoothDamp) — frame-rate independent, no overshoot. `smoothTime = 0.12s` for projectile follow (snappy), `0.35s` for character/impact (cinematic). Trauma²-based screen shake — `mag = trauma² * 6px`, decays at 0.88×/frame. Shake uses coprime-frequency sin products for coherent, non-strobing motion. Impact dwell: 150-tick state machine locks camera on blast zone before returning to active character.
 
 **Rendering approach:**
 - `MeshToonMaterial` with `flatShading: true` for characters
@@ -121,7 +121,7 @@ Projectiles spawn at head-level (4 sim units above character feet) for line-of-s
 
 **Teams:** 3 characters per team, 100 HP each.
 
-**Power-ups:** Airdropped crates every 5s (max 3 on map). Contents: extra time, skip turn, double damage, health pack, bomb trap.
+**Power-ups:** ⚠️ Defined in types (Blindbox, EnvObject) but not yet implemented — no spawn, collection, or effect logic in sim/. Constants `BLINDBOX_INTERVAL`, `BLINDBOX_MAX` exist but do nothing. Planned: airdropped crates every 5s (max 3), barrel/mine chain reactions.
 
 **AI:** Analytical ballistic trajectory solver: `solveAngles(dx,dy,speed,gravity)` → quadratic solution returns ≤2 exact launch angles per target×power sample. 5 power levels × up to 2 angles × 4 weapons × N enemies ≈ 40–80 precise candidates/turn (down from 720 blind samples). Noise-based difficulty (easy ±0.35 rad/±25 power, medium ±0.12/±8, hard ±0.04/±2). Stuck detection in AIController: if position delta < 0.1 for 4 ticks while grounded, issues `{ jump: true }` to unstick.
 
@@ -129,7 +129,7 @@ Projectiles spawn at head-level (4 sim units above character feet) for line-of-s
 
 ## Multiplayer
 
-Server-authoritative: server runs `step()`, broadcasts world state. Clients send `GameInput` on their turn only.
+Server-authoritative: server runs `step()`, broadcasts world state every 6 ticks (~100ms). Clients run `step()` locally every tick for lag-free prediction — both paths always advance the sim. On local turn: client sends `GameInput` to server and applies input locally. On opponent turn: server forwards `opponent_input` to client; client applies it locally for immediate prediction. `applyServerState()` reconciles drift on arrival; stale state (>3 ticks behind local) is dropped.
 
 - Room codes: 4-char alphanumeric
 - Auto-AI fallback if no second player joins within 15s

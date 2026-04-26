@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { createWorld, getActiveCharacter, step, getHeight } from '@sim/index'
-import { TICK_RATE, TEAM_AI, TEAM_HUMAN, AIM_PHASE_DURATION, TERRAIN_CELL_SIZE } from '@shared/constants'
+import { TICK_RATE, TEAM_AI, AIM_PHASE_DURATION, TERRAIN_CELL_SIZE } from '@shared/constants'
 import { AIController } from './aiController'
 import type { WorldState, GameInput, GamePhase } from '@shared/types'
 import type { SerializedWorld } from '@shared/net'
@@ -50,6 +50,7 @@ class Game {
   private lastTimerWarning = -1
   private prevAlive = new Set<number>()
   private pendingDamageLabels: { charId: number; amount: number; isEnemy: boolean }[] = []
+  private pendingOpponentInput: GameInput | null = null
 
   private appState: AppState = 'menu'
   private net: NetClient | null = null
@@ -251,6 +252,7 @@ class Game {
         break
 
       case 'opponent_input':
+        this.pendingOpponentInput = event.input
         break
 
       case 'opponent_disconnected':
@@ -286,6 +288,11 @@ class Game {
 
   private applyServerState(state: SerializedWorld): void {
     if (!this.world) return
+    // Skip state that's more than 3 ticks behind our local sim
+    if (state.tick < this.world.tick - 3) return
+
+    const tickDelta = state.tick - this.world.tick
+
     this.world.tick = state.tick
     this.world.phase = state.phase as GamePhase
     this.world.turn = state.turn
@@ -301,7 +308,12 @@ class Game {
     }
     this.world.projectiles = state.projectiles
 
-    this.terrainVersion++
+    // Only force terrain re-render when server is meaningfully ahead of us
+    // (we missed ticks that may have contained explosions). Routine syncs at
+    // ±3 ticks don't change terrain — the local step() already handles that.
+    if (tickDelta > 3) {
+      this.terrainVersion++
+    }
   }
 
   private initGame(seed: number): void {
@@ -401,6 +413,10 @@ class Game {
           if (input && (input.fire || input.moveDirection || input.moveZDirection || input.jump || input.endTurn)) {
             this.net?.sendInput(input, this.world.tick)
           }
+        } else {
+          // Feed opponent input received from server into local prediction
+          input = this.pendingOpponentInput
+          this.pendingOpponentInput = null
         }
       } else {
         const isAITurn = this.world.activeTeam === TEAM_AI
@@ -418,63 +434,54 @@ class Game {
       }
     }
 
-    if (!this.isMultiplayer) {
-      const events = step(this.world, input)
+    // Always advance sim locally — client-side prediction in multiplayer,
+    // authoritative in solo. Server state reconciles drift every ~100ms.
+    const events = step(this.world, input)
 
-      if (input?.fire) {
-        audio.fire(input.fire.weapon)
-      }
-      if (input?.jump) {
-        audio.jump()
-      }
+    if (input?.fire) audio.fire(input.fire.weapon)
+    if (input?.jump) audio.jump()
 
-      if (events.explosions.length > 0) {
-        this.terrainVersion++
-        for (const exp of events.explosions) {
-          this.explosionRenderer.spawn(exp, this.world.heightmap)
-          this.gameCamera.shake(exp.radius * 0.15)
-          this.gameCamera.onImpact(exp.x, exp.y, exp.z, this.world.heightmap)
-          audio.explosion(exp.radius)
-        }
+    if (events.explosions.length > 0) {
+      this.terrainVersion++
+      for (const exp of events.explosions) {
+        this.explosionRenderer.spawn(exp, this.world.heightmap)
+        this.gameCamera.shake(exp.radius * 0.15)
+        this.gameCamera.onImpact(exp.x, exp.y, exp.z, this.world.heightmap)
+        audio.explosion(exp.radius)
       }
+    }
 
-      for (const dmg of events.damageDealt) {
-        if (dmg.source === 'water') {
-          audio.waterSplash()
-        } else {
-          audio.damage(dmg.amount)
-        }
-        const dmgChar = this.world.characters.find(c => c.id === dmg.charId)
-        if (dmgChar) {
-          const isEnemy = dmgChar.team !== TEAM_HUMAN
-          this.pendingDamageLabels.push({ charId: dmg.charId, amount: dmg.amount, isEnemy })
-        }
+    for (const dmg of events.damageDealt) {
+      if (dmg.source === 'water') {
+        audio.waterSplash()
+      } else {
+        audio.damage(dmg.amount)
       }
-
-      for (const c of this.world.characters) {
-        if (!c.alive && this.prevAlive.has(c.id)) {
-          audio.death()
-          this.prevAlive.delete(c.id)
-        }
+      const dmgChar = this.world.characters.find(c => c.id === dmg.charId)
+      if (dmgChar) {
+        const isEnemy = dmgChar.team !== this.localTeam
+        this.pendingDamageLabels.push({ charId: dmg.charId, amount: dmg.amount, isEnemy })
       }
+    }
 
-      if (events.turnAdvanced) {
+    for (const c of this.world.characters) {
+      if (!c.alive && this.prevAlive.has(c.id)) {
+        audio.death()
+        this.prevAlive.delete(c.id)
+      }
+    }
+
+    if (events.turnAdvanced) {
+      if (!this.isMultiplayer) {
         this.lastAITeamActive = false
         this.aiController.reset()
-        audio.turnChange()
       }
+      audio.turnChange()
+    }
 
-      if (events.gameOver) {
-        const humansAlive = this.world.characters.filter(c => c.team === 0 && c.alive).length
-        audio.gameOver(humansAlive > 0)
-      }
-    } else {
-      if (input?.fire) {
-        audio.fire(input.fire.weapon)
-      }
-      if (input?.jump) {
-        audio.jump()
-      }
+    if (events.gameOver) {
+      const teamAlive = this.world.characters.filter(c => c.team === this.localTeam && c.alive).length
+      audio.gameOver(teamAlive > 0)
     }
 
     const currentWeapon = this.input.getSelectedWeapon()

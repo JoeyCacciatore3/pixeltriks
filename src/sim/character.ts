@@ -84,13 +84,15 @@ export function applyCharacterPhysics(
 
   if (char.x < 0 || char.x > TERRAIN_SIZE ||
       char.z < 0 || char.z > TERRAIN_SIZE) {
+    const dmg = char.hp
     char.hp = 0
-    damages.push({ charId: char.id, amount: char.hp, source: 'water' })
+    damages.push({ charId: char.id, amount: dmg, source: 'water' })
   }
 
   if (char.y < world.waterLevel) {
+    const dmg = char.hp
     char.hp = 0
-    damages.push({ charId: char.id, amount: char.hp, source: 'water' })
+    damages.push({ charId: char.id, amount: dmg, source: 'water' })
   }
 
   if (char.hp <= 0) {

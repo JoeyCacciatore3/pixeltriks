@@ -1,4 +1,4 @@
-import { GRAVITY } from '@shared/constants'
+import { GRAVITY, TERRAIN_SIZE } from '@shared/constants'
 import type {
   Projectile, WorldState, WeaponKind,
   ExplosionEvent, DamageEvent
@@ -56,6 +56,7 @@ export function createAirstrikeProjectiles(
       bouncesLeft: 0,
       fuseTimer: 0,
       active: true,
+      graceTimer: 0,
     })
   }
   return missiles
@@ -71,7 +72,7 @@ export function stepProjectile(
 
   const config = WEAPONS[proj.weapon]
 
-  if (proj.graceTimer !== undefined && proj.graceTimer > 0) proj.graceTimer--
+  if (proj.graceTimer > 0) proj.graceTimer--
 
   proj.vy += GRAVITY * config.gravityMul
   proj.x += proj.vx
@@ -93,7 +94,7 @@ export function stepProjectile(
 
   const groundH = getHeight(world.heightmap, proj.x, proj.z)
 
-  if (proj.y >= groundH && (proj.graceTimer ?? 0) <= 0) {
+  if (proj.y >= groundH && proj.graceTimer <= 0) {
     if (proj.bouncesLeft > 0) {
       proj.y = groundH
       proj.vy = -proj.vy * 0.6
@@ -106,8 +107,8 @@ export function stepProjectile(
     return
   }
 
-  if (proj.x < 0 || proj.x > 256 ||
-      proj.z < 0 || proj.z > 256) {
+  if (proj.x < 0 || proj.x > TERRAIN_SIZE ||
+      proj.z < 0 || proj.z > TERRAIN_SIZE) {
     proj.active = false
     return
   }

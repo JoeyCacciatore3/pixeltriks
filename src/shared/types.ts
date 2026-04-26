@@ -62,7 +62,7 @@ export interface Projectile {
   bouncesLeft: number
   fuseTimer: number
   active: boolean
-  graceTimer?: number  // ticks before terrain collision is checked (prevents clip on steep slopes at spawn)
+  graceTimer: number  // ticks before terrain collision is checked (prevents clip on steep slopes at spawn)
 }
 
 export interface Blindbox {
