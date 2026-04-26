@@ -16,6 +16,7 @@ import { GameCamera } from './camera'
 import { InputManager } from './input'
 import { HUD } from './ui/hud'
 import { TouchControls } from './ui/touchControls'
+import { WeaponPicker } from './ui/weaponPicker'
 import { audio } from './audio'
 import { NetClient } from './net'
 
@@ -45,7 +46,6 @@ class Game {
   private aiController = new AIController()
   private lastAITeamActive = false
   private isMultiplayer = false
-  private isQuickplay = false
   private localTeam = 0
   private lastWeapon: string = 'bazooka'
   private lastChargePlaying = false
@@ -54,6 +54,8 @@ class Game {
   private pendingDamageLabels: { charId: number; amount: number; isEnemy: boolean }[] = []
   private pendingOpponentInput: GameInput | null = null
 
+  private weaponPicker: WeaponPicker | null = null
+
   private portalGroup: THREE.Group | null = null
   private portalHintEl: HTMLElement | null = null
   private readonly PORTAL_SIM_X = 15
@@ -61,7 +63,6 @@ class Game {
 
   private appState: AppState = 'menu'
   private net: NetClient | null = null
-  private roomCode = ''
   private menuEl!: HTMLElement
   private renderersInitialized = false
 
@@ -86,64 +87,56 @@ class Game {
 
     window.addEventListener('resize', this.onResize)
 
-    this.showMenu()
     this.lastTime = performance.now()
     this.loop()
 
-    // Auto-start when arriving through Vibe Jam portal
+    // Auto-start when arriving through Vibe Jam portal — skip queue
     const params = new URLSearchParams(window.location.search)
     if (params.get('portal') === 'true') {
-      this.hideMenu()
       this.isMultiplayer = false
       this.initGame(Date.now())
+    } else {
+      this.autoQueue()
     }
   }
 
-  private showMenu(): void {
-    this.appState = 'menu'
+  private autoQueue(): void {
+    this.isMultiplayer = true
+    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
+    this.net.connect()
+    this.showAutoLobby('Connecting...')
+  }
+
+  private showAutoLobby(message: string): void {
+    this.appState = 'lobby'
+    this.menuEl?.remove()
     this.menuEl = document.createElement('div')
     this.menuEl.id = 'menu-screen'
     this.menuEl.innerHTML = `
       <div class="menu-container">
         <h1 class="menu-title">PIXELTRIKS</h1>
         <p class="menu-subtitle">HUMANS vs AI</p>
-        <div class="menu-buttons">
-          <button id="btn-quick" class="menu-btn primary">QUICK PLAY</button>
-          <button id="btn-solo" class="menu-btn">SOLO vs AI</button>
-          <button id="btn-create" class="menu-btn">CREATE ROOM</button>
-          <div class="join-row">
-            <input id="join-code" type="text" maxlength="4" placeholder="CODE" class="menu-input" />
-            <button id="btn-join" class="menu-btn small">JOIN</button>
-          </div>
+        <div class="lobby-searching">
+          <div class="search-spinner"></div>
+          <p id="lobby-status" class="lobby-status-text">${message}</p>
         </div>
+        <button id="btn-solo" class="menu-btn primary">PLAY SOLO</button>
         <p class="menu-footer">WASD Move | Arrows Aim | Space Fire | Tab Weapon</p>
       </div>
     `
     document.body.appendChild(this.menuEl)
 
-    document.getElementById('btn-quick')!.onclick = () => this.quickPlay()
-    document.getElementById('btn-solo')!.onclick = () => this.startSolo()
-    document.getElementById('btn-create')!.onclick = () => this.createRoom()
-    document.getElementById('btn-join')!.onclick = () => {
-      const code = (document.getElementById('join-code') as HTMLInputElement).value
-      if (code.length === 4) this.joinRoom(code)
+    document.getElementById('btn-solo')!.onclick = () => {
+      this.net?.disconnect()
+      this.net = null
+      this.isMultiplayer = false
+      this.hideMenu()
+      this.initGame(Date.now())
     }
-    ;(document.getElementById('join-code') as HTMLInputElement).addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const code = (e.target as HTMLInputElement).value
-        if (code.length === 4) this.joinRoom(code)
-      }
-    })
   }
 
   private hideMenu(): void {
     this.menuEl?.remove()
-  }
-
-  private startSolo(): void {
-    this.isMultiplayer = false
-    this.hideMenu()
-    this.initGame(Date.now())
   }
 
   private getWsUrl(): string {
@@ -152,98 +145,28 @@ class Game {
     return `${wsProtocol}//${window.location.hostname}:8080`
   }
 
-  private quickPlay(): void {
-    this.isMultiplayer = true
-    this.isQuickplay = true
-    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
-    this.net.connect()
-    this.showLobby('Finding opponent...')
-  }
-
-  private createRoom(): void {
-    this.isMultiplayer = true
-    this.isQuickplay = false
-    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
-    this.net.connect()
-
-    this.showLobby('Creating room...')
-  }
-
-  private joinRoom(code: string): void {
-    this.isMultiplayer = true
-    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
-    this.net.connect()
-    this.roomCode = code.toUpperCase()
-
-    this.showLobby(`Joining ${this.roomCode}...`)
-  }
-
-  private showLobby(message: string): void {
-    this.appState = 'lobby'
-    this.hideMenu()
-
-    this.menuEl = document.createElement('div')
-    this.menuEl.id = 'menu-screen'
-    this.menuEl.innerHTML = `
-      <div class="menu-container">
-        <h1 class="menu-title">PIXELTRIKS</h1>
-        <p id="lobby-status" class="menu-subtitle">${message}</p>
-        <p id="lobby-code" class="lobby-code"></p>
-        <button id="btn-back" class="menu-btn small">BACK</button>
-      </div>
-    `
-    document.body.appendChild(this.menuEl)
-
-    document.getElementById('btn-back')!.onclick = () => {
-      this.net?.disconnect()
-      this.net = null
-      this.hideMenu()
-      this.showMenu()
-    }
-  }
-
   private updateLobby(text: string): void {
     const el = document.getElementById('lobby-status')
     if (el) el.textContent = text
   }
 
-  private showLobbyCode(code: string): void {
-    const el = document.getElementById('lobby-code')
-    if (el) el.textContent = code
-  }
-
   private onNetEvent(event: import('./net').NetEvent): void {
     switch (event.type) {
       case 'connected':
-        if (this.isQuickplay) {
-          this.net!.sendQuickplay()
-        } else if (this.roomCode) {
-          this.net!.joinRoom(this.roomCode)
-        } else {
-          this.net!.createRoom()
-        }
+        this.net!.sendQuickplay()
         break
 
       case 'waiting':
-        this.updateLobby('Searching for opponent... (15s)')
+        this.updateLobby('Searching for opponent...')
         break
 
       case 'room_created':
-        this.roomCode = event.roomCode
-        this.localTeam = event.team
-        if (this.isQuickplay) {
-          // no opponent found after 15s — fall back to solo AI
-          this.net?.disconnect()
-          this.net = null
-          this.hideMenu()
-          this.isMultiplayer = false
-          this.isQuickplay = false
-          this.initGame(Date.now())
-        } else {
-          this.showLobbyCode(event.roomCode)
-          this.updateLobby('Waiting for opponent...')
-          this.net!.sendReady()
-        }
+        // 15s timeout with no opponent — fall back to solo AI
+        this.net?.disconnect()
+        this.net = null
+        this.hideMenu()
+        this.isMultiplayer = false
+        this.initGame(Date.now())
         break
 
       case 'player_joined':
@@ -253,7 +176,7 @@ class Game {
 
       case 'countdown':
         this.appState = 'countdown'
-        this.updateLobby(`Starting in ${event.seconds}...`)
+        this.updateLobby(`Opponent found! Starting in ${event.seconds}...`)
         break
 
       case 'game_start':
@@ -282,7 +205,9 @@ class Game {
         break
 
       case 'error':
-        this.updateLobby(event.message)
+        if (this.appState !== 'playing') {
+          this.updateLobby('Server unavailable — tap PLAY SOLO to continue')
+        }
         break
 
       case 'disconnected':
@@ -360,6 +285,16 @@ class Game {
     this.input = new InputManager()
     new TouchControls(this.input)
     this.hud = new HUD()
+
+    this.weaponPicker?.dispose()
+    this.weaponPicker = new WeaponPicker()
+    this.input.onWeaponPickRequired = () => {
+      if (this.world?.phase === 'aiming' && this.world.activeTeam !== TEAM_AI) {
+        this.weaponPicker!.show(this.input.getSelectedWeapon(), (weapon) => {
+          this.input.confirmWeapon(weapon)
+        })
+      }
+    }
     this.hud.onRestart = this.doRestart
 
     this.terrainRenderer.update(this.world.heightmap, this.terrainVersion)
@@ -437,7 +372,9 @@ class Game {
     }
     this.portalHintEl?.remove()
     this.portalHintEl = null
-    this.showMenu()
+    this.weaponPicker?.dispose()
+    this.weaponPicker = null
+    this.autoQueue()
   }
 
   private onRestartKey = (e: KeyboardEvent): void => {
@@ -565,6 +502,8 @@ class Game {
         this.lastAITeamActive = false
         this.aiController.reset()
       }
+      this.input.resetWeaponConfirm()
+      this.weaponPicker?.hide()
       audio.turnChange()
     }
 
