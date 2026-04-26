@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pixeltriks-server
+    env: node
+    buildCommand: npm install
+    startCommand: npx tsx src/server/index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+    plan: free

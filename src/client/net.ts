@@ -9,6 +9,7 @@ export type NetEvent =
   | { type: 'state'; world: SerializedWorld; tick: number }
   | { type: 'opponent_input'; input: GameInput; tick: number }
   | { type: 'opponent_disconnected' }
+  | { type: 'waiting' }
   | { type: 'error'; message: string }
   | { type: 'connected' }
   | { type: 'disconnected' }
@@ -61,6 +62,10 @@ export class NetClient {
 
   sendInput(input: GameInput, tick: number): void {
     this.send({ type: 'input', input, tick })
+  }
+
+  sendQuickplay(): void {
+    this.send({ type: 'quickplay' })
   }
 
   private send(msg: ClientMessage): void {

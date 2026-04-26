@@ -5,6 +5,7 @@ export type ClientMessage =
   | { type: 'join'; roomCode: string }
   | { type: 'input'; input: GameInput; tick: number }
   | { type: 'ready' }
+  | { type: 'quickplay' }
 
 export type ServerMessage =
   | { type: 'room_created'; roomCode: string; team: number }
@@ -16,6 +17,7 @@ export type ServerMessage =
   | { type: 'opponent_input'; input: GameInput; tick: number }
   | { type: 'error'; message: string }
   | { type: 'opponent_disconnected' }
+  | { type: 'waiting' }
 
 export interface SerializedWorld {
   tick: number

@@ -43,6 +43,7 @@ class Game {
   private aiController = new AIController()
   private lastAITeamActive = false
   private isMultiplayer = false
+  private isQuickplay = false
   private localTeam = 0
   private lastWeapon: string = 'bazooka'
   private lastChargePlaying = false
@@ -90,7 +91,8 @@ class Game {
         <h1 class="menu-title">PIXELTRIKS</h1>
         <p class="menu-subtitle">HUMANS vs AI</p>
         <div class="menu-buttons">
-          <button id="btn-solo" class="menu-btn primary">SOLO vs AI</button>
+          <button id="btn-quick" class="menu-btn primary">QUICK PLAY</button>
+          <button id="btn-solo" class="menu-btn">SOLO vs AI</button>
           <button id="btn-create" class="menu-btn">CREATE ROOM</button>
           <div class="join-row">
             <input id="join-code" type="text" maxlength="4" placeholder="CODE" class="menu-input" />
@@ -102,6 +104,7 @@ class Game {
     `
     document.body.appendChild(this.menuEl)
 
+    document.getElementById('btn-quick')!.onclick = () => this.quickPlay()
     document.getElementById('btn-solo')!.onclick = () => this.startSolo()
     document.getElementById('btn-create')!.onclick = () => this.createRoom()
     document.getElementById('btn-join')!.onclick = () => {
@@ -127,13 +130,22 @@ class Game {
   }
 
   private getWsUrl(): string {
-    const loc = window.location
-    const wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:'
-    return `${wsProtocol}//${loc.hostname}:8080`
+    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL as string
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProtocol}//${window.location.hostname}:8080`
+  }
+
+  private quickPlay(): void {
+    this.isMultiplayer = true
+    this.isQuickplay = true
+    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
+    this.net.connect()
+    this.showLobby('Finding opponent...')
   }
 
   private createRoom(): void {
     this.isMultiplayer = true
+    this.isQuickplay = false
     this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
     this.net.connect()
 
@@ -186,19 +198,35 @@ class Game {
   private onNetEvent(event: import('./net').NetEvent): void {
     switch (event.type) {
       case 'connected':
-        if (this.roomCode) {
+        if (this.isQuickplay) {
+          this.net!.sendQuickplay()
+        } else if (this.roomCode) {
           this.net!.joinRoom(this.roomCode)
         } else {
           this.net!.createRoom()
         }
         break
 
+      case 'waiting':
+        this.updateLobby('Searching for opponent... (15s)')
+        break
+
       case 'room_created':
         this.roomCode = event.roomCode
         this.localTeam = event.team
-        this.showLobbyCode(event.roomCode)
-        this.updateLobby('Waiting for opponent...')
-        this.net!.sendReady()
+        if (this.isQuickplay) {
+          // no opponent found after 15s — fall back to solo AI
+          this.net?.disconnect()
+          this.net = null
+          this.hideMenu()
+          this.isMultiplayer = false
+          this.isQuickplay = false
+          this.initGame(Date.now())
+        } else {
+          this.showLobbyCode(event.roomCode)
+          this.updateLobby('Waiting for opponent...')
+          this.net!.sendReady()
+        }
         break
 
       case 'player_joined':

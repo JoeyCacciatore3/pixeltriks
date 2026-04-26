@@ -24,6 +24,12 @@ interface Room {
 const rooms = new Map<string, Room>()
 const playerRooms = new Map<WebSocket, string>()
 
+interface QuickplayWaiter {
+  ws: WebSocket
+  timer: ReturnType<typeof setTimeout>
+}
+let quickplayQueue: QuickplayWaiter | null = null
+
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let code = ''
@@ -191,6 +197,54 @@ function handleMessage(ws: WebSocket, data: string): void {
       break
     }
 
+    case 'quickplay': {
+      if (quickplayQueue && quickplayQueue.ws.readyState === WebSocket.OPEN) {
+        const opponent = quickplayQueue.ws
+        clearTimeout(quickplayQueue.timer)
+        quickplayQueue = null
+
+        const code = generateRoomCode()
+        const room: Room = {
+          code,
+          players: [
+            { ws: opponent, team: 0, ready: true },
+            { ws, team: 1, ready: true },
+          ],
+          world: null,
+          status: 'waiting',
+          tickInterval: null,
+          pendingInputs: new Map(),
+        }
+        rooms.set(code, room)
+        playerRooms.set(opponent, code)
+        playerRooms.set(ws, code)
+        startCountdown(room)
+      } else {
+        if (quickplayQueue) clearTimeout(quickplayQueue.timer)
+        const timer = setTimeout(() => {
+          if (quickplayQueue?.ws === ws) {
+            quickplayQueue = null
+            // fall back: create a solo room so client can start vs AI
+            const code = generateRoomCode()
+            const room: Room = {
+              code,
+              players: [{ ws, team: 0, ready: true }],
+              world: null,
+              status: 'waiting',
+              tickInterval: null,
+              pendingInputs: new Map(),
+            }
+            rooms.set(code, room)
+            playerRooms.set(ws, code)
+            send(ws, { type: 'room_created', roomCode: code, team: 0 })
+          }
+        }, 15000)
+        quickplayQueue = { ws, timer }
+        send(ws, { type: 'waiting' })
+      }
+      break
+    }
+
     case 'input': {
       const roomCode = playerRooms.get(ws)
       if (!roomCode) return
@@ -210,6 +264,11 @@ function handleMessage(ws: WebSocket, data: string): void {
 }
 
 function handleDisconnect(ws: WebSocket): void {
+  if (quickplayQueue?.ws === ws) {
+    clearTimeout(quickplayQueue.timer)
+    quickplayQueue = null
+  }
+
   const roomCode = playerRooms.get(ws)
   if (!roomCode) return
 
