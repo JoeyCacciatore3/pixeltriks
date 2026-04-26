@@ -41,18 +41,21 @@ export class TerrainRenderer {
       positions.setY(i, h * TERRAIN_CELL_SIZE)
 
       const normalizedH = h / 40
-      if (normalizedH > 0.7) {
-        colors[i * 3] = 0.3
-        colors[i * 3 + 1] = 0.65
-        colors[i * 3 + 2] = 0.2
-      } else if (normalizedH > 0.3) {
-        colors[i * 3] = 0.55
-        colors[i * 3 + 1] = 0.45
-        colors[i * 3 + 2] = 0.3
+      if (normalizedH > 0.88) {
+        // Snow / exposed rock peak
+        colors[i * 3] = 0.82; colors[i * 3 + 1] = 0.82; colors[i * 3 + 2] = 0.76
+      } else if (normalizedH > 0.62) {
+        // Lush grass (high ground)
+        colors[i * 3] = 0.28; colors[i * 3 + 1] = 0.49; colors[i * 3 + 2] = 0.22
+      } else if (normalizedH > 0.40) {
+        // Mid grass / olive slope
+        colors[i * 3] = 0.40; colors[i * 3 + 1] = 0.47; colors[i * 3 + 2] = 0.18
+      } else if (normalizedH > 0.18) {
+        // Dirt / brown slope
+        colors[i * 3] = 0.55; colors[i * 3 + 1] = 0.36; colors[i * 3 + 2] = 0.17
       } else {
-        colors[i * 3] = 0.6
-        colors[i * 3 + 1] = 0.55
-        colors[i * 3 + 2] = 0.4
+        // Base rock (dark, near water)
+        colors[i * 3] = 0.38; colors[i * 3 + 1] = 0.36; colors[i * 3 + 2] = 0.40
       }
     }
 

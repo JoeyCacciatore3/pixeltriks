@@ -14,6 +14,8 @@ export class InputManager {
   private pendingFire: { angle: number; power: number; weapon: WeaponKind; azimuth: number } | null = null
   private pendingEndTurn = false
   private pendingJump = false
+  private weaponConfirmed = false
+  onWeaponPickRequired: (() => void) | null = null
 
   constructor() {
     window.addEventListener('keydown', this.onKeyDown)
@@ -28,12 +30,13 @@ export class InputManager {
     this.keys.add(e.code)
 
     if (e.code === 'Space' && !this.charging) {
-      this.startCharge()
+      this.startChargeOrPick()
     }
 
     if (e.code === 'Tab') {
       e.preventDefault()
       this.cycleWeapon(1)
+      this.weaponConfirmed = true  // Tab counts as explicit selection — skip picker
     }
 
     if (e.code === 'Enter' && !e.shiftKey) {
@@ -53,10 +56,36 @@ export class InputManager {
     }
   }
 
+  startChargeOrPick(): void {
+    if (this.charging) return
+    if (!this.weaponConfirmed) {
+      this.onWeaponPickRequired?.()
+    } else {
+      this.startCharge()
+    }
+  }
+
   startCharge(): void {
     if (this.charging) return
     this.charging = true
     this.chargeStart = performance.now()
+  }
+
+  confirmWeapon(weapon: WeaponKind): void {
+    const idx = WEAPON_ORDER.indexOf(weapon)
+    if (idx !== -1) {
+      this.weaponIndex = idx
+      this.selectedWeapon = weapon
+    }
+    this.weaponConfirmed = true
+  }
+
+  resetWeaponConfirm(): void {
+    this.weaponConfirmed = false
+  }
+
+  isWeaponConfirmed(): boolean {
+    return this.weaponConfirmed
   }
 
   releaseCharge(): void {

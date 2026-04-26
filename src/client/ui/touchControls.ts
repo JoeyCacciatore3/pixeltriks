@@ -117,7 +117,7 @@ export class TouchControls {
       if (action === 'fire') {
         btn.addEventListener('touchstart', (e) => {
           e.preventDefault()
-          this.input.startCharge()
+          this.input.startChargeOrPick()
           btn.classList.add('tc-active')
         }, { passive: false })
 
@@ -134,7 +134,7 @@ export class TouchControls {
 
         btn.addEventListener('mousedown', (e) => {
           e.preventDefault()
-          this.input.startCharge()
+          this.input.startChargeOrPick()
           btn.classList.add('tc-active')
         })
 

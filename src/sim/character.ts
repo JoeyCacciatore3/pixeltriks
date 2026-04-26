@@ -14,21 +14,32 @@ export function moveCharacter(
 ): void {
   if (!char.alive || !char.grounded) return
 
-  const nx = char.x + direction * CHAR_SPEED
-  const nz = char.z + zDir * CHAR_SPEED
+  // Apply X and Z independently so diagonal movement doesn't get blocked
+  // by a steep diagonal cell when either cardinal direction is passable.
+  if (direction !== 0) {
+    const nx = char.x + direction * CHAR_SPEED
+    if (nx >= 1 && nx <= TERRAIN_SIZE - 2) {
+      const curH = getHeight(world.heightmap, char.x, char.z)
+      const tgtH = getHeight(world.heightmap, nx, char.z)
+      if (tgtH - curH <= CLIMB_MAX) {
+        char.x = nx
+        char.y = tgtH
+        char.facing = direction
+      }
+    }
+  }
 
-  if (nx < 1 || nx > TERRAIN_SIZE - 2) return
-  if (nz < 1 || nz > TERRAIN_SIZE - 2) return
-
-  const currentH = getHeight(world.heightmap, char.x, char.z)
-  const targetH = getHeight(world.heightmap, nx, nz)
-
-  if (targetH - currentH > CLIMB_MAX) return
-
-  char.x = nx
-  char.z = nz
-  char.y = targetH
-  if (direction !== 0) char.facing = direction
+  if (zDir !== 0) {
+    const nz = char.z + zDir * CHAR_SPEED
+    if (nz >= 1 && nz <= TERRAIN_SIZE - 2) {
+      const curH = getHeight(world.heightmap, char.x, char.z)
+      const tgtH = getHeight(world.heightmap, char.x, nz)
+      if (tgtH - curH <= CLIMB_MAX) {
+        char.z = nz
+        char.y = tgtH
+      }
+    }
+  }
 }
 
 export function jumpCharacter(char: Character, moveDir: number = 0): void {

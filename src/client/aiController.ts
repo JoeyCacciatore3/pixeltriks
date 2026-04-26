@@ -45,7 +45,7 @@ export class AIController {
 
           if (this.plan?.moveDirection) {
             this.moveDir = this.plan.moveDirection
-            this.moveTarget = char.x + this.moveDir * 15
+            this.moveTarget = char.x + this.moveDir * 30
             this.phase = 'moving'
             this.timer = 0
             this.plan = null
@@ -62,7 +62,7 @@ export class AIController {
       }
 
       case 'moving': {
-        if (this.timer > 90 || !this.moveTarget) {
+        if (this.timer > 150 || !this.moveTarget) {
           this.phase = 'thinking'
           this.timer = 0
           return null

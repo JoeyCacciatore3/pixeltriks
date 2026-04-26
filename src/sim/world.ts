@@ -4,7 +4,7 @@ import {
 } from '@shared/constants'
 import type { WorldState, Character, StepEvents } from '@shared/types'
 import { createPRNG } from './prng'
-import { generateTerrain, getHeight } from './terrain'
+import { generateFixedTerrain, getHeight } from './terrain'
 
 function fnv1a(data: Uint8Array): number {
   let hash = 0x811c9dc5
@@ -37,7 +37,7 @@ export function hashWorld(world: WorldState): number {
 
 export function createWorld(seed: number): WorldState {
   const prng = createPRNG(seed)
-  const heightmap = generateTerrain(prng)
+  const heightmap = generateFixedTerrain()
 
   const characters: Character[] = []
   const size = TERRAIN_SIZE

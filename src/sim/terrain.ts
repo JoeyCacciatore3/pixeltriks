@@ -1,6 +1,51 @@
 import { TERRAIN_SIZE, TERRAIN_HEIGHT_SCALE } from '@shared/constants'
 import type { PRNG } from './prng'
 
+function gauss(x: number, mu: number, sigma: number): number {
+  return Math.exp(-((x - mu) ** 2) / (2 * sigma * sigma))
+}
+
+export function generateFixedTerrain(): Float32Array {
+  const size = TERRAIN_SIZE
+  const map = new Float32Array(size * size)
+
+  for (let z = 0; z < size; z++) {
+    for (let x = 0; x < size; x++) {
+      const nx = x / size
+      const nz = z / size
+
+      // Two raised base platforms where teams spawn
+      const leftBase  = gauss(nx, 0.20, 0.11) * gauss(nz, 0.50, 0.22) * 0.42
+      const rightBase = gauss(nx, 0.80, 0.11) * gauss(nz, 0.50, 0.22) * 0.42
+
+      // Central tactical hills — offset from each other for asymmetric cover
+      const hillL = gauss(nx, 0.41, 0.065) * gauss(nz, 0.44, 0.10) * 0.30
+      const hillR = gauss(nx, 0.59, 0.065) * gauss(nz, 0.56, 0.10) * 0.30
+
+      // North/south cover bumps off the main battle line
+      const coverN = gauss(nx, 0.50, 0.09) * gauss(nz, 0.33, 0.09) * 0.22
+      const coverS = gauss(nx, 0.50, 0.09) * gauss(nz, 0.67, 0.09) * 0.22
+
+      // Base shape: consistent floor, gentle dip at absolute center
+      const baseShape = 0.50 - gauss(nx, 0.50, 0.18) * 0.08
+
+      // Z-axis rolling for depth variety
+      const zWave = Math.sin(nz * Math.PI * 2.8) * 0.032 + Math.sin(nz * Math.PI * 6.1) * 0.016
+
+      const h = baseShape + leftBase + rightBase + hillL + hillR + coverN + coverS + zWave
+
+      // Island edge falloff
+      const ex = Math.min(nx, 1 - nx) * 3.5
+      const ez = Math.min(nz, 1 - nz) * 3.5
+      const edgeFalloff = Math.pow(Math.min(1, ex) * Math.min(1, ez), 1.5)
+
+      map[z * size + x] = Math.max(0, h * TERRAIN_HEIGHT_SCALE * edgeFalloff)
+    }
+  }
+
+  return map
+}
+
 export function generateTerrain(prng: PRNG): Float32Array {
   const size = TERRAIN_SIZE
   const heightmap = new Float32Array(size * size)

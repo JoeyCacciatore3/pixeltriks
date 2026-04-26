@@ -80,7 +80,7 @@ export function computeAIInput(
       ? (bestAirstrike?.score ?? 0)
       : (bestShot?.score ?? 0)
 
-    if (bestMove.score > shotScore * 0.5 || shotScore <= 0) {
+    if (bestMove.score > shotScore * 0.15 || shotScore <= 0) {
       const dir = bestMove.targetX > char.x ? 1 : -1
       if (bestMove.needsJump && char.grounded) {
         return { jump: true }
@@ -297,6 +297,10 @@ function evaluateMovement(
     char.x + 10,
     char.x - 20,
     char.x + 20,
+    char.x - 30,
+    char.x + 30,
+    char.x - 50,
+    char.x + 50,
   ]
 
   for (const tx of candidates) {
@@ -324,7 +328,7 @@ function evaluateMovement(
 
     const myH = getHeight(world.heightmap, tx, char.z)
     const enemyH = getHeight(world.heightmap, nearestEnemy.x, nearestEnemy.z)
-    if (myH < enemyH) score += 15
+    if (myH > enemyH) score += 15
 
     if (tx !== char.x) score -= 5
 
