@@ -158,7 +158,7 @@ Server-authoritative: server runs `step()`, broadcasts world state every 6 ticks
 | Widget script     | ✅ `vibej.am/2026/widget.js` in index.html|
 | Multiplayer       | ✅ 2-player WebSocket rooms               |
 | Three.js          | ✅                                        |
-| Portal/webring    | ⚠️ Exit portal needed (query param link) |
+| Portal/webring    | ✅ Exit portal in scene, `?portal=true` auto-start, redirects to `vibej.am/portal/2026` |
 
 ---
 

@@ -52,6 +52,11 @@ class Game {
   private pendingDamageLabels: { charId: number; amount: number; isEnemy: boolean }[] = []
   private pendingOpponentInput: GameInput | null = null
 
+  private portalGroup: THREE.Group | null = null
+  private portalHintEl: HTMLElement | null = null
+  private readonly PORTAL_SIM_X = 15
+  private readonly PORTAL_SIM_Z = 128
+
   private appState: AppState = 'menu'
   private net: NetClient | null = null
   private roomCode = ''
@@ -82,6 +87,14 @@ class Game {
     this.showMenu()
     this.lastTime = performance.now()
     this.loop()
+
+    // Auto-start when arriving through Vibe Jam portal
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('portal') === 'true') {
+      this.hideMenu()
+      this.isMultiplayer = false
+      this.initGame(Date.now())
+    }
   }
 
   private showMenu(): void {
@@ -357,7 +370,55 @@ class Game {
     this.lastChargePlaying = false
     this.lastTimerWarning = -1
 
+    this.createPortal()
+
     window.addEventListener('keydown', this.onRestartKey)
+  }
+
+  private createPortal(): void {
+    if (this.portalGroup) {
+      this.scene.remove(this.portalGroup)
+      this.portalGroup = null
+    }
+    this.portalHintEl?.remove()
+    this.portalHintEl = null
+
+    const group = new THREE.Group()
+
+    group.add(new THREE.Mesh(
+      new THREE.TorusGeometry(3, 0.25, 8, 32),
+      new THREE.MeshBasicMaterial({ color: 0x00ffaa })
+    ))
+
+    group.add(new THREE.Mesh(
+      new THREE.CircleGeometry(2.75, 32),
+      new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.2, side: THREE.DoubleSide })
+    ))
+
+    group.add(new THREE.PointLight(0x00ffaa, 4, 20))
+
+    const groundH = getHeight(this.world.heightmap, this.PORTAL_SIM_X, this.PORTAL_SIM_Z)
+    group.position.set(
+      (this.PORTAL_SIM_X - 128) * TERRAIN_CELL_SIZE,
+      groundH * TERRAIN_CELL_SIZE + 3,
+      (this.PORTAL_SIM_Z - 128) * TERRAIN_CELL_SIZE
+    )
+
+    this.scene.add(group)
+    this.portalGroup = group
+
+    const hint = document.createElement('div')
+    hint.style.cssText = [
+      'position:fixed', 'bottom:56px', 'left:50%', 'transform:translateX(-50%)',
+      'background:rgba(0,255,170,0.12)', 'border:1px solid rgba(0,255,170,0.5)',
+      'color:#00ffaa', 'font-family:Segoe UI,system-ui,sans-serif', 'font-size:13px',
+      'font-weight:700', 'letter-spacing:2px', 'padding:8px 20px',
+      'border-radius:6px', 'pointer-events:none', 'z-index:30',
+      'display:none', 'text-shadow:0 0 10px #00ffaa',
+    ].join(';')
+    hint.textContent = '✦ VIBE JAM PORTAL — walk in to travel'
+    document.body.appendChild(hint)
+    this.portalHintEl = hint
   }
 
   private doRestart = (): void => {
@@ -366,6 +427,12 @@ class Game {
     this.hud?.reset()
     this.net?.disconnect()
     this.net = null
+    if (this.portalGroup) {
+      this.scene.remove(this.portalGroup)
+      this.portalGroup = null
+    }
+    this.portalHintEl?.remove()
+    this.portalHintEl = null
     this.showMenu()
   }
 
@@ -521,6 +588,26 @@ class Game {
     }
 
     this.hud.update(this.world, this.input)
+    this.checkPortal()
+  }
+
+  private checkPortal(): void {
+    if (!this.portalGroup) return
+    const localChar = this.world.characters.find(c => c.team === this.localTeam && c.alive)
+    if (!localChar) {
+      if (this.portalHintEl) this.portalHintEl.style.display = 'none'
+      return
+    }
+    const dx = localChar.x - this.PORTAL_SIM_X
+    const dz = localChar.z - this.PORTAL_SIM_Z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (this.portalHintEl) {
+      this.portalHintEl.style.display = dist < 20 ? 'block' : 'none'
+    }
+    if (dist < 5) {
+      const ref = encodeURIComponent(window.location.hostname || 'pixeltriks.vibej.am')
+      window.location.href = `https://vibej.am/portal/2026?ref=${ref}`
+    }
   }
 
   private render(): void {
@@ -564,6 +651,10 @@ class Game {
       isLocalAiming,
       this.input.getSelectedWeapon()
     )
+
+    if (this.portalGroup) {
+      this.portalGroup.rotation.y = this.gameTime * 1.2
+    }
 
     this.gameCamera.update()
 
