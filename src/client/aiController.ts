@@ -29,10 +29,6 @@ export class AIController {
     this.moveTarget = null
   }
 
-  isDone(): boolean {
-    return this.phase === 'done'
-  }
-
   tick(world: WorldState): GameInput | null {
     const char = getActiveCharacter(world)
     if (!char) {

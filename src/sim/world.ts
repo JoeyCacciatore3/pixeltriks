@@ -94,12 +94,8 @@ export function createWorld(seed: number): WorldState {
 export function emptyEvents(): StepEvents {
   return {
     explosions: [],
-    objectExplosions: [],
-    blindboxCollected: [],
-    deaths: [],
     turnAdvanced: false,
     gameOver: false,
-    blindboxSpawned: false,
     damageDealt: [],
   }
 }

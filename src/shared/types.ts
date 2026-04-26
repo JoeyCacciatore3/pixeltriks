@@ -107,12 +107,8 @@ export interface WorldState {
 
 export interface StepEvents {
   explosions: ExplosionEvent[]
-  objectExplosions: ExplosionEvent[]
-  blindboxCollected: BlindboxCollectEvent[]
-  deaths: number[]
   turnAdvanced: boolean
   gameOver: boolean
-  blindboxSpawned: boolean
   damageDealt: DamageEvent[]
 }
 
@@ -124,23 +120,8 @@ export interface ExplosionEvent {
   damage: number
 }
 
-export interface BlindboxCollectEvent {
-  charId: number
-  content: BlindboxContent
-  x: number
-  y: number
-  z: number
-}
-
 export interface DamageEvent {
   charId: number
   amount: number
   source: 'projectile' | 'fall' | 'object' | 'water' | 'bombTrap'
-}
-
-export interface RoomState {
-  roomCode: string
-  players: { id: string; team: number; ready: boolean }[]
-  worldState: WorldState | null
-  status: 'waiting' | 'playing' | 'finished'
 }

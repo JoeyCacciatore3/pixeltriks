@@ -251,6 +251,9 @@ class Game {
         this.applyServerState(event.world)
         break
 
+      case 'input_ack':
+        break
+
       case 'opponent_input':
         this.pendingOpponentInput = event.input
         break

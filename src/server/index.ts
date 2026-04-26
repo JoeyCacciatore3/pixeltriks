@@ -160,7 +160,6 @@ function handleMessage(ws: WebSocket, data: string): void {
         players: [{ ws, team: 0, ready: false }],
         world: null,
         status: 'waiting',
-
         pendingInputs: new Map(),
         nextTickAt: 0,
       }
@@ -222,9 +221,8 @@ function handleMessage(ws: WebSocket, data: string): void {
           ],
           world: null,
           status: 'waiting',
-  
           pendingInputs: new Map(),
-        nextTickAt: 0,
+          nextTickAt: 0,
         }
         rooms.set(code, room)
         playerRooms.set(opponent, code)
@@ -242,9 +240,8 @@ function handleMessage(ws: WebSocket, data: string): void {
               players: [{ ws, team: 0, ready: true }],
               world: null,
               status: 'waiting',
-      
               pendingInputs: new Map(),
-        nextTickAt: 0,
+              nextTickAt: 0,
             }
             rooms.set(code, room)
             playerRooms.set(ws, code)

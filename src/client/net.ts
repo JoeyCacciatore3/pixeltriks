@@ -7,6 +7,7 @@ export type NetEvent =
   | { type: 'countdown'; seconds: number }
   | { type: 'game_start'; seed: number; yourTeam: number }
   | { type: 'state'; world: SerializedWorld; tick: number }
+  | { type: 'input_ack'; tick: number }
   | { type: 'opponent_input'; input: GameInput; tick: number }
   | { type: 'opponent_disconnected' }
   | { type: 'waiting' }

@@ -31,15 +31,6 @@ export function step(world: WorldState, input: GameInput | null): StepEvents {
     applyCharacterPhysics(char, world, events.damageDealt)
   }
 
-  const newDeaths = world.characters.filter(
-    c => !c.alive && !events.deaths.includes(c.id)
-  )
-  for (const c of newDeaths) {
-    if (c.hp <= 0 && c.alive === false) {
-      events.deaths.push(c.id)
-    }
-  }
-
   world.hash = hashWorld(world)
   return events
 }
