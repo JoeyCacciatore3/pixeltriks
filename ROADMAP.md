@@ -14,9 +14,9 @@
 | Weapons (6) | ✅ Working | bazooka, grenade, shotgun, airstrike, teleport, dynamite |
 | AI opponent | ✅ Working | 3 difficulty levels, trajectory search |
 | WebSocket multiplayer | ✅ Working | room create/join, server-authoritative tick loop |
-| Quickplay (auto-match) | ❌ Missing | manual room codes only |
+| Quickplay (auto-match) | ✅ Complete | queue → match → 15s fallback to AI |
 | Portal/webring | ❌ Missing | Vibe Jam requirement |
-| Production deploy | ❌ Missing | no CI, no hosting |
+| Production deploy | ⚠️ Partial | Render ✅, CF Pages manual step pending |
 | Mobile testing | ⚠️ Untested | touch controls exist, not validated |
 | Bundle size | ⚠️ Unknown | needs measurement |
 
@@ -64,12 +64,12 @@ const wsUrl = import.meta.env.VITE_WS_URL
 ### Day 1 — Apr 26 — Infra + Matchmaking
 
 - [x] GitHub repo created, initial push
-- [ ] Quickplay auto-match on server (`quickplay` message type, waiting queue)
-- [ ] Menu: add "QUICK PLAY" button as primary CTA
-- [ ] VITE_WS_URL env var support in client
-- [ ] Cloudflare Pages project created, connected to repo
-- [ ] Render.com Web Service deployed
-- [ ] Vibe Jam widget already in index.html ✅
+- [x] Quickplay auto-match on server (`quickplay` message type, waiting queue)
+- [x] Menu: add "QUICK PLAY" button as primary CTA
+- [x] VITE_WS_URL env var support in client
+- [ ] Cloudflare Pages project created, connected to repo (manual step — see infra section)
+- [x] Render.com Web Service deployed → `wss://pixeltriks-server.onrender.com`
+- [x] Vibe Jam widget already in index.html ✅
 
 ### Day 2 — Apr 27 — Gameplay Audit
 
