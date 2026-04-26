@@ -374,17 +374,15 @@ class Game {
     this.gameTime += dt / 1000
     this.accumulator += dt
 
-    // Max 3 ticks per render frame. Prevents sim from running faster than realtime
-    // when rendering is slow — at the cost of minor slow-motion on very long frame spikes.
+    // Max 3 ticks per render frame (spiral-of-death guard).
+    // The dt cap (200ms) already limits how much time can enter the accumulator.
+    // Excess accumulator after the cap carries forward to the next frame — the sim
+    // temporarily runs slower rather than faster, which is the correct tradeoff.
     let ticks = 0
     while (this.accumulator >= this.tickInterval && ticks < 3) {
       this.accumulator -= this.tickInterval
       this.tick()
       ticks++
-    }
-    // Drain leftover accumulator if we hit the cap so it doesn't compound next frame
-    if (this.accumulator > this.tickInterval) {
-      this.accumulator = this.accumulator % this.tickInterval
     }
 
     this.render()
