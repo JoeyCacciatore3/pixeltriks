@@ -179,12 +179,23 @@
     }
 
     /* Weapon pill — top-right corner */
+    .hud-weapon-icon {
+      width: 28px;
+      height: 28px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 6px;
+      background-repeat: no-repeat;
+      image-rendering: pixelated;
+    }
     .hud-weapon {
       position: fixed;
       top: max(10px, env(safe-area-inset-top));
       left: 50%;
       transform: translateX(-50%);
       margin-top: 68px;
+      display: flex;
+      align-items: center;
       background: var(--glass-bg);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
@@ -299,6 +310,14 @@
       padding: 20px;
     }
     .menu-container { text-align: center; width: 100%; max-width: 400px; }
+    .menu-art {
+      width: 100%;
+      max-width: 380px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 60px rgba(60,120,255,0.1);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
     .menu-title {
       font-size: 48px;
       font-weight: 900;
@@ -493,6 +512,13 @@
       font-weight: 900;
       letter-spacing: 0.5px;
       margin-bottom: 4px;
+    }
+    .wp-card-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 4px;
+      background-repeat: no-repeat;
+      image-rendering: pixelated;
     }
     .wp-card-sub {
       font-size: 9px;

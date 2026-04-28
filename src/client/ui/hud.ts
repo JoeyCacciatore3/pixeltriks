@@ -1,6 +1,7 @@
 import type { WorldState, Character } from '@shared/types'
 import { TEAM_HUMAN, TEAM_AI, AIM_PHASE_DURATION, TICK_RATE } from '@shared/constants'
 import type { InputManager } from '../input'
+import { getWeaponSpriteStyle } from './weaponPicker'
 
 interface FloatLabel {
   el: HTMLElement
@@ -202,7 +203,8 @@ export class HUD {
     )
 
     // ── Weapon ──
-    this.weaponDisplay.innerHTML = `<span style="letter-spacing:2px">${input.getSelectedWeapon().toUpperCase()}</span>`
+    const wpn = input.getSelectedWeapon()
+    this.weaponDisplay.innerHTML = `<div class="hud-weapon-icon" style="${getWeaponSpriteStyle(wpn)}"></div><span style="letter-spacing:2px">${wpn.toUpperCase()}</span>`
 
     // ── Power bar ──
     const isCharging = input.isCharging()

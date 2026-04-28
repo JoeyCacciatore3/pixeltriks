@@ -170,6 +170,7 @@ class Game {
     this.menuEl.id = 'menu-screen'
     this.menuEl.innerHTML = `
       <div class="menu-container">
+        <img src="/title-art.png" alt="Humans vs AI" class="menu-art" />
         <h1 class="menu-title">PIXELTRIKS</h1>
         <p class="menu-subtitle">HUMANS vs AI</p>
         <button id="btn-play" class="menu-btn primary">PLAY</button>
