@@ -133,15 +133,17 @@ export class InputManager {
   getInput(): GameInput {
     const input: GameInput = {}
 
-    // WASD = camera-relative movement (rotated by aim azimuth)
-    const rawX = (this.isPressed('KeyD') ? 1 : 0) - (this.isPressed('KeyA') ? 1 : 0)
-    const rawZ = (this.isPressed('KeyS') ? 1 : 0) - (this.isPressed('KeyW') ? 1 : 0)
+    // WASD = camera-relative movement
+    // W = forward (along azimuth), S = backward, A = strafe left, D = strafe right
+    const forward = (this.isPressed('KeyW') ? 1 : 0) - (this.isPressed('KeyS') ? 1 : 0)
+    const strafe = (this.isPressed('KeyD') ? 1 : 0) - (this.isPressed('KeyA') ? 1 : 0)
 
-    if (rawX !== 0 || rawZ !== 0) {
+    if (forward !== 0 || strafe !== 0) {
       const cosA = Math.cos(this.aimAzimuth)
       const sinA = Math.sin(this.aimAzimuth)
-      const worldX = rawX * cosA + rawZ * sinA
-      const worldZ = -rawX * sinA + rawZ * cosA
+      // Forward = azimuth direction, right = perpendicular (clockwise in XZ)
+      const worldX = forward * cosA + strafe * sinA
+      const worldZ = forward * sinA - strafe * cosA
       const threshold = 0.3
       if (Math.abs(worldX) > threshold) input.moveDirection = (worldX > 0 ? 1 : -1) as -1 | 1
       if (Math.abs(worldZ) > threshold) input.moveZDirection = (worldZ > 0 ? 1 : -1) as -1 | 1
@@ -155,10 +157,10 @@ export class InputManager {
       this.aimAngle = Math.max(this.aimAngle - 0.03, -Math.PI * 0.4)
     }
     if (this.isPressed('ArrowLeft')) {
-      this.aimAzimuth = this.aimAzimuth - 0.04
+      this.aimAzimuth = this.aimAzimuth + 0.04
     }
     if (this.isPressed('ArrowRight')) {
-      this.aimAzimuth = this.aimAzimuth + 0.04
+      this.aimAzimuth = this.aimAzimuth - 0.04
     }
 
     if (this.pendingJump) {

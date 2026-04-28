@@ -380,6 +380,19 @@ class Game {
     this.touchControls = new TouchControls(this.input)
     this.hud = new HUD()
 
+    const startChar = getActiveCharacter(this.world)
+    if (startChar) {
+      const enemies = this.world.characters.filter(c => c.team !== this.localTeam && c.alive)
+      if (enemies.length > 0) {
+        const nearest = enemies.reduce((a, b) => {
+          const da = (a.x - startChar.x) ** 2 + (a.z - startChar.z) ** 2
+          const db = (b.x - startChar.x) ** 2 + (b.z - startChar.z) ** 2
+          return da < db ? a : b
+        })
+        this.input.setAimAzimuth(Math.atan2(nearest.z - startChar.z, nearest.x - startChar.x))
+      }
+    }
+
     this.weaponPicker?.dispose()
     this.weaponPicker = new WeaponPicker()
     this.input.onWeaponPickRequired = () => {
@@ -613,6 +626,22 @@ class Game {
       this.input.resetWeaponConfirm()
       this.weaponPicker?.hide()
       audio.turnChange()
+
+      if (this.world.activeTeam === this.localTeam) {
+        const activeChar = getActiveCharacter(this.world)
+        if (activeChar) {
+          const enemies = this.world.characters.filter(c => c.team !== this.localTeam && c.alive)
+          if (enemies.length > 0) {
+            const nearest = enemies.reduce((a, b) => {
+              const da = (a.x - activeChar.x) ** 2 + (a.z - activeChar.z) ** 2
+              const db = (b.x - activeChar.x) ** 2 + (b.z - activeChar.z) ** 2
+              return da < db ? a : b
+            })
+            const az = Math.atan2(nearest.z - activeChar.z, nearest.x - activeChar.x)
+            this.input.setAimAzimuth(az)
+          }
+        }
+      }
     }
 
     if (events.gameOver) {
@@ -706,6 +735,18 @@ class Game {
     if (isLocalAiming && activeChar) {
       this.characterRenderer.setAzimuth(activeChar.id, this.input.getAimAzimuth())
       this.gameCamera.setAzimuth(this.input.getAimAzimuth())
+    } else if (isAiming && activeChar && this.world.activeTeam === TEAM_AI) {
+      const enemies = this.world.characters.filter(c => c.team !== TEAM_AI && c.alive)
+      if (enemies.length > 0) {
+        const nearest = enemies.reduce((a, b) => {
+          const da = (a.x - activeChar.x) ** 2 + (a.z - activeChar.z) ** 2
+          const db = (b.x - activeChar.x) ** 2 + (b.z - activeChar.z) ** 2
+          return da < db ? a : b
+        })
+        const aiAz = Math.atan2(nearest.z - activeChar.z, nearest.x - activeChar.x)
+        this.characterRenderer.setAzimuth(activeChar.id, aiAz)
+        this.gameCamera.setAzimuth(aiAz)
+      }
     }
 
     if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {

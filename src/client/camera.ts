@@ -90,8 +90,8 @@ export class GameCamera {
     let smoothTime: number
 
     if (this.mode === 'character') {
-      const behindX = -Math.sin(this.azimuth) * this.BEHIND_DIST
-      const behindZ = -Math.cos(this.azimuth) * this.BEHIND_DIST
+      const behindX = -Math.cos(this.azimuth) * this.BEHIND_DIST
+      const behindZ = -Math.sin(this.azimuth) * this.BEHIND_DIST
       goal = new THREE.Vector3(
         this.target.x + behindX,
         this.target.y + this.BEHIND_HEIGHT,
@@ -99,8 +99,8 @@ export class GameCamera {
       )
       smoothTime = 0.30
     } else if (this.mode === 'projectile') {
-      const behindX = -Math.sin(this.azimuth) * this.PROJ_DIST
-      const behindZ = -Math.cos(this.azimuth) * this.PROJ_DIST
+      const behindX = -Math.cos(this.azimuth) * this.PROJ_DIST
+      const behindZ = -Math.sin(this.azimuth) * this.PROJ_DIST
       goal = new THREE.Vector3(
         this.target.x + behindX,
         this.target.y + this.PROJ_HEIGHT,
