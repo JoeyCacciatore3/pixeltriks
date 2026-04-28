@@ -13,12 +13,13 @@ import type { WeaponKind } from '@shared/types'
 const SEED = 42
 
 describe('world setup', () => {
-  it('creates characters at same Z position', () => {
+  it('creates characters near center Z with spread', () => {
     const world = createWorld(SEED)
-    const zPositions = world.characters.map(c => c.z)
-    const uniqueZ = new Set(zPositions)
-    expect(uniqueZ.size).toBe(1)
-    expect(zPositions[0]).toBe(TERRAIN_SIZE * 0.5)
+    const centerZ = TERRAIN_SIZE * 0.5
+    const maxSpread = TERRAIN_SIZE * 0.15 / 2
+    for (const c of world.characters) {
+      expect(Math.abs(c.z - centerZ)).toBeLessThan(maxSpread)
+    }
   })
 
   it('places teams on opposite sides', () => {

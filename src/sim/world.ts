@@ -49,7 +49,7 @@ export function createWorld(seed: number): WorldState {
       const xZone = team === TEAM_HUMAN
         ? size * 0.15 + prng.next() * size * 0.2
         : size * 0.65 + prng.next() * size * 0.2
-      const zPos = battleZ
+      const zPos = battleZ + (prng.next() - 0.5) * size * 0.15
       const y = getHeight(heightmap, xZone, zPos)
 
       characters.push({

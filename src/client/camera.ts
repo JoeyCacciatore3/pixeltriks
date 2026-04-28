@@ -35,16 +35,22 @@ export class GameCamera {
   private azimuth = 0
   private readonly IMPACT_DWELL = 150
 
-  private readonly BEHIND_DIST = 18
+  private behindDist = 18
   private readonly BEHIND_HEIGHT = 10
   private readonly PROJ_DIST = 25
   private readonly PROJ_HEIGHT = 15
+  private readonly MIN_DIST = 10
+  private readonly MAX_DIST = 40
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000)
     this.camera.position.set(0, 20, 30)
     this.camera.lookAt(0, 0, 0)
     this.currentPos.copy(this.camera.position)
+
+    window.addEventListener('wheel', (e) => {
+      this.behindDist = Math.max(this.MIN_DIST, Math.min(this.MAX_DIST, this.behindDist + e.deltaY * 0.02))
+    }, { passive: true })
   }
 
   setAzimuth(az: number): void {
@@ -90,8 +96,8 @@ export class GameCamera {
     let smoothTime: number
 
     if (this.mode === 'character') {
-      const behindX = -Math.cos(this.azimuth) * this.BEHIND_DIST
-      const behindZ = -Math.sin(this.azimuth) * this.BEHIND_DIST
+      const behindX = -Math.cos(this.azimuth) * this.behindDist
+      const behindZ = -Math.sin(this.azimuth) * this.behindDist
       goal = new THREE.Vector3(
         this.target.x + behindX,
         this.target.y + this.BEHIND_HEIGHT,

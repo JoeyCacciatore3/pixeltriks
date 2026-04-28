@@ -85,6 +85,14 @@ export function stepProjectile(
     return
   }
 
+  if (config.drag) {
+    const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy + proj.vz * proj.vz)
+    if (speed < 0.5) {
+      proj.active = false
+      return
+    }
+  }
+
   if (config.fuseTime === 0 && config.radius > 0) {
     for (const char of world.characters) {
       if (!char.alive || char.id === proj.owner) continue

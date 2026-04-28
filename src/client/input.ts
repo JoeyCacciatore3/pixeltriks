@@ -151,16 +151,16 @@ export class InputManager {
 
     // Arrow keys = aim direction
     if (this.isPressed('ArrowUp')) {
-      this.aimAngle = Math.min(this.aimAngle + 0.03, Math.PI / 2)
+      this.aimAngle = Math.min(this.aimAngle + 0.035, Math.PI / 2.2)
     }
     if (this.isPressed('ArrowDown')) {
-      this.aimAngle = Math.max(this.aimAngle - 0.03, -Math.PI * 0.4)
+      this.aimAngle = Math.max(this.aimAngle - 0.035, -Math.PI * 0.35)
     }
     if (this.isPressed('ArrowLeft')) {
-      this.aimAzimuth = this.aimAzimuth + 0.04
+      this.aimAzimuth = this.aimAzimuth + 0.045
     }
     if (this.isPressed('ArrowRight')) {
-      this.aimAzimuth = this.aimAzimuth - 0.04
+      this.aimAzimuth = this.aimAzimuth - 0.045
     }
 
     if (this.pendingJump) {

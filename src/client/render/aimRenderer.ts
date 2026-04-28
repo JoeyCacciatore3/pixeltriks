@@ -74,31 +74,46 @@ export class AimRenderer {
     const config = WEAPONS[weapon]
     const previewPower = isCharging ? power : 50
     const speed = config.speed * (previewPower / 100)
-    const hSpeed = Math.cos(angle) * speed * TERRAIN_CELL_SIZE
+    const elevationAngle = -angle
+    const hSpeed = Math.cos(elevationAngle) * speed
 
-    let px = 0
-    let py = 0
-    let pz = 0
+    let simX = char.x
+    let simY = char.y - 4
+    let simZ = char.z
     let vx = Math.cos(azimuth) * hSpeed
-    let vy = Math.sin(angle) * speed * TERRAIN_CELL_SIZE
+    let vy = Math.sin(elevationAngle) * speed
     let vz = Math.sin(azimuth) * hSpeed
 
     const positions = this.line.geometry.attributes.position as THREE.BufferAttribute
     const dummy = new THREE.Object3D()
     let dotIdx = 0
+    let stepsDrawn = 0
     const dotInterval = Math.max(1, Math.floor(PREVIEW_STEPS / PREVIEW_DOTS))
 
     for (let i = 0; i < PREVIEW_STEPS; i++) {
-      vy -= GRAVITY * config.gravityMul * TERRAIN_CELL_SIZE
+      vy += GRAVITY * config.gravityMul
 
-      px += vx
-      py += vy
-      pz += vz
+      simX += vx
+      simY += vy
+      simZ += vz
 
-      positions.setXYZ(i, cx + px, cy + py, cz + pz)
+      if (config.drag) {
+        vx *= (1 - config.drag)
+        vz *= (1 - config.drag)
+      }
+
+      const worldPx = (simX - 128) * TERRAIN_CELL_SIZE
+      const simGroundH = heightmap ? getHeight(heightmap, simX, simZ) : 0
+      const worldPy = (2 * simGroundH - simY) * TERRAIN_CELL_SIZE
+      const worldPz = (simZ - 128) * TERRAIN_CELL_SIZE
+
+      if (heightmap && simY >= simGroundH && i > 4) break
+
+      positions.setXYZ(i, worldPx, worldPy, worldPz)
+      stepsDrawn = i + 1
 
       if (i > 0 && i % dotInterval === 0 && dotIdx < PREVIEW_DOTS) {
-        dummy.position.set(cx + px, cy + py, cz + pz)
+        dummy.position.set(worldPx, worldPy, worldPz)
         dummy.updateMatrix()
         this.dots.setMatrixAt(dotIdx, dummy.matrix)
         dotIdx++
@@ -106,7 +121,7 @@ export class AimRenderer {
     }
 
     positions.needsUpdate = true
-    this.line.geometry.setDrawRange(0, PREVIEW_STEPS)
+    this.line.geometry.setDrawRange(0, stepsDrawn)
     this.dots.count = dotIdx
     this.dots.instanceMatrix.needsUpdate = true
 

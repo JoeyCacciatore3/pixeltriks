@@ -111,13 +111,13 @@ export function applyCharacterPhysics(
       }
 
       char.vy = 0
-      char.vx = 0
-      char.vz = 0
+      char.vx *= 0.5
+      char.vz *= 0.5
       char.grounded = true
     }
   } else {
     const groundH = getHeight(world.heightmap, char.x, char.z)
-    if (char.y < groundH - 1) {
+    if (char.y < groundH - 2) {
       char.grounded = false
     } else {
       char.y = groundH

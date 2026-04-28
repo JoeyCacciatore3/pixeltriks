@@ -719,7 +719,7 @@ class Game {
 
     const activeChar = getActiveCharacter(this.world)
 
-    this.characterRenderer.update(this.world.characters, activeChar?.id ?? -1, this.world.heightmap, this.gameTime)
+    this.characterRenderer.update(this.world.characters, activeChar?.id ?? -1, this.world.heightmap, this.gameTime, this.gameCamera.camera)
     this.projectileRenderer.update(this.world.projectiles, this.world.heightmap)
     this.explosionRenderer.update()
     this.blindboxRenderer.update(this.world.blindboxes, this.world.heightmap, this.gameTime)
@@ -752,7 +752,16 @@ class Game {
     if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {
       const proj = this.world.projectiles[0]
       this.gameCamera.followProjectile(proj.x, proj.y, proj.z, this.world.heightmap)
+    } else if (this.world.phase === 'resolving') {
+      const airborne = this.world.characters.find(c => c.alive && !c.grounded)
+      if (airborne) {
+        this.gameCamera.followTarget(airborne.x, airborne.y, airborne.z, this.world.heightmap)
+      } else if (activeChar) {
+        this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
+      }
     } else if (isAiming && activeChar) {
+      this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
+    } else if (activeChar) {
       this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
     }
 

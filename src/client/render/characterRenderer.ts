@@ -13,20 +13,22 @@ export class CharacterRenderer {
   private hpBars: Map<number, THREE.Mesh> = new Map()
   private indicator: THREE.Mesh
   private charAzimuths: Map<number, number> = new Map()
+  private hitFlash: Map<number, number> = new Map()
+  private lastHp: Map<number, number> = new Map()
 
   constructor(scene: THREE.Scene) {
     this.group = new THREE.Group()
     scene.add(this.group)
 
-    const coneGeom = new THREE.ConeGeometry(0.35, 0.7, 6)
+    const coneGeom = new THREE.ConeGeometry(0.5, 1.0, 6)
     coneGeom.rotateX(Math.PI)
-    const coneMat = new THREE.MeshBasicMaterial({ color: 0xffff00 })
+    const coneMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.9 })
     this.indicator = new THREE.Mesh(coneGeom, coneMat)
     this.indicator.visible = false
     scene.add(this.indicator)
   }
 
-  update(characters: Character[], activeCharId: number, heightmap: Float32Array, time: number): void {
+  update(characters: Character[], activeCharId: number, heightmap: Float32Array, time: number, camera?: THREE.Camera): void {
     for (const char of characters) {
       let charGroup = this.meshes.get(char.id)
 
@@ -48,11 +50,41 @@ export class CharacterRenderer {
       const az = this.charAzimuths.get(char.id) ?? (char.facing > 0 ? 0 : Math.PI)
       charGroup.rotation.y = -az
 
+      const prevHp = this.lastHp.get(char.id) ?? char.hp
+      if (char.hp < prevHp && char.alive) {
+        this.hitFlash.set(char.id, 8)
+      }
+      this.lastHp.set(char.id, char.hp)
+
+      const flash = this.hitFlash.get(char.id) ?? 0
+      if (flash > 0) {
+        this.hitFlash.set(char.id, flash - 1)
+        const flashIntensity = flash / 8
+        charGroup.traverse(child => {
+          if (child instanceof THREE.Mesh) {
+            const mat = child.material as THREE.MeshStandardMaterial
+            if (mat.emissive) mat.emissive.setRGB(flashIntensity, flashIntensity * 0.3, flashIntensity * 0.3)
+          }
+        })
+      } else {
+        charGroup.traverse(child => {
+          if (child instanceof THREE.Mesh) {
+            const mat = child.material as THREE.MeshStandardMaterial
+            if (mat.emissive) mat.emissive.setRGB(0, 0, 0)
+          }
+        })
+      }
+
       const hpBar = this.hpBars.get(char.id)
       if (hpBar) {
         hpBar.scale.x = Math.max(0, char.hp / 100)
         const mat = hpBar.material as THREE.MeshBasicMaterial
         mat.color.setHex(char.hp > 50 ? 0x00ff00 : char.hp > 25 ? 0xffaa00 : 0xff0000)
+        if (camera) {
+          const worldPos = new THREE.Vector3()
+          hpBar.getWorldPosition(worldPos)
+          hpBar.lookAt(camera.position)
+        }
       }
 
       if (!char.alive) {
@@ -102,11 +134,12 @@ export class CharacterRenderer {
       }
     })
 
-    const hpGeom = new THREE.PlaneGeometry(1.5, 0.15)
+    group.scale.setScalar(1.4)
+
+    const hpGeom = new THREE.PlaneGeometry(1.8, 0.2)
     const hpMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide })
     const hpBar = new THREE.Mesh(hpGeom, hpMat)
-    hpBar.position.y = 2.8
-    hpBar.lookAt(new THREE.Vector3(0, 100, 100))
+    hpBar.position.y = 3.2
     group.add(hpBar)
     this.hpBars.set(char.id, hpBar)
 
