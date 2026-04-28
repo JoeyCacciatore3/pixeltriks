@@ -4,9 +4,6 @@ import { getHeight } from '@sim/terrain'
 
 type CameraMode = 'character' | 'projectile' | 'impact'
 
-// Critically damped spring — Unity SmoothDamp algorithm.
-// Frame-rate independent, no overshoot, reaches target and stops cleanly.
-// smoothTime: time (seconds) to reach within ~1/e of target from rest.
 function smoothDamp(
   current: number,
   target: number,
@@ -30,23 +27,33 @@ export class GameCamera {
   private velX = { v: 0 }
   private velY = { v: 0 }
   private velZ = { v: 0 }
-  private offset = new THREE.Vector3(0, 32, 42)
   private trauma = 0
   private shakePhase = 0
   private mode: CameraMode = 'character'
   private impactTimer = 0
   private lastUpdateMs = 0
-  private readonly IMPACT_DWELL = 150  // 2.5s at 60fps
+  private azimuth = 0
+  private readonly IMPACT_DWELL = 150
+
+  private readonly BEHIND_DIST = 18
+  private readonly BEHIND_HEIGHT = 10
+  private readonly PROJ_DIST = 25
+  private readonly PROJ_HEIGHT = 15
 
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000)
-    this.camera.position.set(0, 32, 42)
+    this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000)
+    this.camera.position.set(0, 20, 30)
     this.camera.lookAt(0, 0, 0)
     this.currentPos.copy(this.camera.position)
   }
 
+  setAzimuth(az: number): void {
+    this.azimuth = az
+  }
+
   followTarget(x: number, simY: number, z: number, heightmap: Float32Array): void {
     if (this.mode === 'impact') return
+    this.mode = 'character'
     this.setTarget(x, simY, z, heightmap)
   }
 
@@ -79,17 +86,41 @@ export class GameCamera {
       }
     }
 
-    // Critically damped spring: 0.12s for projectile (snappy), 0.35s for character (cinematic)
-    const smoothTime = this.mode === 'projectile' ? 0.12 : 0.35
-    const goal = new THREE.Vector3().addVectors(this.target, this.offset)
+    let goal: THREE.Vector3
+    let smoothTime: number
+
+    if (this.mode === 'character') {
+      const behindX = -Math.sin(this.azimuth) * this.BEHIND_DIST
+      const behindZ = -Math.cos(this.azimuth) * this.BEHIND_DIST
+      goal = new THREE.Vector3(
+        this.target.x + behindX,
+        this.target.y + this.BEHIND_HEIGHT,
+        this.target.z + behindZ
+      )
+      smoothTime = 0.30
+    } else if (this.mode === 'projectile') {
+      const behindX = -Math.sin(this.azimuth) * this.PROJ_DIST
+      const behindZ = -Math.cos(this.azimuth) * this.PROJ_DIST
+      goal = new THREE.Vector3(
+        this.target.x + behindX,
+        this.target.y + this.PROJ_HEIGHT,
+        this.target.z + behindZ
+      )
+      smoothTime = 0.15
+    } else {
+      goal = new THREE.Vector3(
+        this.target.x,
+        this.target.y + 12,
+        this.target.z + 16
+      )
+      smoothTime = 0.35
+    }
 
     this.currentPos.x = smoothDamp(this.currentPos.x, goal.x, this.velX, smoothTime, dt)
     this.currentPos.y = smoothDamp(this.currentPos.y, goal.y, this.velY, smoothTime, dt)
     this.currentPos.z = smoothDamp(this.currentPos.z, goal.z, this.velZ, smoothTime, dt)
     this.camera.position.copy(this.currentPos)
 
-    // Coherent trauma shake: product of coprime-frequency sin waves.
-    // Unlike Math.random(), this is continuous and doesn't strobe between frames.
     if (this.trauma > 0.01) {
       const mag = this.trauma * this.trauma * 6
       this.shakePhase += 2.5
@@ -101,7 +132,10 @@ export class GameCamera {
       if (this.trauma < 0.01) this.trauma = 0
     }
 
-    this.camera.lookAt(this.target)
+    const lookTarget = this.mode === 'character'
+      ? new THREE.Vector3(this.target.x, this.target.y + 2, this.target.z)
+      : this.target
+    this.camera.lookAt(lookTarget)
   }
 
   resize(aspect: number): void {

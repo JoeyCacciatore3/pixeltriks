@@ -1,6 +1,6 @@
 // Physics
 export const GRAVITY = 0.3
-export const CHAR_SPEED = 1.5
+export const CHAR_SPEED = 0.8
 export const JUMP_IMPULSE = -6
 export const FALL_DAMAGE_THRESHOLD = 8
 export const FALL_DAMAGE_MULTIPLIER = 3

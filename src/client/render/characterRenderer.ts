@@ -95,6 +95,13 @@ export class CharacterRenderer {
       this.buildAIMesh(group, color)
     }
 
+    group.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+
     const hpGeom = new THREE.PlaneGeometry(1.5, 0.15)
     const hpMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide })
     const hpBar = new THREE.Mesh(hpGeom, hpMat)

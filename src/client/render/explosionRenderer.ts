@@ -5,6 +5,9 @@ import { getHeight } from '@sim/terrain'
 
 interface ActiveExplosion {
   particles: THREE.Points
+  debris: THREE.InstancedMesh
+  debrisCount: number
+  debrisVelocities: Float32Array
   light: THREE.PointLight
   life: number
   maxLife: number
@@ -74,8 +77,37 @@ export class ExplosionRenderer {
     this.group.add(particles)
     this.group.add(light)
 
+    // Debris chunks — small boxes that fly outward and tumble
+    const debrisCount = Math.floor(5 + scale * 10)
+    const debrisGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12)
+    const debrisMat = new THREE.MeshStandardMaterial({
+      color: 0x8b5a2b, roughness: 0.9, metalness: 0.0,
+    })
+    const debris = new THREE.InstancedMesh(debrisGeo, debrisMat, debrisCount)
+    debris.count = debrisCount
+    debris.position.copy(particles.position)
+    const debrisVelocities = new Float32Array(debrisCount * 3)
+    const dummy = new THREE.Object3D()
+    for (let d = 0; d < debrisCount; d++) {
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.random() * Math.PI * 0.7
+      const spd = (0.15 + Math.random() * 0.35) * (0.5 + scale * 0.5)
+      debrisVelocities[d * 3] = Math.sin(phi) * Math.cos(theta) * spd
+      debrisVelocities[d * 3 + 1] = Math.cos(phi) * spd + 0.15
+      debrisVelocities[d * 3 + 2] = Math.sin(phi) * Math.sin(theta) * spd
+      dummy.position.set(0, 0, 0)
+      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0)
+      dummy.updateMatrix()
+      debris.setMatrixAt(d, dummy.matrix)
+    }
+    debris.instanceMatrix.needsUpdate = true
+    this.group.add(debris)
+
     this.active.push({
       particles,
+      debris,
+      debrisCount,
+      debrisVelocities,
       light,
       life: 0,
       maxLife: Math.floor(50 + scale * 40),
@@ -104,11 +136,31 @@ export class ExplosionRenderer {
       mat.opacity = 1 - t
       exp.light.intensity = 5 * (1 - t)
 
+      // Animate debris
+      const dummy = new THREE.Object3D()
+      for (let d = 0; d < exp.debrisCount; d++) {
+        exp.debris.getMatrixAt(d, dummy.matrix)
+        dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale)
+        dummy.position.x += exp.debrisVelocities[d * 3]
+        dummy.position.y += exp.debrisVelocities[d * 3 + 1]
+        dummy.position.z += exp.debrisVelocities[d * 3 + 2]
+        exp.debrisVelocities[d * 3 + 1] -= 0.006 // gravity
+        dummy.rotation.x += 0.15
+        dummy.rotation.z += 0.1
+        dummy.scale.setScalar(Math.max(0, 1 - t * 1.2))
+        dummy.updateMatrix()
+        exp.debris.setMatrixAt(d, dummy.matrix)
+      }
+      exp.debris.instanceMatrix.needsUpdate = true
+
       if (exp.life >= exp.maxLife) {
         this.group.remove(exp.particles)
+        this.group.remove(exp.debris)
         this.group.remove(exp.light)
         geom.dispose()
         mat.dispose()
+        exp.debris.geometry.dispose()
+        ;(exp.debris.material as THREE.Material).dispose()
         this.active.splice(i, 1)
       }
     }
@@ -118,6 +170,8 @@ export class ExplosionRenderer {
     for (const exp of this.active) {
       exp.particles.geometry.dispose()
       ;(exp.particles.material as THREE.Material).dispose()
+      exp.debris.geometry.dispose()
+      ;(exp.debris.material as THREE.Material).dispose()
     }
   }
 }

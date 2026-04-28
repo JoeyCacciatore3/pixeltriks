@@ -1,46 +1,30 @@
 import * as THREE from 'three'
+import { Sky } from 'three/examples/jsm/objects/Sky.js'
 
 export class SkyRenderer {
-  private mesh: THREE.Mesh
+  sky: Sky
+  sunPosition: THREE.Vector3
 
   constructor(scene: THREE.Scene) {
-    const geom = new THREE.SphereGeometry(500, 16, 12)
-    const mat = new THREE.ShaderMaterial({
-      uniforms: {
-        topColor: { value: new THREE.Color(0x0044aa) },
-        bottomColor: { value: new THREE.Color(0x88ccff) },
-        offset: { value: 10 },
-        exponent: { value: 0.4 },
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPos.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 bottomColor;
-        uniform float offset;
-        uniform float exponent;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition + offset).y;
-          gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
-        }
-      `,
-      side: THREE.BackSide,
-      depthWrite: false,
-    })
+    this.sky = new Sky()
+    this.sky.scale.setScalar(450000)
+    scene.add(this.sky)
 
-    this.mesh = new THREE.Mesh(geom, mat)
-    scene.add(this.mesh)
+    const uniforms = this.sky.material.uniforms
+    uniforms['turbidity'].value = 2
+    uniforms['rayleigh'].value = 3
+    uniforms['mieCoefficient'].value = 0.003
+    uniforms['mieDirectionalG'].value = 0.7
+
+    this.sunPosition = new THREE.Vector3()
+    const phi = THREE.MathUtils.degToRad(90 - 40)
+    const theta = THREE.MathUtils.degToRad(200)
+    this.sunPosition.setFromSphericalCoords(1, phi, theta)
+    uniforms['sunPosition'].value.copy(this.sunPosition)
   }
 
   dispose(): void {
-    this.mesh.geometry.dispose()
-    ;(this.mesh.material as THREE.Material).dispose()
+    this.sky.geometry.dispose()
+    ;(this.sky.material as THREE.Material).dispose()
   }
 }

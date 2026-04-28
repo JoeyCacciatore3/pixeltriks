@@ -133,12 +133,19 @@ export class InputManager {
   getInput(): GameInput {
     const input: GameInput = {}
 
-    // WASD = 4-directional movement
-    const xDir = this.isPressed('KeyA') ? -1 : this.isPressed('KeyD') ? 1 : 0
-    const zDir = this.isPressed('KeyW') ? -1 : this.isPressed('KeyS') ? 1 : 0
+    // WASD = camera-relative movement (rotated by aim azimuth)
+    const rawX = (this.isPressed('KeyD') ? 1 : 0) - (this.isPressed('KeyA') ? 1 : 0)
+    const rawZ = (this.isPressed('KeyS') ? 1 : 0) - (this.isPressed('KeyW') ? 1 : 0)
 
-    if (xDir !== 0) input.moveDirection = xDir as -1 | 1
-    if (zDir !== 0) input.moveZDirection = zDir as -1 | 1
+    if (rawX !== 0 || rawZ !== 0) {
+      const cosA = Math.cos(this.aimAzimuth)
+      const sinA = Math.sin(this.aimAzimuth)
+      const worldX = rawX * cosA + rawZ * sinA
+      const worldZ = -rawX * sinA + rawZ * cosA
+      const threshold = 0.3
+      if (Math.abs(worldX) > threshold) input.moveDirection = (worldX > 0 ? 1 : -1) as -1 | 1
+      if (Math.abs(worldZ) > threshold) input.moveZDirection = (worldZ > 0 ? 1 : -1) as -1 | 1
+    }
 
     // Arrow keys = aim direction
     if (this.isPressed('ArrowUp')) {

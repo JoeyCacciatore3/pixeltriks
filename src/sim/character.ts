@@ -9,44 +9,75 @@ import { getHeight } from './terrain'
 export function moveCharacter(
   char: Character,
   direction: -1 | 0 | 1,
-  world: WorldState,
+  _world: WorldState,
   zDir: -1 | 0 | 1 = 0
 ): void {
   if (!char.alive || !char.grounded) return
 
-  // Apply X and Z independently so diagonal movement doesn't get blocked
-  // by a steep diagonal cell when either cardinal direction is passable.
+  const accel = CHAR_SPEED * 0.35
   if (direction !== 0) {
-    const nx = char.x + direction * CHAR_SPEED
-    if (nx >= 1 && nx <= TERRAIN_SIZE - 2) {
-      const curH = getHeight(world.heightmap, char.x, char.z)
-      const tgtH = getHeight(world.heightmap, nx, char.z)
-      if (tgtH - curH <= CLIMB_MAX) {
-        char.x = nx
-        char.y = tgtH
-        char.facing = direction
-      }
-    }
+    char.vx += direction * accel
+    char.facing = direction
+  }
+  if (zDir !== 0) {
+    char.vz += zDir * accel
   }
 
-  if (zDir !== 0) {
-    const nz = char.z + zDir * CHAR_SPEED
-    if (nz >= 1 && nz <= TERRAIN_SIZE - 2) {
-      const curH = getHeight(world.heightmap, char.x, char.z)
-      const tgtH = getHeight(world.heightmap, char.x, nz)
-      if (tgtH - curH <= CLIMB_MAX) {
-        char.z = nz
-        char.y = tgtH
-      }
-    }
+  const maxSpd = CHAR_SPEED
+  const spd = Math.sqrt(char.vx * char.vx + char.vz * char.vz)
+  if (spd > maxSpd) {
+    char.vx *= maxSpd / spd
+    char.vz *= maxSpd / spd
   }
+}
+
+export function applyGroundMovement(char: Character, world: WorldState): void {
+  if (!char.alive || !char.grounded) return
+  if (Math.abs(char.vx) < 0.01 && Math.abs(char.vz) < 0.01) {
+    char.vx = 0
+    char.vz = 0
+    return
+  }
+
+  const friction = 0.82
+  const nx = char.x + char.vx
+  const nz = char.z + char.vz
+
+  if (nx >= 1 && nx <= TERRAIN_SIZE - 2) {
+    const curH = getHeight(world.heightmap, char.x, char.z)
+    const tgtH = getHeight(world.heightmap, nx, char.z)
+    if (tgtH - curH <= CLIMB_MAX) {
+      char.x = nx
+      char.y = tgtH
+    } else {
+      char.vx = 0
+    }
+  } else {
+    char.vx = 0
+  }
+
+  if (nz >= 1 && nz <= TERRAIN_SIZE - 2) {
+    const curH = getHeight(world.heightmap, char.x, char.z)
+    const tgtH = getHeight(world.heightmap, char.x, nz)
+    if (tgtH - curH <= CLIMB_MAX) {
+      char.z = nz
+      char.y = tgtH
+    } else {
+      char.vz = 0
+    }
+  } else {
+    char.vz = 0
+  }
+
+  char.vx *= friction
+  char.vz *= friction
 }
 
 export function jumpCharacter(char: Character, moveDir: number = 0): void {
   if (!char.alive || !char.grounded) return
   char.vy = JUMP_IMPULSE
   if (moveDir !== 0) {
-    char.vx = moveDir * CHAR_SPEED * 1.2
+    char.vx = moveDir * CHAR_SPEED * 1.5
   }
   char.grounded = false
 }

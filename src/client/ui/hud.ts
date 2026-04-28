@@ -21,6 +21,7 @@ export class HUD {
   private aiHpLabel: HTMLElement
   private aiDots: HTMLElement
 
+  private timerPanel: HTMLElement
   private timerEl: HTMLElement
   private phaseLabel: HTMLElement
   private turnLabel: HTMLElement
@@ -76,7 +77,8 @@ export class HUD {
 
     // ── Center timer panel (inside #hud) ──
     const hud = document.getElementById('hud')!
-    const timerPanel = document.createElement('div')
+    this.timerPanel = document.createElement('div')
+    const timerPanel = this.timerPanel
     timerPanel.className = 'timer-panel'
     timerPanel.innerHTML = `
       <div class="hud-phase-label"></div>
@@ -231,12 +233,19 @@ export class HUD {
     if (world.phase === 'game_over' && !this.gameOverShown) {
       this.gameOverShown = true
       const humansAlive = world.characters.filter(c => c.team === TEAM_HUMAN && c.alive).length
+      const aiAlive = world.characters.filter(c => c.team === TEAM_AI && c.alive).length
+      const humanHP = world.characters.filter(c => c.team === TEAM_HUMAN).reduce((s, c) => s + Math.max(0, c.hp), 0)
+      const aiHP = world.characters.filter(c => c.team === TEAM_AI).reduce((s, c) => s + Math.max(0, c.hp), 0)
       const winner    = humansAlive > 0 ? 'HUMANS WIN' : 'AI WINS'
       const winColor  = humansAlive > 0 ? '#3a8fff' : '#ff4a3a'
       this.gameOverOverlay.style.display = 'flex'
       this.gameOverOverlay.innerHTML = `
         <h1 style="color:${winColor}">${winner}</h1>
-        <p>Press R or tap to play again</p>
+        <div class="game-over-stats">
+          <div class="go-stat"><span class="go-label">Turns</span><span class="go-value">${world.turn}</span></div>
+          <div class="go-stat"><span class="go-label" style="color:#3a8fff">Humans</span><span class="go-value">${humansAlive}/3 alive · ${humanHP} HP</span></div>
+          <div class="go-stat"><span class="go-label" style="color:#ff4a3a">AI Bots</span><span class="go-value">${aiAlive}/3 alive · ${aiHP} HP</span></div>
+        </div>
         <button class="restart-btn">PLAY AGAIN</button>
       `
       const btn = this.gameOverOverlay.querySelector('.restart-btn')
@@ -285,5 +294,18 @@ export class HUD {
     this.gameOverOverlay.style.display = 'none'
     this.lastTurn = -1
     this.lastTeam = -1
+  }
+
+  dispose(): void {
+    this.humanPanel.remove()
+    this.aiPanel.remove()
+    this.timerPanel.remove()
+    this.weaponDisplay.remove()
+    this.powerBarWrap.remove()
+    this.turnBanner.remove()
+    this.gameOverOverlay.remove()
+    this.controlsHint.remove()
+    for (const f of this.floatLabels) f.el.remove()
+    this.floatLabels = []
   }
 }

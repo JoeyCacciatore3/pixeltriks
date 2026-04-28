@@ -49,14 +49,6 @@ export class NetClient {
     }
   }
 
-  createRoom(): void {
-    this.send({ type: 'create' })
-  }
-
-  joinRoom(code: string): void {
-    this.send({ type: 'join', roomCode: code })
-  }
-
   sendReady(): void {
     this.send({ type: 'ready' })
   }

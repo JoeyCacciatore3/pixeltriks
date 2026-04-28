@@ -1,7 +1,7 @@
 import type { WorldState, GameInput, StepEvents } from '@shared/types'
 import { WEAPONS } from '@shared/types'
 import { emptyEvents, getActiveCharacter, hashWorld } from './world'
-import { moveCharacter, jumpCharacter, applyCharacterPhysics } from './character'
+import { moveCharacter, jumpCharacter, applyCharacterPhysics, applyGroundMovement } from './character'
 import { createProjectile, createAirstrikeProjectiles, stepProjectile } from './projectile'
 import { advanceTurn, isAllSettled, updatePhaseTimer } from './turn'
 import { stepBlindboxes } from './blindbox'
@@ -91,6 +91,8 @@ function handleAimingPhase(
       world.phaseTimer = 0
     }
   }
+
+  applyGroundMovement(char, world)
 
   if (updatePhaseTimer(world)) {
     world.phase = 'between_turns'

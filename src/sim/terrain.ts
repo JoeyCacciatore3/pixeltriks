@@ -50,20 +50,25 @@ export function generateTerrain(prng: PRNG): Float32Array {
   const size = TERRAIN_SIZE
   const heightmap = new Float32Array(size * size)
 
-  // Low-frequency base shape (broad hills/valleys)
-  const basePhases = Array.from({ length: 4 }, () => prng.next() * Math.PI * 2)
-  const basePhasesZ = Array.from({ length: 4 }, () => prng.next() * Math.PI * 2)
-  const baseFreqs = [1.0, 1.8, 2.6, 3.4]
-  const baseAmps = [1.0, 0.5, 0.28, 0.15]
+  // Low-frequency base shape (broad hills/valleys) — 5 octaves
+  const basePhases = Array.from({ length: 5 }, () => prng.next() * Math.PI * 2)
+  const basePhasesZ = Array.from({ length: 5 }, () => prng.next() * Math.PI * 2)
+  const baseFreqs = [0.8, 1.5, 2.4, 3.2, 4.8]
+  const baseAmps = [1.2, 0.6, 0.35, 0.18, 0.09]
 
-  // High-frequency ridges (sharp peaks using abs(sin))
-  const ridgePhases = Array.from({ length: 3 }, () => prng.next() * Math.PI * 2)
-  const ridgePhasesZ = Array.from({ length: 3 }, () => prng.next() * Math.PI * 2)
-  const ridgeFreqs = [4.0, 6.5, 9.0]
-  const ridgeAmps = [0.22, 0.12, 0.06]
+  // Ridge noise — sharp peaks via abs(sin)
+  const ridgePhases = Array.from({ length: 4 }, () => prng.next() * Math.PI * 2)
+  const ridgePhasesZ = Array.from({ length: 4 }, () => prng.next() * Math.PI * 2)
+  const ridgeFreqs = [3.0, 5.5, 8.0, 12.0]
+  const ridgeAmps = [0.28, 0.15, 0.08, 0.04]
 
-  // Plateau mask — random flat areas mixed with the noise
-  const plateauPhase = prng.next() * Math.PI * 2
+  // Erosion channels — carve valleys using diagonal sin waves
+  const erosionPhase1 = prng.next() * Math.PI * 2
+  const erosionPhase2 = prng.next() * Math.PI * 2
+
+  // Central valley for tactical gameplay
+  const valleyCenter = 0.35 + prng.next() * 0.30
+  const valleyWidth = 0.08 + prng.next() * 0.06
 
   for (let z = 0; z < size; z++) {
     for (let x = 0; x < size; x++) {
@@ -72,31 +77,42 @@ export function generateTerrain(prng: PRNG): Float32Array {
 
       // Base rolling hills (fBm)
       let h = 0
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 5; i++) {
         h += Math.sin(nx * Math.PI * 2 * baseFreqs[i] + basePhases[i]) * baseAmps[i]
-        h += Math.sin(nz * Math.PI * 2 * baseFreqs[i] + basePhasesZ[i]) * baseAmps[i] * 0.6
+        h += Math.sin(nz * Math.PI * 2 * baseFreqs[i] + basePhasesZ[i]) * baseAmps[i] * 0.7
       }
 
-      // Sharp ridges (abs(sin) creates V-shaped peaks and flat valleys)
+      // Ridges — V-shaped peaks
       let ridge = 0
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         ridge += (1 - Math.abs(Math.sin(nx * Math.PI * ridgeFreqs[i] + ridgePhases[i]))) * ridgeAmps[i]
-        ridge += (1 - Math.abs(Math.sin(nz * Math.PI * ridgeFreqs[i] + ridgePhasesZ[i]))) * ridgeAmps[i] * 0.5
+        ridge += (1 - Math.abs(Math.sin(nz * Math.PI * ridgeFreqs[i] + ridgePhasesZ[i]))) * ridgeAmps[i] * 0.6
       }
 
-      // Plateau effect: smooth out some areas using a low-freq mask
-      const plateauMask = (Math.sin(nx * Math.PI * 2.5 + plateauPhase) + 1) * 0.5
-      const combinedH = h + ridge * (0.6 + plateauMask * 0.4)
+      // Erosion channels — diagonal grooves that carve into the terrain
+      const erosion1 = Math.abs(Math.sin((nx + nz) * Math.PI * 6 + erosionPhase1))
+      const erosion2 = Math.abs(Math.sin((nx - nz) * Math.PI * 4.5 + erosionPhase2))
+      const erosionCarve = Math.min(erosion1, erosion2) * 0.12
 
-      // Island edge falloff — steeper curve for dramatic cliff edges
-      const ex = Math.min(nx, 1 - nx) * 3.5
-      const ez = Math.min(nz, 1 - nz) * 3.5
+      // Valley — a gentle dip across the map for tactical positioning
+      const valleyDist = Math.abs(nz - valleyCenter) / valleyWidth
+      const valleyDepth = valleyDist < 1 ? (1 - valleyDist * valleyDist) * 0.25 : 0
+
+      // Spawn plateaus — flatter areas where teams start
+      const leftPlateau = gauss(nx, 0.18, 0.08) * gauss(nz, 0.50, 0.18) * 0.15
+      const rightPlateau = gauss(nx, 0.82, 0.08) * gauss(nz, 0.50, 0.18) * 0.15
+
+      const combinedH = h + ridge - erosionCarve - valleyDepth + leftPlateau + rightPlateau
+
+      // Island edge falloff — steep cliff edges
+      const ex = Math.min(nx, 1 - nx) * 4.0
+      const ez = Math.min(nz, 1 - nz) * 4.0
       const edgeFalloff = Math.min(1, ex) * Math.min(1, ez)
-      const steepEdge = edgeFalloff * edgeFalloff  // steeper cliffs at map edge
+      const steepEdge = edgeFalloff * edgeFalloff
 
-      const baseline = TERRAIN_HEIGHT_SCALE * 0.50
-      const amplitude = TERRAIN_HEIGHT_SCALE * 0.32
-      heightmap[z * size + x] = (baseline + combinedH * amplitude) * steepEdge
+      const baseline = TERRAIN_HEIGHT_SCALE * 0.48
+      const amplitude = TERRAIN_HEIGHT_SCALE * 0.38
+      heightmap[z * size + x] = Math.max(0, (baseline + combinedH * amplitude) * steepEdge)
     }
   }
 

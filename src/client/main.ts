@@ -19,6 +19,11 @@ import { TouchControls } from './ui/touchControls'
 import { WeaponPicker } from './ui/weaponPicker'
 import { audio } from './audio'
 import { NetClient } from './net'
+import { PostProcessing } from './render/postProcessing'
+import { DustParticles } from './render/dustParticles'
+import { EnvironmentRenderer } from './render/environmentRenderer'
+import { CloudRenderer } from './render/cloudRenderer'
+import { perfMonitor } from './perfMonitor'
 
 type AppState = 'menu' | 'lobby' | 'countdown' | 'playing'
 
@@ -37,6 +42,7 @@ class Game {
   private blindboxRenderer!: BlindboxRenderer
   private input!: InputManager
   private hud!: HUD
+  private touchControls: TouchControls | null = null
 
   private accumulator = 0
   private lastTime = 0
@@ -61,8 +67,15 @@ class Game {
 
   private appState: AppState = 'menu'
   private net: NetClient | null = null
+  private postProcessing!: PostProcessing
+  private dustParticles!: DustParticles
+  private environmentRenderer!: EnvironmentRenderer
+  private cloudRenderer!: CloudRenderer
   private menuEl!: HTMLElement
+  private matchStatusEl: HTMLElement | null = null
   private renderersInitialized = false
+  private previewWorld: WorldState | null = null
+  private matchmakingTimeout: ReturnType<typeof setTimeout> | null = null
 
   constructor() {
     this.scene = new THREE.Scene()
@@ -70,43 +83,88 @@ class Game {
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.shadowMap.enabled = false
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.0
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     document.getElementById('game')!.appendChild(this.renderer.domElement)
 
     this.gameCamera = new GameCamera(window.innerWidth / window.innerHeight)
 
-    const ambient = new THREE.AmbientLight(0x6688aa, 0.6)
-    this.scene.add(ambient)
+    const hemi = new THREE.HemisphereLight(0x88bbdd, 0x446633, 0.6)
+    this.scene.add(hemi)
 
-    const sun = new THREE.DirectionalLight(0xffeedd, 1.2)
+    const sun = new THREE.DirectionalLight(0xffeedd, 1.6)
     sun.position.set(50, 80, 30)
+    sun.castShadow = true
+    sun.shadow.mapSize.width = 1024
+    sun.shadow.mapSize.height = 1024
+    sun.shadow.camera.near = 1
+    sun.shadow.camera.far = 200
+    sun.shadow.camera.left = -80
+    sun.shadow.camera.right = 80
+    sun.shadow.camera.top = 80
+    sun.shadow.camera.bottom = -80
+    sun.shadow.bias = -0.002
     this.scene.add(sun)
 
+    const fill = new THREE.DirectionalLight(0xffaa66, 0.25)
+    fill.position.set(-30, 10, -20)
+    this.scene.add(fill)
+
+    const rim = new THREE.DirectionalLight(0x88bbff, 0.2)
+    rim.position.set(-20, 40, -60)
+    this.scene.add(rim)
+
+    this.scene.fog = new THREE.FogExp2(0x8ab4d8, 0.006)
+
+    new SkyRenderer(this.scene)
+    this.dustParticles = new DustParticles(this.scene)
+    this.environmentRenderer = new EnvironmentRenderer(this.scene)
+    this.cloudRenderer = new CloudRenderer(this.scene)
+
+    this.postProcessing = new PostProcessing(
+      this.renderer, this.scene, this.gameCamera.camera
+    )
+    perfMonitor.setRenderer(this.renderer)
+
     window.addEventListener('resize', this.onResize)
+
+    // Init a preview world so the 3D scene renders behind the menu
+    this.initPreview()
 
     this.lastTime = performance.now()
     this.loop()
 
-    // Auto-start when arriving through Vibe Jam portal — skip queue
     const params = new URLSearchParams(window.location.search)
     if (params.get('portal') === 'true') {
       this.isMultiplayer = false
       this.initGame(Date.now())
     } else {
-      this.autoQueue()
+      this.showMenu()
     }
   }
 
-  private autoQueue(): void {
-    this.isMultiplayer = true
-    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
-    this.net.connect()
-    this.showAutoLobby('Connecting...')
+  private initPreview(): void {
+    this.previewWorld = createWorld(Date.now())
+    if (!this.renderersInitialized) {
+      this.terrainRenderer = new TerrainRenderer(this.scene)
+      this.characterRenderer = new CharacterRenderer(this.scene)
+      this.projectileRenderer = new ProjectileRenderer(this.scene)
+      this.explosionRenderer = new ExplosionRenderer(this.scene)
+      this.waterRenderer = new WaterRenderer(this.scene)
+      this.aimRenderer = new AimRenderer(this.scene)
+      this.blindboxRenderer = new BlindboxRenderer(this.scene)
+      this.renderersInitialized = true
+    }
+    this.terrainRenderer.update(this.previewWorld.heightmap, this.terrainVersion)
+    this.environmentRenderer.update(this.previewWorld.heightmap, this.terrainVersion)
+    this.waterRenderer.update(this.previewWorld.waterLevel, 0, this.gameCamera.camera)
+    this.characterRenderer.update(this.previewWorld.characters, -1, this.previewWorld.heightmap, 0)
   }
 
-  private showAutoLobby(message: string): void {
-    this.appState = 'lobby'
+  private showMenu(): void {
+    this.appState = 'menu'
     this.menuEl?.remove()
     this.menuEl = document.createElement('div')
     this.menuEl.id = 'menu-screen'
@@ -114,24 +172,50 @@ class Game {
       <div class="menu-container">
         <h1 class="menu-title">PIXELTRIKS</h1>
         <p class="menu-subtitle">HUMANS vs AI</p>
-        <div class="lobby-searching">
-          <div class="search-spinner"></div>
-          <p id="lobby-status" class="lobby-status-text">${message}</p>
-        </div>
-        <button id="btn-solo" class="menu-btn primary">PLAY SOLO</button>
+        <button id="btn-play" class="menu-btn primary">PLAY</button>
         <p class="menu-footer">WASD Move | Arrows Aim | Space Fire | Tab Weapon</p>
       </div>
     `
     document.body.appendChild(this.menuEl)
 
-    document.getElementById('btn-solo')!.onclick = () => {
+    document.getElementById('btn-play')!.onclick = () => {
       audio.start()
-      this.net?.disconnect()
-      this.net = null
-      this.isMultiplayer = false
       this.hideMenu()
-      this.initGame(Date.now())
+      this.startMatchmaking()
     }
+  }
+
+  private startMatchmaking(): void {
+    this.appState = 'lobby'
+
+    // Show subtle status in bottom corner
+    this.matchStatusEl?.remove()
+    this.matchStatusEl = document.createElement('div')
+    this.matchStatusEl.style.cssText = [
+      'position:fixed', 'bottom:12px', 'right:12px',
+      'font-family:var(--font-ui)', 'font-size:11px', 'font-weight:600',
+      'letter-spacing:2px', 'color:rgba(255,255,255,0.35)',
+      'pointer-events:none', 'z-index:25',
+    ].join(';')
+    this.matchStatusEl.textContent = 'SEARCHING FOR OPPONENT...'
+    document.body.appendChild(this.matchStatusEl)
+
+    // Try to connect — if server is unavailable, start solo immediately
+    this.isMultiplayer = true
+    this.net = new NetClient(this.getWsUrl(), (event) => this.onNetEvent(event))
+    this.net.connect()
+
+    // Fallback: if no match in 12s, start solo
+    this.matchmakingTimeout = setTimeout(() => {
+      if (this.appState !== 'playing') {
+        this.net?.disconnect()
+        this.net = null
+        this.isMultiplayer = false
+        this.matchStatusEl?.remove()
+        this.matchStatusEl = null
+        this.initGame(Date.now())
+      }
+    }, 12000)
   }
 
   private hideMenu(): void {
@@ -144,9 +228,26 @@ class Game {
     return `${wsProtocol}//${window.location.hostname}:8080`
   }
 
-  private updateLobby(text: string): void {
-    const el = document.getElementById('lobby-status')
-    if (el) el.textContent = text
+  private updateMatchStatus(text: string): void {
+    if (this.matchStatusEl) this.matchStatusEl.textContent = text
+  }
+
+  private clearMatchmaking(): void {
+    if (this.matchmakingTimeout) {
+      clearTimeout(this.matchmakingTimeout)
+      this.matchmakingTimeout = null
+    }
+    this.matchStatusEl?.remove()
+    this.matchStatusEl = null
+  }
+
+  private startSoloFallback(): void {
+    if (this.appState === 'playing') return
+    this.net?.disconnect()
+    this.net = null
+    this.isMultiplayer = false
+    this.clearMatchmaking()
+    this.initGame(Date.now())
   }
 
   private onNetEvent(event: import('./net').NetEvent): void {
@@ -156,33 +257,25 @@ class Game {
         break
 
       case 'waiting':
-        this.updateLobby('Searching for opponent...')
+        this.updateMatchStatus('SEARCHING FOR OPPONENT...')
         break
 
       case 'room_created':
-        // 15s timeout with no opponent — fall back to solo AI
-        this.net?.disconnect()
-        this.net = null
-        this.hideMenu()
-        this.isMultiplayer = false
-        audio.start()
-        this.initGame(Date.now())
         break
 
       case 'player_joined':
-        this.updateLobby('Opponent joined! Starting...')
+        this.updateMatchStatus('OPPONENT FOUND!')
         this.net!.sendReady()
         break
 
       case 'countdown':
         this.appState = 'countdown'
-        this.updateLobby(`Opponent found! Starting in ${event.seconds}...`)
+        this.updateMatchStatus(`STARTING IN ${event.seconds}...`)
         break
 
       case 'game_start':
         this.localTeam = event.yourTeam
-        audio.start()
-        this.hideMenu()
+        this.clearMatchmaking()
         this.initGame(event.seed)
         break
 
@@ -196,20 +289,18 @@ class Game {
       case 'opponent_disconnected':
         if (this.appState === 'playing' && this.isMultiplayer) {
           this.showDisconnectMessage()
-        } else if (this.appState === 'lobby') {
-          this.updateLobby('Opponent disconnected')
         }
         break
 
       case 'error':
-        if (this.appState !== 'playing') {
-          this.updateLobby('Server unavailable — tap PLAY SOLO to continue')
-        }
+        this.startSoloFallback()
         break
 
       case 'disconnected':
         if (this.appState === 'playing' && this.isMultiplayer) {
           this.showDisconnectMessage()
+        } else if (this.appState !== 'playing') {
+          this.startSoloFallback()
         }
         break
     }
@@ -275,14 +366,17 @@ class Game {
       this.projectileRenderer = new ProjectileRenderer(this.scene)
       this.explosionRenderer = new ExplosionRenderer(this.scene)
       this.waterRenderer = new WaterRenderer(this.scene)
-      new SkyRenderer(this.scene)
       this.aimRenderer = new AimRenderer(this.scene)
       this.blindboxRenderer = new BlindboxRenderer(this.scene)
       this.renderersInitialized = true
     }
 
+    this.input?.dispose()
+    this.touchControls?.dispose()
+    this.hud?.dispose()
+
     this.input = new InputManager()
-    new TouchControls(this.input)
+    this.touchControls = new TouchControls(this.input)
     this.hud = new HUD()
 
     this.weaponPicker?.dispose()
@@ -297,6 +391,7 @@ class Game {
     this.hud.onRestart = this.doRestart
 
     this.terrainRenderer.update(this.world.heightmap, this.terrainVersion)
+    this.environmentRenderer.update(this.world.heightmap, this.terrainVersion)
 
     for (const c of this.world.characters) {
       if (c.alive) this.prevAlive.add(c.id)
@@ -372,7 +467,9 @@ class Game {
     this.portalHintEl = null
     this.weaponPicker?.dispose()
     this.weaponPicker = null
-    this.autoQueue()
+    this.clearMatchmaking()
+    this.initPreview()
+    this.showMenu()
   }
 
   private onRestartKey = (e: KeyboardEvent): void => {
@@ -383,6 +480,7 @@ class Game {
     const w = window.innerWidth
     const h = window.innerHeight
     this.renderer.setSize(w, h)
+    this.postProcessing.resize(w, h)
     this.gameCamera.resize(w / h)
   }
 
@@ -396,9 +494,12 @@ class Game {
     const dt = Math.min(now - this.lastTime, 200)
     this.lastTime = now
 
-    if (this.appState !== 'playing') return
-
     this.gameTime += dt / 1000
+
+    if (this.appState !== 'playing') {
+      this.renderPreview()
+      return
+    }
     this.accumulator += dt
 
     // Max 3 ticks per render frame (spiral-of-death guard).
@@ -470,6 +571,7 @@ class Game {
         this.gameCamera.shake(exp.radius * 0.15)
         this.gameCamera.onImpact(exp.x, exp.y, exp.z, this.world.heightmap)
         audio.explosion(exp.radius)
+        perfMonitor.log('explosion', { x: exp.x, z: exp.z, radius: exp.radius })
       }
     }
 
@@ -515,6 +617,7 @@ class Game {
     if (events.gameOver) {
       const teamAlive = this.world.characters.filter(c => c.team === this.localTeam && c.alive).length
       audio.gameOver(teamAlive > 0)
+      perfMonitor.log('game_over', { won: teamAlive > 0, turn: this.world.turn })
     }
 
     this.updateAudio()
@@ -565,8 +668,24 @@ class Game {
     }
   }
 
+  private renderPreview(): void {
+    if (!this.previewWorld) return
+    const t = this.gameTime * 0.15
+    const radius = 60
+    const cx = Math.sin(t) * radius
+    const cz = Math.cos(t) * radius
+    this.gameCamera.camera.position.set(cx, 35, cz)
+    this.gameCamera.camera.lookAt(0, 0, 0)
+    this.waterRenderer.update(this.previewWorld.waterLevel, this.gameTime, this.gameCamera.camera)
+    this.cloudRenderer.update(this.gameTime)
+    this.dustParticles.update(this.gameTime, this.gameCamera.camera)
+    this.postProcessing.render()
+  }
+
   private render(): void {
     this.terrainRenderer.update(this.world.heightmap, this.terrainVersion)
+    this.environmentRenderer.update(this.world.heightmap, this.terrainVersion)
+    this.cloudRenderer.update(this.gameTime)
 
     const activeChar = getActiveCharacter(this.world)
 
@@ -574,19 +693,8 @@ class Game {
     this.projectileRenderer.update(this.world.projectiles, this.world.heightmap)
     this.explosionRenderer.update()
     this.blindboxRenderer.update(this.world.blindboxes, this.world.heightmap, this.gameTime)
-    this.waterRenderer.update(this.world.waterLevel, this.gameTime)
-
-    if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {
-      const proj = this.world.projectiles[0]
-      this.gameCamera.followProjectile(proj.x, proj.y, proj.z, this.world.heightmap)
-    } else if (this.world.phase === 'aiming') {
-      // Only pull camera back to the active character once their turn actually starts.
-      // During resolving + between_turns the camera lingers on the blast zone so the
-      // player can read damage numbers and see knockback before the next turn loads.
-      if (activeChar) {
-        this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
-      }
-    }
+    this.waterRenderer.update(this.world.waterLevel, this.gameTime, this.gameCamera.camera)
+    this.dustParticles.update(this.gameTime, this.gameCamera.camera)
 
     const isAiming = this.world.phase === 'aiming'
     const isLocalAiming = isAiming && (
@@ -596,6 +704,14 @@ class Game {
 
     if (isLocalAiming && activeChar) {
       this.characterRenderer.setAzimuth(activeChar.id, this.input.getAimAzimuth())
+      this.gameCamera.setAzimuth(this.input.getAimAzimuth())
+    }
+
+    if (this.world.phase === 'firing' && this.world.projectiles.length > 0) {
+      const proj = this.world.projectiles[0]
+      this.gameCamera.followProjectile(proj.x, proj.y, proj.z, this.world.heightmap)
+    } else if (isAiming && activeChar) {
+      this.gameCamera.followTarget(activeChar.x, activeChar.y, activeChar.z, this.world.heightmap)
     }
 
     this.aimRenderer.update(
@@ -605,7 +721,8 @@ class Game {
       this.input.getChargePower(),
       this.input.isCharging(),
       isLocalAiming,
-      this.input.getSelectedWeapon()
+      this.input.getSelectedWeapon(),
+      this.world.heightmap
     )
 
     if (this.portalGroup) {
@@ -636,7 +753,8 @@ class Game {
 
     this.hud.tickFloats()
 
-    this.renderer.render(this.scene, this.gameCamera.camera)
+    this.postProcessing.render()
+    perfMonitor.tick()
   }
 }
 

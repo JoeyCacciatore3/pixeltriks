@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { GRAVITY, TERRAIN_CELL_SIZE } from '@shared/constants'
 import type { Character, WeaponKind } from '@shared/types'
 import { WEAPONS } from '@shared/types'
+import { getHeight } from '@sim/terrain'
 
 const PREVIEW_STEPS = 60
 const PREVIEW_DOTS = 12
@@ -19,9 +20,9 @@ export class AimRenderer {
     this.group = new THREE.Group()
 
     this.material = new THREE.LineBasicMaterial({
-      color: 0xffffff,
+      color: 0xffdd44,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.85,
     })
 
     const geom = new THREE.BufferGeometry()
@@ -30,8 +31,8 @@ export class AimRenderer {
     this.line = new THREE.Line(geom, this.material)
     this.group.add(this.line)
 
-    const dotGeom = new THREE.SphereGeometry(0.08, 4, 3)
-    const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 })
+    const dotGeom = new THREE.SphereGeometry(0.2, 6, 4)
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xffdd44, transparent: true, opacity: 0.9 })
     this.dots = new THREE.InstancedMesh(dotGeom, dotMat, PREVIEW_DOTS)
     this.dots.count = 0
     this.group.add(this.dots)
@@ -58,14 +59,16 @@ export class AimRenderer {
     power: number,
     isCharging: boolean,
     visible: boolean,
-    weapon: WeaponKind = 'bazooka'
+    weapon: WeaponKind = 'bazooka',
+    heightmap?: Float32Array
   ): void {
     this.group.visible = visible && char !== null
 
     if (!char || !visible) return
 
     const cx = (char.x - 128) * TERRAIN_CELL_SIZE
-    const cy = char.y * TERRAIN_CELL_SIZE + 2.0
+    const groundH = heightmap ? getHeight(heightmap, char.x, char.z) : char.y
+    const cy = (2 * groundH - char.y) * TERRAIN_CELL_SIZE + 2.0
     const cz = (char.z - 128) * TERRAIN_CELL_SIZE
 
     const config = WEAPONS[weapon]

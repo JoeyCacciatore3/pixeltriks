@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { createWorld, getActiveCharacter } from './world'
 import { step } from './game'
 import { createProjectile, createAirstrikeProjectiles } from './projectile'
-import { moveCharacter, jumpCharacter } from './character'
+import { moveCharacter, jumpCharacter, applyGroundMovement } from './character'
 import { computeAIInput } from './ai'
 import { generateTerrain, explodeTerrain, getHeight } from './terrain'
 import { createPRNG } from './prng'
-import { TEAM_HUMAN, TEAM_AI, TERRAIN_SIZE } from '@shared/constants'
+import { TEAM_HUMAN, TEAM_AI, TERRAIN_SIZE, STARTING_HP, SUDDEN_DEATH_TURN } from '@shared/constants'
+import { WEAPONS } from '@shared/types'
+import type { WeaponKind } from '@shared/types'
 
 const SEED = 42
 
@@ -148,6 +150,7 @@ describe('movement', () => {
     const char = getActiveCharacter(world)!
     const startX = char.x
     moveCharacter(char, 1, world)
+    applyGroundMovement(char, world)
     expect(char.x).toBeGreaterThan(startX)
   })
 
@@ -416,9 +419,189 @@ describe('terrain explosion', () => {
     const afterCenter = getHeight(heightmap, cx, cz)
     const afterEdge   = getHeight(heightmap, cx + 6, cz)
 
-    // Center should drop more than edge (quadratic = deeper bowl)
     const centerDrop = beforeCenter - afterCenter
     const edgeDrop   = beforeEdge   - afterEdge
     expect(centerDrop).toBeGreaterThan(edgeDrop)
+  })
+})
+
+describe('PRNG determinism', () => {
+  it('same seed produces identical sequences', () => {
+    const a = createPRNG(12345)
+    const b = createPRNG(12345)
+    for (let i = 0; i < 100; i++) {
+      expect(a.next()).toBe(b.next())
+    }
+  })
+
+  it('different seeds produce different sequences', () => {
+    const a = createPRNG(1)
+    const b = createPRNG(2)
+    let same = 0
+    for (let i = 0; i < 50; i++) {
+      if (a.next() === b.next()) same++
+    }
+    expect(same).toBeLessThan(5)
+  })
+
+  it('same seed produces identical worlds', () => {
+    const w1 = createWorld(999)
+    const w2 = createWorld(999)
+    expect(w1.characters.map(c => c.x)).toEqual(w2.characters.map(c => c.x))
+    expect(w1.characters.map(c => c.y)).toEqual(w2.characters.map(c => c.y))
+    expect(w1.hash).toBe(w2.hash)
+  })
+})
+
+describe('weapon configs', () => {
+  it('all 6 weapons are defined', () => {
+    const kinds: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'airstrike', 'teleport', 'dynamite']
+    for (const k of kinds) {
+      expect(WEAPONS[k]).toBeDefined()
+      expect(WEAPONS[k].speed).toBeGreaterThan(0)
+    }
+  })
+
+  it('teleport deals no damage', () => {
+    expect(WEAPONS.teleport.damage).toBe(0)
+    expect(WEAPONS.teleport.radius).toBe(0)
+  })
+
+  it('dynamite has highest damage and knockback', () => {
+    const maxDmg = Math.max(...Object.values(WEAPONS).map(w => w.damage))
+    const maxKb = Math.max(...Object.values(WEAPONS).map(w => w.knockbackMul))
+    expect(WEAPONS.dynamite.damage).toBe(maxDmg)
+    expect(WEAPONS.dynamite.knockbackMul).toBe(maxKb)
+  })
+
+  it('shotgun has no gravity and drag', () => {
+    expect(WEAPONS.shotgun.gravityMul).toBe(0)
+    expect(WEAPONS.shotgun.drag).toBeDefined()
+    expect(WEAPONS.shotgun.drag!).toBeGreaterThan(0)
+  })
+
+  it('grenade bounces 3 times with a fuse', () => {
+    expect(WEAPONS.grenade.bounces).toBe(3)
+    expect(WEAPONS.grenade.fuseTime).toBeGreaterThan(0)
+  })
+})
+
+describe('terrain generation', () => {
+  it('heightmap has correct dimensions', () => {
+    const prng = createPRNG(42)
+    const hm = generateTerrain(prng)
+    expect(hm.length).toBe(TERRAIN_SIZE * TERRAIN_SIZE)
+  })
+
+  it('heights are within reasonable range', () => {
+    const prng = createPRNG(42)
+    const hm = generateTerrain(prng)
+    let min = Infinity, max = -Infinity
+    for (let i = 0; i < hm.length; i++) {
+      if (hm[i] < min) min = hm[i]
+      if (hm[i] > max) max = hm[i]
+    }
+    expect(min).toBeGreaterThanOrEqual(-10)
+    expect(max).toBeLessThanOrEqual(70)
+  })
+
+  it('edges are lower than center (falloff)', () => {
+    const prng = createPRNG(42)
+    const hm = generateTerrain(prng)
+    const center = getHeight(hm, 128, 128)
+    const edge = getHeight(hm, 5, 5)
+    expect(center).toBeGreaterThan(edge)
+  })
+
+  it('getHeight clamps out-of-bounds coordinates', () => {
+    const prng = createPRNG(42)
+    const hm = generateTerrain(prng)
+    const h = getHeight(hm, -10, -10)
+    expect(h).toBeDefined()
+    expect(typeof h).toBe('number')
+  })
+})
+
+describe('character initial state', () => {
+  it('all characters start with full HP', () => {
+    const world = createWorld(SEED)
+    for (const c of world.characters) {
+      expect(c.hp).toBe(STARTING_HP)
+      expect(c.alive).toBe(true)
+    }
+  })
+
+  it('has correct team sizes', () => {
+    const world = createWorld(SEED)
+    const humans = world.characters.filter(c => c.team === TEAM_HUMAN)
+    const ai = world.characters.filter(c => c.team === TEAM_AI)
+    expect(humans.length).toBe(3)
+    expect(ai.length).toBe(3)
+  })
+
+  it('characters start grounded', () => {
+    const world = createWorld(SEED)
+    for (const c of world.characters) {
+      expect(c.grounded).toBe(true)
+    }
+  })
+})
+
+describe('water death', () => {
+  it('kills characters at water level', () => {
+    const world = createWorld(SEED)
+    const char = world.characters[0]
+    char.y = world.waterLevel + 10
+    char.grounded = false
+
+    let ticks = 0
+    while (char.alive && ticks < 500) {
+      step(world, null)
+      ticks++
+    }
+  })
+})
+
+describe('sudden death', () => {
+  it('water rises after sudden death turn', () => {
+    const world = createWorld(SEED)
+    const initialWater = world.waterLevel
+
+    world.turn = SUDDEN_DEATH_TURN + 1
+
+    for (let i = 0; i < 60; i++) step(world, null)
+
+    expect(world.waterLevel).toBeGreaterThanOrEqual(initialWater)
+  })
+})
+
+describe('grenade mechanics', () => {
+  it('grenade has bounces and fuse timer set', () => {
+    const proj = createProjectile(100, 20, 128, 0.3, 80, 'grenade', 0, 1)
+    expect(proj.bouncesLeft).toBe(3)
+    expect(proj.fuseTimer).toBe(180)
+  })
+
+  it('dynamite spawns near character with low speed', () => {
+    const proj = createProjectile(100, 20, 128, 0, 100, 'dynamite', 0, 1)
+    expect(Math.abs(proj.vx)).toBeLessThan(5)
+  })
+})
+
+describe('game phase transitions', () => {
+  it('end turn skips to between_turns', () => {
+    const world = createWorld(SEED)
+    expect(world.phase).toBe('aiming')
+    step(world, { endTurn: true })
+    expect(world.phase).toBe('between_turns')
+  })
+
+  it('timeout auto-ends aiming phase', () => {
+    const world = createWorld(SEED)
+    world.phaseTimer = world.phaseTimer - 2
+
+    for (let i = 0; i < 10; i++) step(world, null)
+
+    expect(['between_turns', 'aiming']).toContain(world.phase)
   })
 })

@@ -14,7 +14,14 @@ export class BlindboxRenderer {
   update(blindboxes: Blindbox[], heightmap: Float32Array, time: number): void {
     // Sync pool size
     while (this.groups.length > blindboxes.length) {
-      this.scene.remove(this.groups.pop()!)
+      const g = this.groups.pop()!
+      this.scene.remove(g)
+      for (const child of g.children) {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose()
+          ;(child.material as THREE.Material).dispose()
+        }
+      }
     }
     while (this.groups.length < blindboxes.length) {
       const g = this.createMesh()
@@ -84,6 +91,12 @@ export class BlindboxRenderer {
   dispose(): void {
     for (const g of this.groups) {
       this.scene.remove(g)
+      for (const child of g.children) {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose()
+          ;(child.material as THREE.Material).dispose()
+        }
+      }
     }
     this.groups = []
   }

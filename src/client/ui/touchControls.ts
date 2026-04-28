@@ -67,8 +67,14 @@ export class TouchControls {
     `
 
     document.body.appendChild(this.el)
-    this.el.style.display = 'flex'
-    document.body.classList.add('has-touch')
+
+    // Only show on actual mobile/tablet — coarse pointer means touch-primary device
+    const isTouchPrimary = matchMedia('(pointer: coarse)').matches
+    if (isTouchPrimary) {
+      this.el.style.display = 'flex'
+      document.body.classList.add('has-touch')
+    }
+
     this.bindEvents()
   }
 
@@ -169,5 +175,9 @@ export class TouchControls {
         btn.addEventListener('mousedown', handler)
       }
     })
+  }
+
+  dispose(): void {
+    this.el.remove()
   }
 }
