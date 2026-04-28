@@ -69,16 +69,10 @@ export function computeAIInput(
   const nearDist = dist(char, nearestEnemy)
 
   const bestShot = findBestShot(char, world)
-  const bestAirstrike = scoreAirstrike(char, world)
   const bestMove = evaluateMovement(char, world, difficulty)
 
-  const useAirstrike = bestAirstrike &&
-    (!bestShot || bestAirstrike.score > bestShot.score * 1.2)
-
   if (bestMove && bestMove.score > 0 && bestMove.targetX !== char.x) {
-    const shotScore = useAirstrike
-      ? (bestAirstrike?.score ?? 0)
-      : (bestShot?.score ?? 0)
+    const shotScore = bestShot?.score ?? 0
 
     if (bestMove.score > shotScore * 0.15 || shotScore <= 0) {
       const dir = bestMove.targetX > char.x ? 1 : -1
@@ -86,23 +80,6 @@ export function computeAIInput(
         return { jump: true }
       }
       return { moveDirection: dir as -1 | 1 }
-    }
-  }
-
-  // Azimuth for airstrike: face toward nearest enemy
-  const airstrikeAz = nearestEnemy.x > char.x ? 0 : Math.PI
-
-  if (useAirstrike && bestAirstrike) {
-    const noise = NOISE[difficulty]
-    return {
-      fire: {
-        angle: 0,
-        power: Math.max(10, Math.min(100,
-          bestAirstrike.power + prng.nextFloat(-noise.power, noise.power)
-        )),
-        weapon: 'airstrike',
-        azimuth: airstrikeAz,
-      },
     }
   }
 
@@ -242,41 +219,6 @@ function simulateShot(
   }
 
   return 0
-}
-
-function scoreAirstrike(
-  char: Character,
-  world: WorldState
-): ShotCandidate | null {
-  const config = WEAPONS.airstrike
-  let best: ShotCandidate | null = null
-
-  for (let pi = 1; pi <= 10; pi++) {
-    const power = (pi / 10) * 100
-    const targetX = char.x + char.facing * (power / 100) * 80
-    if (targetX < 5 || targetX > TERRAIN_SIZE - 5) continue
-
-    const spread = config.radius / 5
-    let totalScore = 0
-    const missileCount = 5
-
-    for (let m = 0; m < missileCount; m++) {
-      const offsetX = (m - (missileCount - 1) / 2) * (spread * 0.6)
-      const mx = targetX + offsetX
-      const mz = char.z
-      const gh = getHeight(world.heightmap, mx, mz)
-
-      totalScore += scoreImpact(
-        mx, gh, mz, config.damage, spread, char, world
-      )
-    }
-
-    if (!best || totalScore > best.score) {
-      best = { weapon: 'airstrike', angle: 0, power, azimuth: 0, score: totalScore }
-    }
-  }
-
-  return best
 }
 
 function evaluateMovement(

@@ -4,7 +4,6 @@ const WEAPONS: { weapon: WeaponKind; label: string; sub: string; color: string }
   { weapon: 'bazooka',   label: 'BAZOOKA',   sub: '45 DMG',   color: '#ff8844' },
   { weapon: 'grenade',   label: 'GRENADE',   sub: '40 DMG',   color: '#88cc44' },
   { weapon: 'shotgun',   label: 'SHOTGUN',   sub: '2×30 DMG', color: '#ffcc44' },
-  { weapon: 'airstrike', label: 'AIRSTRIKE', sub: '5×55 DMG', color: '#4488ff' },
   { weapon: 'teleport',  label: 'TELEPORT',  sub: 'RELOCATE', color: '#aa44ff' },
   { weapon: 'dynamite',  label: 'DYNAMITE',  sub: '70 DMG',   color: '#ff4444' },
 ]

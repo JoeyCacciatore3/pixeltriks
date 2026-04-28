@@ -1,6 +1,6 @@
 import type { GameInput, WeaponKind } from '@shared/types'
 
-const WEAPON_ORDER: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'airstrike', 'teleport', 'dynamite']
+const WEAPON_ORDER: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'teleport', 'dynamite']
 
 export class InputManager {
   private keys = new Set<string>()

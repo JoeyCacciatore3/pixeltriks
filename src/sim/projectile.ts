@@ -34,34 +34,6 @@ export function createProjectile(
   }
 }
 
-export function createAirstrikeProjectiles(
-  targetX: number, targetZ: number, owner: number
-): Projectile[] {
-  const config = WEAPONS.airstrike
-  const missiles: Projectile[] = []
-  const count = 5
-  const spread = config.radius / 5
-
-  for (let i = 0; i < count; i++) {
-    const offsetX = (i - (count - 1) / 2) * (spread * 0.6)
-    missiles.push({
-      x: targetX + offsetX,
-      y: -20,
-      z: targetZ,
-      vx: 0,
-      vy: config.speed * 0.5,
-      vz: 0,
-      weapon: 'airstrike',
-      owner,
-      bouncesLeft: 0,
-      fuseTimer: 0,
-      active: true,
-      graceTimer: 0,
-    })
-  }
-  return missiles
-}
-
 export function stepProjectile(
   proj: Projectile,
   world: WorldState,

@@ -129,11 +129,7 @@ class AudioEngine {
         this.noise(0.1, 0.35, 5000, 2)
         this.tone(150, 0.06, 0.2, 'sawtooth', 50)
         break
-      case 'airstrike':
-        this.tone(800, 0.3, 0.15, 'sine', 200)
-        this.noise(0.2, 0.1, 1500)
-        break
-      case 'teleport':
+case 'teleport':
         this.tone(400, 0.3, 0.15, 'sine', 1200)
         this.tone(600, 0.3, 0.1, 'sine', 1800)
         break

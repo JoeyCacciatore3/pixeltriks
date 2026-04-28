@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createWorld, getActiveCharacter } from './world'
 import { step } from './game'
-import { createProjectile, createAirstrikeProjectiles } from './projectile'
+import { createProjectile } from './projectile'
 import { moveCharacter, jumpCharacter, applyGroundMovement } from './character'
 import { computeAIInput } from './ai'
 import { generateTerrain, explodeTerrain, getHeight } from './terrain'
@@ -62,41 +62,6 @@ describe('projectile facing', () => {
   })
 })
 
-describe('airstrike', () => {
-  it('creates 5 missiles', () => {
-    const projs = createAirstrikeProjectiles(100, 128, 0)
-    expect(projs.length).toBe(5)
-  })
-
-  it('missiles fall downward from above', () => {
-    const projs = createAirstrikeProjectiles(100, 128, 0)
-    for (const p of projs) {
-      expect(p.y).toBeLessThan(0)
-      expect(p.vy).toBeGreaterThan(0)
-      expect(p.vx).toBe(0)
-    }
-  })
-
-  it('missiles survive the boundary check while descending', () => {
-    const world = createWorld(SEED)
-    step(world, { fire: { angle: 0, power: 60, weapon: 'airstrike' } })
-
-    step(world, null)
-
-    const active = world.projectiles.filter(p => p.active)
-    expect(active.length).toBe(5)
-  })
-
-  it('missiles spread around target X', () => {
-    const projs = createAirstrikeProjectiles(100, 128, 0)
-    const xs = projs.map(p => p.x)
-    const minX = Math.min(...xs)
-    const maxX = Math.max(...xs)
-    expect(maxX - minX).toBeGreaterThan(0)
-    const avgX = xs.reduce((a, b) => a + b) / xs.length
-    expect(avgX).toBeCloseTo(100, 0)
-  })
-})
 
 describe('shotgun multi-shot', () => {
   it('fires multiple projectiles via game step', () => {
@@ -190,7 +155,7 @@ describe('AI', () => {
     world.activeCharIndex = 0
 
     const input = computeAIInput(world, 'hard')
-    if (input?.fire && input.fire.weapon !== 'airstrike') {
+    if (input?.fire) {
       const char = getActiveCharacter(world)!
       const proj = createProjectile(
         char.x, char.y, char.z,
@@ -273,18 +238,6 @@ describe('end-to-end game loop', () => {
     }
   })
 
-  it('plays an airstrike turn correctly', () => {
-    const world = createWorld(SEED)
-    step(world, { fire: { angle: 0, power: 60, weapon: 'airstrike' } })
-    expect(world.phase).toBe('firing')
-    expect(world.projectiles.length).toBe(5)
-
-    for (const p of world.projectiles) {
-      expect(p.weapon).toBe('airstrike')
-      expect(p.vy).toBeGreaterThan(0)
-    }
-  })
-
   it('AI fires toward human team', () => {
     const world = createWorld(SEED)
 
@@ -296,7 +249,7 @@ describe('end-to-end game loop', () => {
     const input = computeAIInput(world, 'hard')
     expect(input).not.toBeNull()
 
-    if (input?.fire && input.fire.weapon !== 'airstrike') {
+    if (input?.fire) {
       const proj = createProjectile(
         aiChar.x, aiChar.y, aiChar.z,
         input.fire.angle, input.fire.power,
@@ -454,8 +407,8 @@ describe('PRNG determinism', () => {
 })
 
 describe('weapon configs', () => {
-  it('all 6 weapons are defined', () => {
-    const kinds: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'airstrike', 'teleport', 'dynamite']
+  it('all 5 weapons are defined', () => {
+    const kinds: WeaponKind[] = ['bazooka', 'grenade', 'shotgun', 'teleport', 'dynamite']
     for (const k of kinds) {
       expect(WEAPONS[k]).toBeDefined()
       expect(WEAPONS[k].speed).toBeGreaterThan(0)

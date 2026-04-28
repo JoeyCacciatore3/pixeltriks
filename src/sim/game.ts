@@ -2,7 +2,7 @@ import type { WorldState, GameInput, StepEvents } from '@shared/types'
 import { WEAPONS } from '@shared/types'
 import { emptyEvents, getActiveCharacter, hashWorld } from './world'
 import { moveCharacter, jumpCharacter, applyCharacterPhysics, applyGroundMovement } from './character'
-import { createProjectile, createAirstrikeProjectiles, stepProjectile } from './projectile'
+import { createProjectile, stepProjectile } from './projectile'
 import { advanceTurn, isAllSettled, updatePhaseTimer } from './turn'
 import { stepBlindboxes } from './blindbox'
 
@@ -57,14 +57,7 @@ function handleAimingPhase(
       jumpCharacter(char, input.moveDirection || 0)
     }
     if (input.fire) {
-      if (input.fire.weapon === 'airstrike') {
-        const az = input.fire.azimuth ?? (char.facing > 0 ? 0 : Math.PI)
-        const targetX = char.x + Math.cos(az) * (input.fire.power / 100) * 80
-        const targetZ = char.z + Math.sin(az) * (input.fire.power / 100) * 80
-        const projs = createAirstrikeProjectiles(targetX, targetZ, char.id)
-        world.projectiles.push(...projs)
-      } else {
-        const config = WEAPONS[input.fire.weapon]
+      const config = WEAPONS[input.fire.weapon]
         const shotCount = config.shots || 1
         const spreadStep = shotCount > 1 ? 0.06 : 0
         const baseAngle = input.fire.angle - spreadStep * (shotCount - 1) / 2
@@ -82,7 +75,6 @@ function handleAimingPhase(
           )
           world.projectiles.push(proj)
         }
-      }
       world.phase = 'firing'
       world.phaseTimer = 0
     }

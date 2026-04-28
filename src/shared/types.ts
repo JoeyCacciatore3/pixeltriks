@@ -1,4 +1,4 @@
-export type WeaponKind = 'bazooka' | 'grenade' | 'shotgun' | 'airstrike' | 'teleport' | 'dynamite'
+export type WeaponKind = 'bazooka' | 'grenade' | 'shotgun' | 'teleport' | 'dynamite'
 
 export interface WeaponConfig {
   speed: number
@@ -18,7 +18,6 @@ export const WEAPONS: Record<WeaponKind, WeaponConfig> = {
   bazooka:   { speed: 12, radius: 35, damage: 45, gravityMul: 1,   bounces: 0, fuseTime: 0,   shots: 1, craterMul: 1.0, knockbackMul: 1.0 },
   grenade:   { speed: 10, radius: 30, damage: 40, gravityMul: 1,   bounces: 3, fuseTime: 180, shots: 1, craterMul: 0.7, knockbackMul: 1.3 },
   shotgun:   { speed: 20, radius: 14, damage: 30, gravityMul: 0,   bounces: 0, fuseTime: 0,   shots: 2, craterMul: 0.0, knockbackMul: 0.4, drag: 0.04 },
-  airstrike: { speed: 14, radius: 40, damage: 55, gravityMul: 1.5, bounces: 0, fuseTime: 0,   shots: 5, craterMul: 1.3, knockbackMul: 0.7 },
   teleport:  { speed: 18, radius: 0,  damage: 0,  gravityMul: 1,   bounces: 0, fuseTime: 0,   shots: 1, craterMul: 0.0, knockbackMul: 0.0 },
   dynamite:  { speed: 2,  radius: 50, damage: 70, gravityMul: 1,   bounces: 0, fuseTime: 120, shots: 1, craterMul: 2.0, knockbackMul: 1.8 },
 }
