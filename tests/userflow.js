@@ -79,9 +79,6 @@
   }
 
   async function runDesktop() {
-    // Default UI is now "simple"; force Pro so hidden tools (Fill/Shape/Eyedropper)
-    // and the More panel are present for the full desktop flow.
-    await step('force Pro interface for full-surface flow', () => { if (document.body.dataset.ui !== 'pro') { const b = $('#btn-simple'); if (b) b.click(); } });
     /* --- edge: everything must be safe BEFORE a document exists --- */
     await step('no-doc: tools + hero + palette are safe', () => {
       ['brush', 'move', 'crop', 'select', 'fill', 'text', 'wand'].forEach(t => tool(t));

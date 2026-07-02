@@ -39,9 +39,9 @@ window.GF = window.GF || {};
     { key:'exposure',   label:'Exposure',   min:-100, max:100 },
     { key:'contrast',   label:'Contrast',   min:-100, max:100 },
     { key:'saturation', label:'Saturation', min:-100, max:100 },
-    { key:'vibrance',   label:'Vibrance',   min:-100, max:100, adv:true },
-    { key:'warmth',     label:'Warmth',     min:-100, max:100, adv:true },
-    { key:'clarity',    label:'Clarity',    min:-100, max:100, adv:true },
+    { key:'vibrance',   label:'Vibrance',   min:-100, max:100 },
+    { key:'warmth',     label:'Warmth',     min:-100, max:100 },
+    { key:'clarity',    label:'Clarity',    min:-100, max:100 },
   ];
   let adj = blankAdj();
   function blankAdj() { return { exposure:0, contrast:0, saturation:0, vibrance:0, warmth:0, clarity:0 }; }
@@ -100,7 +100,6 @@ window.GF = window.GF || {};
     buildBlendOptions();
     buildProTools();
     wireTopbar();
-    wireUIMode();
     wireTools();
     wirePanel();
     wireHero();
@@ -261,7 +260,6 @@ window.GF = window.GF || {};
     const host = $('#adj-sliders'); host.innerHTML = '';
     ADJ.forEach(s => {
       const row = document.createElement('div'); row.className = 'slider';
-      if (s.adv) row.setAttribute('data-adv', '');   // hidden in Simple mode
       row.innerHTML =
         `<div class="slider-top"><b>${s.label}</b><span class="val" data-k="${s.key}">0</span></div>
          <input type="range" min="${s.min}" max="${s.max}" value="0" data-k="${s.key}">`;
@@ -389,36 +387,6 @@ window.GF = window.GF || {};
     layoutCrop();
   }
 
-  /* Simple / Pro interface. Simple = a slim, uncluttered default (essential
-     tools + Adjust/Layers); Pro reveals every tool and the More panel. Nothing
-     is lost in Simple — the command palette (⌘K) still reaches everything. */
-  const ADV_TOOLS = ['fill', 'shape', 'eyedropper', 'clone', 'gradient'];
-  function wireUIMode() {
-    const b = $('#btn-simple'); if (!b) return;
-    const label = b.querySelector('.ui-mode');
-    const apply = mode => {
-      document.body.dataset.ui = mode;
-      if (label) label.textContent = mode === 'simple' ? 'Simple' : 'Pro';
-      b.classList.toggle('pro', mode === 'pro');
-      b.title = mode === 'simple'
-        ? 'Simple interface — click for Pro (every tool & the More panel)'
-        : 'Pro interface — click for Simple';
-      if (mode === 'simple') {
-        if ($('#panel').dataset.tab === 'pro') { const at = $('.ptab[data-tab="adjust"]'); if (at) at.click(); }
-        if (ADV_TOOLS.indexOf(curTool) >= 0) setTool('brush');   // don't strand an active, now-hidden tool
-      }
-      buildOptbar(curTool);   // reflect the new density in the current tool's options
-      try { localStorage.setItem('forge.ui', mode); } catch (e) {}
-    };
-    b.addEventListener('click', () => {
-      const next = document.body.dataset.ui === 'simple' ? 'pro' : 'simple';
-      apply(next);
-      U.toast(next === 'pro' ? 'Pro interface — all tools & panels shown' : 'Simple interface');
-    });
-    let saved = 'simple'; try { saved = localStorage.getItem('forge.ui') || 'simple'; } catch (e) {}
-    apply(saved);
-  }
-
   function wireTools() {
     $$('#toolrail .tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
     $('#brush-color').addEventListener('input', e => { V().brush.color = e.target.value; });
@@ -459,18 +427,17 @@ window.GF = window.GF || {};
 
   function buildOptbar(name) {
     const bar = $('#optbar');
-    const simple = document.body.dataset.ui === 'simple';   // pare dense options in Simple mode
     let html = '';
     if (name === 'brush' || name === 'eraser') {
       html = optSlider('Size', 'brush-size', 1, 200, V().brush.size)
            + optSlider('Opacity', 'brush-op', 0, 100, Math.round((V().brush.opacity ?? 1) * 100))
-           + (simple || name === 'eraser' ? '' : seg('brush-shape', [['round','Round'],['square','Square']], V().brush.shape || 'round'))
+           + (name === 'eraser' ? '' : seg('brush-shape', [['round','Round'],['square','Square']], V().brush.shape || 'round'))
            + `<label class="opt"><input type="checkbox" id="brush-pixel" ${V().brush.pixel ? 'checked' : ''}> Pixel</label>`;
     } else if (name === 'magicerase') {
       html = `<span class="opt">Click an object to remove it</span>`
            + seg('me-mode', [['heal','Heal (rebuild)'],['erase','Erase (transparent)']], V().wand.heal ? 'heal' : 'erase')
            + optSlider('Tolerance', 'me-tol', 0, 128, V().wand.tolerance)
-           + (simple ? '' : `<label class="opt"><input type="checkbox" id="me-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`);
+           + `<label class="opt"><input type="checkbox" id="me-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`;
     } else if (name === 'clone') {
       html = `<span class="opt"><span class="kbd">Alt</span>-click a source, then paint</span>`
            + optSlider('Size', 'brush-size', 1, 200, V().brush.size)
@@ -483,17 +450,17 @@ window.GF = window.GF || {};
     } else if (name === 'fill') {
       html = optSlider('Tolerance', 'fill-tol', 0, 128, V().fillTolerance);
     } else if (name === 'wand') {
-      html = (simple ? '' : selModeSeg())
+      html = selModeSeg()
            + optSlider('Tolerance', 'wand-tol', 0, 128, V().wand.tolerance)
            + `<label class="opt"><input type="checkbox" id="wand-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`
-           + (simple ? '' : seg('wand-sample', [['all','All layers'],['layer','Layer']], V().wand.sample || 'all')
-              + `<label class="opt"><input type="checkbox" id="wand-aa" ${V().wand.antialias ? 'checked' : ''}> Anti-alias</label>`)
+           + seg('wand-sample', [['all','All layers'],['layer','Layer']], V().wand.sample || 'all')
+           + `<label class="opt"><input type="checkbox" id="wand-aa" ${V().wand.antialias ? 'checked' : ''}> Anti-alias</label>`
            + `<button class="text-btn ghost" id="sel-menu">Select ▾</button>`;
     } else if (name === 'select') {
-      html = (simple ? '' : selModeSeg())
+      html = selModeSeg()
            + seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
-           + (simple ? '' : `<button class="text-btn ghost" id="sel-feather">Feather</button>`
-              + `<button class="text-btn ghost" id="sel-grow">Grow</button>`)
+           + `<button class="text-btn ghost" id="sel-feather">Feather</button>`
+           + `<button class="text-btn ghost" id="sel-grow">Grow</button>`
            + `<button class="text-btn ghost" id="sel-menu">Select ▾</button>`;
     } else if (name === 'shape') {
       html = seg('shp-kind', [['rect','Rect'],['ellipse','Ellipse'],['line','Line']], V().shape.kind)

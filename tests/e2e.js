@@ -40,9 +40,6 @@
   const proBtn = label => Array.prototype.find.call(document.querySelectorAll('#pro-grid .pro-btn'), b => b.textContent === label);
 
   async function runAll() {
-    // Default UI is now "simple" (Fill/Shape/Eyedropper + More tab hidden). Force
-    // Pro so this full-surface audit exercises every tool and panel.
-    if (document.body.dataset.ui !== 'pro') { const b = $('#btn-simple'); if (b) b.click(); }
     /* ---------- DOCUMENT ---------- */
     await t('newDoc opens 200x200, 1 layer', () => {
       freshDoc(200, 200);
