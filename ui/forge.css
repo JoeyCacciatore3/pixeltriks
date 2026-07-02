@@ -42,6 +42,7 @@
     --line:#d6dae1; --line-soft:#e4e7ec;
     --ink:#1c2128; --ink-2:#4a5260; --ink-3:#828b98;
     --accent-ink:#fff; --shadow:0 8px 30px rgba(20,30,50,.16);
+    --ai:#6a52f0; --ai-2:#5540d6;   /* the dark-theme lavenders wash out on light */
   }
 }
 :root[data-theme="light"] {
@@ -49,6 +50,7 @@
   --line:#d6dae1; --line-soft:#e4e7ec;
   --ink:#1c2128; --ink-2:#4a5260; --ink-3:#828b98;
   --accent-ink:#fff; --shadow:0 8px 30px rgba(20,30,50,.16);
+  --ai:#6a52f0; --ai-2:#5540d6;
 }
 
 * { box-sizing: border-box; }
@@ -490,9 +492,13 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 @media (max-width: 880px) {
   .menu-btn { display: inline-grid; }
   .brand-name { display: none; }
-  #topbar { grid-template-columns: auto 1fr auto; }
+  #topbar { grid-template-columns: auto 1fr auto; padding: 0 .35rem; }
+  .tb-group { gap: .2rem; }
   .tb-center { gap: .15rem; }
-  #btn-new { display: none; }
+  /* keep the top bar inside the viewport: Open/New/Save live in the ☰ menu,
+     zoom is pinch + the touch companion's Fit */
+  #btn-new, #btn-open, #doc-dims, .zoom-pill { display: none; }
+  .tb-right .text-btn { padding: .45em .7em; }
 
   /* tool rail -> bottom bar */
   #toolrail {
@@ -540,6 +546,13 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .hero { flex-direction: column; align-items: flex-start; gap: .25rem; font-size: .9em; }
 }
 
+/* ------------- no-document state: quiet the chrome until work exists -------------
+   The scene (3D) pane stays live — a 3D scene can start before any document. */
+body.no-doc #panel .ptab-pane:not([data-pane="scene"]) { opacity: .45; pointer-events: none; }
+body.no-doc[data-mode="image"] #optbar { display: none; }
+body.no-doc #histogram { display: none; }
+body.no-doc #touch-companion { display: none; }
+
 /* ============================= 3D WORKSPACE ============================= */
 /* WebGL host overlays the 2D canvas; visible only while body[data-mode="3d"] */
 #scene3d-host { position: absolute; inset: 0; display: none; background: transparent; }
@@ -555,6 +568,16 @@ body[data-mode="3d"] #empty-state, body[data-mode="3d"] #sel-bar { display: none
 .s3-num input { width: 100%; min-width: 0; padding: .3em .35em; border-radius: 7px;
   border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: .95em; }
 .s3-status { font-size: .78em; color: var(--ink-3); margin: .5rem 0 0; }
+/* label row with a right-aligned value — matches the Adjust tab's slider rhythm */
+.s3-top { display: flex; justify-content: space-between; align-items: baseline; }
+.s3-val { color: var(--ink-3); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* AI dialog "Advanced" disclosure */
+.ai-adv summary { cursor: pointer; color: var(--ink-3); font-size: .85em; font-weight: 600; margin: .2rem 0; }
+.ai-adv[open] summary { margin-bottom: .5rem; }
+@media (max-width: 880px) {
+  /* keep the 3D options bar to one tidy row on phones */
+  .s3-hint, #s3-export-ob { display: none; }
+}
 #s3-objects { margin-top: .4rem; }
 #s3-objects .layer-item { cursor: pointer; }
 

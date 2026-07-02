@@ -11,10 +11,11 @@ GF.scene3dUI = (function () {
   const $ = s => document.querySelector(s);
   const S = () => GF.scene3d;
 
+  // plain text, matching the More tab's pro-grid style (no mixed-weight glyphs)
   const PRIMS = [
-    ['sphere', '● Sphere'], ['box', '⬛ Box'], ['cylinder', '⬤ Cylinder'], ['cone', '▲ Cone'],
-    ['torus', '◯ Torus'], ['torusknot', '✾ Knot'], ['capsule', '⬭ Capsule'], ['plane', '▱ Plane'],
-    ['panel', '▭ Panel'], ['tile', '▬ Tile'], ['hex', '⬡ Hex'], ['curved', '◠ Curved'],
+    ['sphere', 'Sphere'], ['box', 'Box'], ['cylinder', 'Cylinder'], ['cone', 'Cone'],
+    ['torus', 'Torus'], ['torusknot', 'Torus knot'], ['capsule', 'Capsule'], ['plane', 'Plane'],
+    ['panel', 'Panel'], ['tile', 'Tile'], ['hex', 'Hex tile'], ['curved', 'Curved wall'],
   ];
   const SAMPLES = ['cube', 'sphere', 'cylinder', 'cone', 'plane'];
 
@@ -38,7 +39,7 @@ GF.scene3dUI = (function () {
     const seg = [['orbit', 'Orbit'], ['move', 'Move'], ['rotate', 'Rotate'], ['scale', 'Scale']]
       .map(([v, l]) => `<button data-v="${v}" class="${v === cur ? 'on' : ''}">${l}</button>`).join('');
     return `<span class="seg" id="s3-interact">${seg}</span>`
-      + `<span class="opt">Click an object to select it</span>`
+      + `<span class="opt s3-hint">Click an object to select it</span>`
       + `<button class="text-btn primary" id="s3-flatten-ob">⬇ Flatten to layer</button>`
       + `<button class="text-btn ghost" id="s3-export-ob">Export GLB</button>`;
   }
@@ -66,8 +67,8 @@ GF.scene3dUI = (function () {
       <h3 class="panel-h first">Objects</h3>
       <div class="pro-grid s3-prims">${PRIMS.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div>
       <div class="s3-row">
-        <button class="text-btn ghost" id="s3-import">⬆ Import model…</button>
-        <button class="text-btn ghost" id="s3-ph-model">🌐 Poly Haven…</button>
+        <button class="text-btn ghost" id="s3-import">Import model…</button>
+        <button class="text-btn ghost" id="s3-ph-model">Poly Haven…</button>
       </div>
       <div class="s3-row">
         <label class="mini">Sample<select id="s3-sample"><option value="">Add a sample model…</option>${SAMPLES.map(s => `<option value="${s}">${s}</option>`).join('')}</select></label>
@@ -77,7 +78,7 @@ GF.scene3dUI = (function () {
       <h3 class="panel-h">Environment</h3>
       <div class="s3-row">
         <button class="text-btn ghost" id="s3-hdr-file">HDRI file…</button>
-        <button class="text-btn ghost" id="s3-ph-hdri">🌐 Poly Haven…</button>
+        <button class="text-btn ghost" id="s3-ph-hdri">Poly Haven…</button>
         <button class="text-btn ghost" id="s3-env-clear">Clear</button>
       </div>
       <div class="s3-row">
@@ -93,15 +94,18 @@ GF.scene3dUI = (function () {
         <button class="text-btn primary" id="s3-flatten">⬇ Flatten to layer</button>
       </div>
       <div class="s3-row">
-        <button class="text-btn ghost" id="s3-glb">Export GLB (scene)</button>
-        <button class="text-btn ghost" id="s3-glb-sel">Selected only</button>
+        <button class="text-btn ghost" id="s3-glb">Export GLB</button>
+        <button class="text-btn ghost" id="s3-glb-sel">Export selected</button>
       </div>
       <div class="s3-row">
         <button class="text-btn ghost" id="s3-refresh">↻ Refresh textures</button>
       </div>
       <p class="s3-status" id="s3-status"></p>`;
 
-    pane.querySelectorAll('[data-prim]').forEach(b => b.addEventListener('click', () => S().addPrimitive(b.dataset.prim)));
+    pane.querySelectorAll('[data-prim]').forEach(b => b.addEventListener('click', () => {
+      if (!S().isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');   // pane is reachable before the 3D tool
+      S().addPrimitive(b.dataset.prim);
+    }));
     $('#s3-import').addEventListener('click', () => $('#file-input').click());   // exporter routes .glb/.gltf/.hdr back to scene3d
     $('#s3-hdr-file').addEventListener('click', () => $('#file-input').click());
     $('#s3-sample').addEventListener('change', e => {
@@ -140,7 +144,7 @@ GF.scene3dUI = (function () {
       li.className = 'layer-item' + (o.selected ? ' on' : '');
       const name = document.createElement('span');
       name.className = 'layer-name';
-      name.textContent = (o.kind === 'model' ? '◆ ' : '· ') + o.name;
+      name.textContent = (o.kind === 'model' ? '◆ ' : '') + o.name;
       const vis = document.createElement('button');
       vis.className = 'icon-btn sm layer-vis' + (o.visible ? '' : ' off');
       vis.textContent = o.visible ? '👁' : '–';
@@ -162,6 +166,9 @@ GF.scene3dUI = (function () {
   }
   function renderInspector() {
     const host = $('#s3-inspector'); if (!host) return;
+    // don't yank focus (and the half-typed value) out from under the user —
+    // every committed edit fires onChange → refresh while they tab through fields
+    if (host.contains(document.activeElement)) return;
     const t = S().getObject(S().selectedId());
     if (!t) { host.innerHTML = `<p class="s3-status">Select an object — or add one above.</p>`; return; }
     const layers = (D.doc.layers || []);
@@ -192,9 +199,9 @@ GF.scene3dUI = (function () {
           <label class="mini">Color<input type="color" id="s3-color" value="${t.mat.color}"></label>
           <label class="ck"><input type="checkbox" id="s3-2side" ${t.mat.doubleSided ? 'checked' : ''}> 2-sided</label>
         </div>
-        <label class="mini">Roughness <span id="s3-rough-v">${t.mat.roughness}</span>
+        <label class="mini"><span class="s3-top">Roughness<span class="s3-val" id="s3-rough-v">${t.mat.roughness.toFixed(2)}</span></span>
           <input type="range" id="s3-rough" min="0" max="100" value="${Math.round(t.mat.roughness * 100)}"></label>
-        <label class="mini">Metalness <span id="s3-metal-v">${t.mat.metalness}</span>
+        <label class="mini"><span class="s3-top">Metalness<span class="s3-val" id="s3-metal-v">${t.mat.metalness.toFixed(2)}</span></span>
           <input type="range" id="s3-metal" min="0" max="100" value="${Math.round(t.mat.metalness * 100)}"></label>
         <label class="mini">Normal map<select id="s3-normal">${mapOpts(t.mat.normalSource, 'normal')}</select></label>
         <label class="mini">Roughness map<select id="s3-roughmap">${mapOpts(t.mat.roughSource, 'roughness')}</select></label>
@@ -216,10 +223,21 @@ GF.scene3dUI = (function () {
       if (map.value === '__import') { importTextureImage(id); return; }
       S().setMaterial(id, { mapSource: map.value || null });
     });
-    const col = $('#s3-color'); if (col) col.addEventListener('input', () => S().setMaterial(id, { color: col.value }));
+    // live preview while dragging (no history), ONE undo entry on release
+    const liveCommit = (el, valEl, patchOf) => {
+      if (!el) return;
+      let base = null;
+      el.addEventListener('input', () => {
+        base = base || Object.assign({}, S().getObject(id).mat);
+        if (valEl) valEl.textContent = (el.value / 100).toFixed(2);
+        S().setMaterial(id, patchOf(el), false);
+      });
+      el.addEventListener('change', () => { S().setMaterial(id, patchOf(el), true, base); base = null; });
+    };
+    liveCommit($('#s3-color'), null, el => ({ color: el.value }));
+    liveCommit($('#s3-rough'), $('#s3-rough-v'), el => ({ roughness: el.value / 100 }));
+    liveCommit($('#s3-metal'), $('#s3-metal-v'), el => ({ metalness: el.value / 100 }));
     const ts = $('#s3-2side'); if (ts) ts.addEventListener('change', () => S().setMaterial(id, { doubleSided: ts.checked }));
-    const rough = $('#s3-rough'); if (rough) rough.addEventListener('change', () => S().setMaterial(id, { roughness: rough.value / 100 }));
-    const metal = $('#s3-metal'); if (metal) metal.addEventListener('change', () => S().setMaterial(id, { metalness: metal.value / 100 }));
     const nrm = $('#s3-normal'); if (nrm) nrm.addEventListener('change', () => S().setMaterial(id, { normalSource: nrm.value || null }));
     const rm = $('#s3-roughmap'); if (rm) rm.addEventListener('change', () => S().setMaterial(id, { roughSource: rm.value || null }));
   }
@@ -302,6 +320,11 @@ GF.scene3dUI = (function () {
     GF.library.apiList(type).then(a => { assets = a; render(); })
       .catch(() => { grid.innerHTML = '<p class="s3-status">Could not reach Poly Haven — are you online?</p>'; });
   }
+
+  // Build the pane eagerly — the panel's "3D" tab is clickable before the 3D
+  // tool is ever activated and must never show an empty pane.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); refresh(); });
+  else { ensurePane(); refresh(); }
 
   return { enter, exit, optbarHtml, wireOptbar, refresh };
 })();

@@ -201,5 +201,5 @@ if (GF.api && GF.api.register) {
     if (!GF.ai.hasKey()) { GF.ui.openAIDialog(); return; }
     GF.util.toast('Running AI…');
     return GF.ai.run(a || {}).catch(e => GF.util.toast(e.message));
-  }, { group: 'Retouch', label: 'Generative fill (AI)…', needsDoc: true });
+  }, { group: 'Retouch', label: 'Generative fill (AI)…' });   // no needsDoc: the config dialog must open even before a document exists
 }

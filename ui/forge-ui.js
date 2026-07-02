@@ -112,6 +112,7 @@ window.GF = window.GF || {};
     GF.history.onChange(updateUndoRedo);
     setTool('brush');
     updateUndoRedo();
+    document.body.classList.toggle('no-doc', !D.doc.open);   // quiets panel/optbar chrome pre-document
   }
 
   /* Procreate-standard touch gestures (on top of the engine's pinch zoom/pan):
@@ -138,11 +139,15 @@ window.GF = window.GF || {};
 
   function onDocumentOpened() {
     $('#empty-state').hidden = true;
+    document.body.classList.remove('no-doc');
     stopCrop();
     if (V().wand) V().wand.seed = null;
     adj = blankAdj(); D.clearPreview(); syncAdjustUI();
     refreshLayers();
     GF.view.zoomFit();
+    // re-fit once layout settles — hiding the empty state / mobile chrome can
+    // change the viewport box after the synchronous fit above
+    requestAnimationFrame(() => { GF.view.zoomFit(); updateZoomLabel(); });
     updateZoomLabel();
     setDims();
     drawHistogram();
@@ -278,9 +283,21 @@ window.GF = window.GF || {};
   }
   function buildFilters() {
     const strip = $('#filter-strip'); strip.innerHTML = '';
+    // one colorful base swatch, run through each filter = real preview thumbnails
+    const TW = 56, TH = 40;
+    const base = U.makeCanvas(TW, TH), bc = U.ctx2d(base);
+    const grad = bc.createLinearGradient(0, 0, TW, TH);
+    grad.addColorStop(0, '#e8a33d'); grad.addColorStop(0.5, '#c84b4b'); grad.addColorStop(1, '#3a78c8');
+    bc.fillStyle = grad; bc.fillRect(0, 0, TW, TH);
+    bc.fillStyle = '#e9edf3'; bc.beginPath(); bc.arc(TW * 0.7, TH * 0.35, 9, 0, 7); bc.fill();
+    bc.fillStyle = '#1d2330'; bc.fillRect(6, TH - 13, 16, 8);
     FILTERS.forEach(f => {
       const b = document.createElement('button'); b.className = 'filter-chip';
-      b.innerHTML = `<span>${f.name}</span>`;
+      const c = U.makeCanvas(TW, TH), x = U.ctx2d(c);
+      x.drawImage(base, 0, 0);
+      try { const img = x.getImageData(0, 0, TW, TH); f.fn(img); x.putImageData(img, 0, 0); } catch (e) {}
+      b.appendChild(c);
+      const s = document.createElement('span'); s.textContent = f.name; b.appendChild(s);
       b.addEventListener('click', () => {
         const L = D.active(); if (!L || !L.canvas) return U.toast('Open an image first');
         GF.filters.applyToLayer(L, f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name);
@@ -618,7 +635,8 @@ window.GF = window.GF || {};
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
       // Escape works everywhere: close an open modal first, else clear selection
-      if (k === 'escape') { if (modalEl) closeModal(); else run('deselect'); return; }
+      // (the palette handles its own Escape — don't also nuke the selection)
+      if (k === 'escape') { if (modalEl) closeModal(); else if (!paletteEl) run('deselect'); return; }
       // a modal is open: don't let document/tool shortcuts fire behind it
       if (modalEl) return;
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
@@ -628,6 +646,7 @@ window.GF = window.GF || {};
         if (k === 'y') { e.preventDefault(); run('redo'); return; }
         if (k === 's') { e.preventDefault(); GF.exporter.saveProject(); return; }
         if (k === 'e') { e.preventDefault(); openExportDialog(); return; }
+        if (k === 'm') { e.preventDefault(); if (D.doc.open) openCurves(); return; }
         if (k === 'a') { e.preventDefault(); run('selectAll'); return; }
         if (k === 'i') { e.preventDefault(); run('invertSelection'); return; }
         return;
@@ -794,7 +813,10 @@ window.GF = window.GF || {};
              <label>API key<input id="ai-key" type="password" placeholder="${GF.ai.hasKey()?'key set — leave blank to keep':'paste your key'}"></label>
              <label class="ai-only" data-for="fal custom">Prompt<textarea id="ai-prompt" placeholder="describe what to generate, e.g. a calm blue sky"></textarea></label>
              <label class="ai-only" data-for="custom">Endpoint URL<input id="ai-endpoint" placeholder="https://…" value="${cfg.endpoint||''}"></label>
-             <label>CORS proxy <span style="color:var(--ink-3)">(if blocked from file://)</span><input id="ai-proxy" placeholder="http://localhost:8787/?url=" value="${cfg.proxy||''}"></label>`,
+             <details class="ai-adv"${cfg.proxy ? ' open' : ''}><summary>Advanced</summary>
+               <label>Request proxy <span style="color:var(--ink-3)">— only needed if the browser blocks the provider</span>
+               <input id="ai-proxy" placeholder="http://localhost:8787/?url=" value="${cfg.proxy||''}"></label>
+             </details>`,
       ok: 'Run',
       mount: m => {
         const prov = m.querySelector('#ai-prov');
@@ -899,7 +921,6 @@ window.GF = window.GF || {};
       { group: 'Adjust', label: 'Auto enhance', run: () => guarded(ACTIONS.enhance) },
       { group: 'Adjust', label: 'Curves…', hint: 'Ctrl+M', run: openCurves },
       { group: 'Retouch', label: 'Remove background', run: () => guarded(ACTIONS.removeBg) },
-      { group: 'Retouch', label: 'Magic erase (content-aware)', run: () => guarded(ACTIONS.magicErase) },
       { group: 'Retouch', label: 'Color replace…', run: () => guarded(openColorReplace) },
       { group: 'Retouch', label: 'Smart upscale 2×', run: () => guarded(() => run('smartUpscale', { factor: 2, mode: 'photo' })) },
       { group: 'Layer', label: 'Layer style (outline / glow / shadow)…', run: () => guarded(openLayerStyle) },
@@ -911,10 +932,13 @@ window.GF = window.GF || {};
       { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) { GF.scene3d.snapshotToLayer(); setTool('move'); } else U.toast('Add a 3D object first'); } },
       { group: '3D', label: 'Export GLB (3D scene)', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') },
     );
-    // every ui-annotated engine command, straight from the catalog
+    // every ui-annotated engine command, straight from the catalog.
+    // needsDoc means "a document must be open" — NOT "active layer has pixels"
+    // (guarded() would wrongly block these while an adjustment layer is active)
+    const docGuarded = fn => D.doc.open ? fn() : U.toast('Open an image first');
     GF.api.commands().forEach(c => cmds.push({
       group: c.group, label: c.label, hint: c.hint,
-      run: () => c.needsDoc ? guarded(() => run(c.name, {})) : run(c.name, {}),
+      run: () => c.needsDoc ? docGuarded(() => run(c.name, {})) : run(c.name, {}),
     }));
     ADJ_LAYER_TYPES.forEach(t => cmds.push({ group: 'Adjustment', label: 'Add ' + t.label + ' layer', run: () => addAdjustmentLayer(t.kind) }));
     FILTERS.forEach(f => cmds.push({ group: 'Filters', label: 'Filter: ' + f.name, run: () => guarded(() => { GF.filters.applyToLayer(D.active(), f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name); }) }));
@@ -925,11 +949,18 @@ window.GF = window.GF || {};
     return cmds;
   }
   function guarded(fn) { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); }
+  /* Substring matches always outrank scattered-subsequence matches (typing
+     "fill" must surface "Generative fill", not "FILter: cooL"), word-start
+     substrings outrank mid-word ones, and subsequences too scattered to be
+     intentional are rejected outright. */
   function fuzzyScore(q, s) {
     if (!q) return 0; q = q.toLowerCase(); s = s.toLowerCase();
-    let i = 0, score = 0, last = -1;
-    for (let j = 0; j < s.length && i < q.length; j++) if (s[j] === q[i]) { score += (j - last); last = j; i++; }
-    return i === q.length ? score : -1;
+    const idx = s.indexOf(q);
+    if (idx >= 0) return idx + (idx === 0 || /[^a-z0-9]/.test(s[idx - 1]) ? 0 : 40);
+    let i = 0, last = -1, gaps = 0;
+    for (let j = 0; j < s.length && i < q.length; j++) if (s[j] === q[i]) { if (last >= 0) gaps += j - last - 1; last = j; i++; }
+    if (i !== q.length || gaps > q.length * 3) return -1;
+    return 400 + gaps;
   }
   let paletteEl = null, palItems = [], palIdx = 0;
   function openPalette() {
@@ -977,6 +1008,10 @@ window.GF = window.GF || {};
     const ctx = cv.getContext('2d'), W = cv.width, H = cv.height;
     ctx.clearRect(0, 0, W, H);
     if (!D.doc.open) return;
+    // baseline so the box never reads as empty/broken (near-white images
+    // collapse into a single right-edge spike)
+    ctx.fillStyle = 'rgba(160,170,185,.3)';
+    ctx.fillRect(0, H - 1, W, 1);
     const comp = D.composite();
     const sw = Math.min(320, comp.width), sh = Math.max(1, Math.round(comp.height * sw / comp.width));
     const s = U.makeCanvas(sw, sh), sx = U.ctx2d(s); sx.drawImage(comp, 0, 0, sw, sh);

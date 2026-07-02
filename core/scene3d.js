@@ -92,8 +92,13 @@ GF.scene3d = (function () {
   /* =================================================================
      Renderer / scene lifecycle
      ================================================================= */
-  async function ensureRenderer() {
-    if (renderer) return true;
+  let rendererPromise = null;   // memoized so concurrent callers share one build
+  function ensureRenderer() {
+    if (renderer) return Promise.resolve(true);
+    if (!rendererPromise) rendererPromise = buildRenderer().catch(e => { rendererPromise = null; throw e; });
+    return rendererPromise;
+  }
+  async function buildRenderer() {
     const T = (await libBundle().catch(offline)).THREE;
     const host = U.$('#scene3d-host');
     renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
@@ -140,14 +145,18 @@ GF.scene3d = (function () {
     renderer.render(scene, camera);
   }
 
+  let modeEpoch = 0;   // guards the enter/exit race while the engine is still booting
   async function enter() {
+    const epoch = ++modeEpoch;
     try { await ensureRenderer(); } catch (e) { return false; }
+    if (epoch !== modeEpoch) return false;   // superseded by an exit() (user switched tools mid-boot)
     document.body.dataset.mode = '3d';
     if (!raf) animate();
     refreshAll();
     return true;
   }
   function exit() {
+    modeEpoch++;
     document.body.dataset.mode = 'image';
     if (raf) { cancelAnimationFrame(raf); raf = null; }
   }
@@ -158,16 +167,22 @@ GF.scene3d = (function () {
              'auto:roughness' | null
      ================================================================= */
   const MAP_NAMES = ['normal', 'roughness', 'height', 'ao'];
-  function findLayer(nameContains) {
-    const n = nameContains.toLowerCase();
-    return (D.doc.layers || []).find(L => L.name.toLowerCase().includes(n)) || null;
+  // token match, not substring — "Chaos"/"Normalize" must not count as ao/normal maps
+  const mapTokenRe = name => new RegExp('(^|[^a-z])' + name + '([^a-z]|$)');
+  function isMapLayerName(layerName) {
+    const n = layerName.toLowerCase();
+    return MAP_NAMES.some(m => mapTokenRe(m).test(n));
+  }
+  function findLayer(mapName) {
+    const re = mapTokenRe(mapName.toLowerCase());
+    return (D.doc.layers || []).find(L => re.test(L.name.toLowerCase())) || null;
   }
   function compositeCanvas() {
     if (!D.doc.open) return null;
     // hide map-convention layers so they don't pollute the base color
     const hidden = [];
     for (const L of D.doc.layers) {
-      if (MAP_NAMES.some(n => L.name.toLowerCase().includes(n)) && L.visible) { L.visible = false; hidden.push(L); }
+      if (L.visible && isMapLayerName(L.name)) { L.visible = false; hidden.push(L); }
     }
     const flat = D.composite();
     hidden.forEach(L => { L.visible = true; });
@@ -191,10 +206,18 @@ GF.scene3d = (function () {
     if (source.startsWith('image:')) return images.get(source) || null;
     return null;
   }
-  function texFor(source, srgb) {
+  function texFor(source, srgb, flipY) {
+    flipY = flipY !== false;
+    // cache key covers everything that forces a distinct GPU texture: the same
+    // source can serve base (sRGB) and data maps (linear), and three-primitive
+    // UVs (flipY) vs glTF UVs (no flip) can't share one texture either
+    const key = source + (srgb ? '|srgb' : '|linear') + (flipY ? '' : '|noflip');
     const cnv = resolveSourceCanvas(source);
-    if (!cnv) return null;
-    const key = source + (srgb ? '|srgb' : '|linear');   // same source can serve base (sRGB) AND data maps (linear)
+    if (!cnv) {
+      const stale = texCache.get(key);
+      if (stale) { stale.tex.dispose(); texCache.delete(key); }   // e.g. its layer was deleted
+      return null;
+    }
     let e = texCache.get(key);
     if (!e || e.srcCanvas !== cnv) {
       if (e) e.tex.dispose();
@@ -202,8 +225,8 @@ GF.scene3d = (function () {
       if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      tex.flipY = true;
-      e = { tex, srcCanvas: cnv, source, srgb };
+      tex.flipY = flipY;
+      e = { tex, srcCanvas: cnv, source, srgb, flipY };
       texCache.set(key, e);
     } else {
       e.tex.needsUpdate = true;
@@ -220,10 +243,10 @@ GF.scene3d = (function () {
   }
   function listImageSources() { return [...images.entries()].map(([k, c]) => ({ key: k, name: c._srcName })); }
 
-  function refreshTextures() {
-    if (!renderer || !isActive()) return;
+  function refreshTextures(force) {
+    if (!renderer || (!force && !isActive())) return;
     // refresh backing canvases and re-upload every cached texture
-    for (const e of [...texCache.values()]) texFor(e.source, e.srgb);
+    for (const e of [...texCache.values()]) texFor(e.source, e.srgb, e.flipY);
     objects.forEach(applyMaterial);
   }
   function refreshAll() {
@@ -250,9 +273,10 @@ GF.scene3d = (function () {
     if (!o || !THREE) return;
     if (o.kind === 'model' && o.mat.keepOriginal) { restoreOriginalMats(o); return; }
     const m = o.material;
-    m.map = o.mat.mapSource ? texFor(o.mat.mapSource, true) : null;
-    m.normalMap = o.mat.normalSource ? texFor(o.mat.normalSource, false) : null;
-    m.roughnessMap = o.mat.roughSource ? texFor(o.mat.roughSource, false) : null;
+    const flipY = o.kind !== 'model';   // glTF UVs are top-left origin — no flip
+    m.map = o.mat.mapSource ? texFor(o.mat.mapSource, true, flipY) : null;
+    m.normalMap = o.mat.normalSource ? texFor(o.mat.normalSource, false, flipY) : null;
+    m.roughnessMap = o.mat.roughSource ? texFor(o.mat.roughSource, false, flipY) : null;
     m.color.set(m.map ? '#ffffff' : o.mat.color);
     m.roughness = o.mat.roughnessMap ? 1.0 : o.mat.roughness;
     m.metalness = o.mat.metalness;
@@ -266,12 +290,16 @@ GF.scene3d = (function () {
     if (!o._origMats) return;
     o.node.traverse(ch => { if (ch.isMesh && o._origMats.has(ch)) ch.material = o._origMats.get(ch); });
   }
-  function setMaterial(id, patch) {
+  /** record=false gives a live, history-free preview (e.g. dragging the color
+      picker); the caller then commits once with record=true against `base`
+      (the mat snapshot from before the preview run) so undo restores it. */
+  function setMaterial(id, patch, record, base) {
     const o = byId(id); if (!o) return;
-    const before = Object.assign({}, o.mat);
+    const before = base || Object.assign({}, o.mat);
     Object.assign(o.mat, patch);
-    const after = Object.assign({}, o.mat);
     applyMaterial(o);
+    if (record === false) return;
+    const after = Object.assign({}, o.mat);
     hist.push('material', () => { o.mat = Object.assign({}, before); applyMaterial(o); },
                           () => { o.mat = Object.assign({}, after); applyMaterial(o); });
   }
@@ -284,7 +312,7 @@ GF.scene3d = (function () {
   function listObjects() {
     return objects.map(o => ({ id: o.id, name: o.name, kind: o.kind, visible: o.visible, selected: o.id === selectedId }));
   }
-  function attach(o) { sceneRoot.add(o.node); if (!objects.includes(o)) objects.push(o); o.visible = true; o.node.visible = true; emit(); }
+  function attach(o) { sceneRoot.add(o.node); if (!objects.includes(o)) objects.push(o); o.node.visible = o.visible; emit(); }
   function detach(o) { sceneRoot.remove(o.node); const i = objects.indexOf(o); if (i >= 0) objects.splice(i, 1); if (selectedId === o.id) select(null); emit(); }
 
   function primGeo(kind) {
@@ -307,9 +335,10 @@ GF.scene3d = (function () {
   }
   async function addPrimitive(kind) {
     try { await ensureRenderer(); } catch (e) { return null; }
+    const prim = kind || 'sphere', id = nextId++;
     const o = {
-      id: nextId++, name: (kind || 'sphere') + ' ' + nextId, kind: 'primitive', prim: kind || 'sphere',
-      node: null, visible: true, mat: defaultMat('primitive', kind), _origMats: new Map()
+      id, name: prim.charAt(0).toUpperCase() + prim.slice(1) + ' ' + id, kind: 'primitive', prim,
+      node: null, visible: true, mat: defaultMat('primitive', prim), _origMats: new Map()
     };
     o.material = new THREE.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
     o.node = new THREE.Mesh(primGeo(o.prim), o.material);
@@ -317,7 +346,7 @@ GF.scene3d = (function () {
     o.node.position.x = (objects.length % 3) * 0.4 - 0.4;
     attach(o); applyMaterial(o); select(o.id);
     hist.push('add ' + o.prim, () => detach(o), () => { attach(o); applyMaterial(o); });
-    setStatus(objects.length + ' object(s)');
+    setStatus(objects.length + (objects.length === 1 ? ' object' : ' objects'));
     return o.id;
   }
 
@@ -359,13 +388,17 @@ GF.scene3d = (function () {
     files = Array.from(files);
     const urls = new Map(files.map(f => [f.name, URL.createObjectURL(f)]));
     const hasGltf = files.some(f => /\.gltf$/i.test(f.name));
-    for (const f of files) {
-      if (/\.hdr$/i.test(f.name)) await setEnvironment(urls.get(f.name));
-      else if (/\.(glb|gltf)$/i.test(f.name)) {
-        const includeMap = {};
-        if (hasGltf) files.forEach(s => { if (s !== f) includeMap[s.name] = urls.get(s.name); });
-        await importModel(urls.get(f.name), f.name.replace(/\.(glb|gltf)$/i, ''), includeMap);
-      } else if (f.type && f.type.startsWith('image/') && !hasGltf) GF.exporter.importImage(f);
+    try {
+      for (const f of files) {
+        if (/\.hdr$/i.test(f.name)) await setEnvironment(urls.get(f.name));
+        else if (/\.(glb|gltf)$/i.test(f.name)) {
+          const includeMap = {};
+          if (hasGltf) files.forEach(s => { if (s !== f) includeMap[s.name] = urls.get(s.name); });
+          await importModel(urls.get(f.name), f.name.replace(/\.(glb|gltf)$/i, ''), includeMap);
+        } else if (f.type && f.type.startsWith('image/') && !hasGltf) GF.exporter.importImage(f);
+      }
+    } finally {
+      for (const u of urls.values()) URL.revokeObjectURL(u);
     }
   }
 
@@ -374,7 +407,12 @@ GF.scene3d = (function () {
     detach(o);
     hist.push('remove ' + o.name, () => { attach(o); applyMaterial(o); }, () => detach(o));
   }
-  function setVisible(id, v) { const o = byId(id); if (!o) return; o.visible = !!v; o.node.visible = !!v; emit(); }
+  function setVisible(id, v) {
+    const o = byId(id); if (!o || o.visible === !!v) return;
+    const apply = val => { o.visible = val; o.node.visible = val; emit(); };
+    apply(!!v);
+    hist.push((v ? 'show ' : 'hide ') + o.name, () => apply(!v), () => apply(!!v));
+  }
 
   /* ---- transforms: full 9-DOF, one write path for inputs + drags ---- */
   const R2D = 180 / Math.PI, D2R = Math.PI / 180;
@@ -384,7 +422,8 @@ GF.scene3d = (function () {
     return {
       id: o.id, name: o.name, kind: o.kind, prim: o.prim, visible: o.visible,
       px: n.position.x, py: n.position.y, pz: n.position.z,
-      rx: Math.round(n.rotation.x * R2D), ry: Math.round(n.rotation.y * R2D), rz: Math.round(n.rotation.z * R2D),
+      // 0.1° precision: fine enough to survive an edit-one-field round-trip
+      rx: Math.round(n.rotation.x * R2D * 10) / 10, ry: Math.round(n.rotation.y * R2D * 10) / 10, rz: Math.round(n.rotation.z * R2D * 10) / 10,
       sx: n.scale.x, sy: n.scale.y, sz: n.scale.z,
       mat: Object.assign({}, o.mat)
     };
@@ -502,7 +541,17 @@ GF.scene3d = (function () {
       }
     };
     el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', () => { drag = null; });
+    el.addEventListener('pointercancel', () => {
+      // commit the transform so far — a lost pointer must still be undoable
+      if (!drag) return;
+      const d = drag; drag = null;
+      const o = d.id != null && byId(d.id);
+      if (o && d.moved && interact !== 'orbit') {
+        const before = d.start, after = snapTransform(o);
+        hist.push(interact, () => writeTransform(o, before), () => writeTransform(o, after));
+        emit();
+      }
+    });
   }
   function planePoint(e, plane) {
     const T = THREE, r = renderer.domElement.getBoundingClientRect();
@@ -532,20 +581,23 @@ GF.scene3d = (function () {
       await ensureRenderer();
       const T = THREE;
       setStatus('Loading HDRI…');
-      new LIB.RGBELoader().load(url, tex => {
-        tex.mapping = T.EquirectangularReflectionMapping;
-        const pmrem = new T.PMREMGenerator(renderer);
-        pmrem.compileEquirectangularShader();
-        const env = pmrem.fromEquirectangular(tex).texture;
-        if (envMap) envMap.dispose();
-        envMap = env;
-        scene.environment = env;
-        applyBackground();
-        tex.dispose(); pmrem.dispose();
-        setStatus('HDRI environment active');
-        U.toast('HDRI environment applied');
-      }, undefined, () => { setStatus('Could not load that HDRI.'); U.toast('Could not load that HDRI'); });
-    } catch (e) { /* status set */ }
+      return await new Promise(resolve => {
+        new LIB.RGBELoader().load(url, tex => {
+          tex.mapping = T.EquirectangularReflectionMapping;
+          const pmrem = new T.PMREMGenerator(renderer);
+          pmrem.compileEquirectangularShader();
+          const env = pmrem.fromEquirectangular(tex).texture;
+          if (envMap) envMap.dispose();
+          envMap = env;
+          scene.environment = env;
+          applyBackground();
+          tex.dispose(); pmrem.dispose();
+          setStatus('HDRI environment active');
+          U.toast('HDRI environment applied');
+          resolve(true);
+        }, undefined, () => { setStatus('Could not load that HDRI.'); U.toast('Could not load that HDRI'); resolve(false); });
+      });
+    } catch (e) { return false; }
   }
   function clearEnvironment() {
     if (!scene) return;
@@ -574,6 +626,7 @@ GF.scene3d = (function () {
       "one canvas is the ops center" handoff back to 2D editing. */
   function snapshotToLayer() {
     if (!renderer || !objects.length) { U.toast('Add a 3D object first'); return null; }
+    refreshTextures(true);   // may be invoked from 2D mode (palette) — don't bake stale textures
     if (!D.doc.open) { D.newDocument(1024, 1024, null, '3d-render'); GF.ui.onDocumentOpened(); }
     else GF.history.push(D.doc, '3D render');
     const W = D.doc.width, H = D.doc.height;
@@ -640,7 +693,12 @@ if (GF.api && GF.api.register) {
   R('scene3d.importModel', 'url, name?', 'Import a GLB/GLTF model into the 3D scene', a => GF.scene3d.importModel(a.url, a.name));
   R('scene3d.list', '', 'List the 3D scene objects', () => GF.scene3d.listObjects());
   R('scene3d.setObject', 'id, px?, py?, pz?, rx?(deg), ry?, rz?, sx?, sy?, sz?, scale?', 'Transform a 3D object', a => GF.scene3d.setObject(a.id, a));
-  R('scene3d.setMaterial', 'id, mapSource?("composite"|"layer:<id>"|null), color?, roughness?(0-1), metalness?(0-1)', "Set a 3D object's material / texture source", a => GF.scene3d.setMaterial(a.id, a));
+  R('scene3d.setMaterial', 'id, mapSource?("composite"|"layer:<id>"|null), color?, roughness?(0-1), metalness?(0-1)', "Set a 3D object's material / texture source", a => {
+    const p = {};
+    ['mapSource', 'normalSource', 'roughSource', 'color', 'roughness', 'metalness', 'doubleSided', 'keepOriginal']
+      .forEach(k => { if (a[k] !== undefined) p[k] = a[k]; });
+    return GF.scene3d.setMaterial(a.id, p);
+  });
   R('scene3d.snapshotToLayer', '', 'Render the 3D scene at document resolution onto a new 2D layer', () => GF.scene3d.snapshotToLayer());
   R('scene3d.exportGLB', 'selection?("scene"|"selected")', 'Export the 3D scene as a .glb file', a => GF.scene3d.exportGLB(a || {}));
 }

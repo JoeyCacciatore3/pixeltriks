@@ -132,10 +132,15 @@ GF.exporter = (function () {
   }
 
   function handleFiles(files) {
-    // 3D-ish drops (.glb/.gltf/.hdr, plus a .gltf's sibling .bin/textures) go
-    // to the 3D workspace as one batch so multi-file models resolve.
-    const list = Array.from(files);
-    if (GF.scene3d && list.some(f => /\.(glb|gltf|hdr)$/i.test(f.name))) { GF.scene3d.handleFiles(list); return; }
+    // 3D-ish drops go to the 3D workspace. A .gltf needs its sibling
+    // .bin/textures, so that case takes the whole batch; otherwise only the
+    // .glb/.hdr files leave the list and the rest (projects, images) load here.
+    let list = Array.from(files);
+    if (GF.scene3d && list.some(f => /\.(glb|gltf|hdr)$/i.test(f.name))) {
+      if (list.some(f => /\.gltf$/i.test(f.name))) { GF.scene3d.handleFiles(list); return; }
+      GF.scene3d.handleFiles(list.filter(f => /\.(glb|hdr)$/i.test(f.name)));
+      list = list.filter(f => !/\.(glb|hdr)$/i.test(f.name));
+    }
     for (const f of list) {
       if (f.name.endsWith('.json')) loadProject(f);
       else if (f.type.startsWith('image/')) importImage(f);

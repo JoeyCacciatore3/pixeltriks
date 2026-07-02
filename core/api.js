@@ -113,8 +113,10 @@ GF.api = (function () {
       { group: 'Layer', label: 'Copy selection to layer', needsDoc: true });
 
   /* --- retouch / filters / texture --- */
-  cmd('contentAwareFill', '', 'Rebuild the selected region from surrounding texture', () => GF.retouch.contentAwareFill(L()),
-      { group: 'Retouch', label: 'Content-aware fill', needsDoc: true });
+  cmd('contentAwareFill', '', 'Rebuild the selected region from surrounding texture', () => {
+    if (!GF.select.has()) { U.toast('Make a selection first — then content-aware fill rebuilds it'); return; }
+    return GF.retouch.contentAwareFill(L());
+  }, { group: 'Retouch', label: 'Content-aware fill', needsDoc: true });
   cmd('removeBackground', 'tolerance?, defringe?', 'Auto-remove the background from the edges', a => GF.retouch.removeBackground(L(), a.tolerance ?? 32, a.defringe !== false));
   cmd('colorReplace', 'from([r,g,b]), to?([r,g,b]), tol?, soft?, dH?, dS?, dL?', 'Replace/shift a color on the active layer', a => GF.retouch.colorReplace(L(), { from: a.from, to: a.to || null, tol: a.tol ?? 48, soft: a.soft ?? 32, dH: a.dH || 0, dS: a.dS || 0, dL: a.dL || 0 }));
   cmd('layerFX', 'kind("outline"|"glow"|"shadow"|"bevel"|"emboss"), color?, size?, angle?, depth?', 'Silhouette effect behind, or bevel/emboss depth on, the active layer', a => GF.retouch.layerFX(L(), a.kind, a.color || '#000', a.size || 4, { angle: a.angle, depth: a.depth, soft: a.soft }));

@@ -123,7 +123,9 @@ GF.library = (function () {
     if (!node || !node.url) throw new Error('No glTF for this model');
     const includeMap = {};
     if (node.include) for (const k in node.include) includeMap[k] = node.include[k].url;
-    await GF.scene3d.importModel(node.url, name, includeMap);
+    const objId = await GF.scene3d.importModel(node.url, name, includeMap);
+    if (objId == null) throw new Error('model failed to load');   // callers toast success otherwise
+    return objId;
   }
 
   /* ============== procedural generators (offline) ============== */
