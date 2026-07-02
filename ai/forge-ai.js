@@ -192,3 +192,14 @@ GF.ai = (function () {
 
   return { config, setConfig, hasKey, run, _findImageInResponse: findImageInResponse };
 })();
+
+/* Register AI as a first-class command so the palette (and any automated
+   agent driving GF.api) reaches it through the same catalog as everything
+   else. With no key configured it opens the config dialog instead. */
+if (GF.api && GF.api.register) {
+  GF.api.register('aiGenerate', 'prompt?', 'Run the configured AI provider (opens the ✦ AI dialog when no key is set)', a => {
+    if (!GF.ai.hasKey()) { GF.ui.openAIDialog(); return; }
+    GF.util.toast('Running AI…');
+    return GF.ai.run(a || {}).catch(e => GF.util.toast(e.message));
+  }, { group: 'Retouch', label: 'Generative fill (AI)…', needsDoc: true });
+}

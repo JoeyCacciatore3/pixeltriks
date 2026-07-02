@@ -629,3 +629,18 @@ GF.scene3d = (function () {
     hist
   };
 })();
+
+/* Agent/automation surface: the 3D workspace joins the shared command
+   catalog like everything else (GF.api.run('scene3d.addPrimitive', …)). */
+if (GF.api && GF.api.register) {
+  const R = GF.api.register;
+  R('scene3d.enter', '', 'Open the 3D workspace', () => GF.ui.setTool('scene3d'));
+  R('scene3d.exit', '', 'Leave the 3D workspace (back to image editing)', () => GF.ui.setTool('move'));
+  R('scene3d.addPrimitive', 'kind(box|sphere|cylinder|cone|torus|torusknot|capsule|plane|panel|tile|hex|curved)', 'Add a primitive to the 3D scene', a => GF.scene3d.addPrimitive(a.kind || 'box'));
+  R('scene3d.importModel', 'url, name?', 'Import a GLB/GLTF model into the 3D scene', a => GF.scene3d.importModel(a.url, a.name));
+  R('scene3d.list', '', 'List the 3D scene objects', () => GF.scene3d.listObjects());
+  R('scene3d.setObject', 'id, px?, py?, pz?, rx?(deg), ry?, rz?, sx?, sy?, sz?, scale?', 'Transform a 3D object', a => GF.scene3d.setObject(a.id, a));
+  R('scene3d.setMaterial', 'id, mapSource?("composite"|"layer:<id>"|null), color?, roughness?(0-1), metalness?(0-1)', "Set a 3D object's material / texture source", a => GF.scene3d.setMaterial(a.id, a));
+  R('scene3d.snapshotToLayer', '', 'Render the 3D scene at document resolution onto a new 2D layer', () => GF.scene3d.snapshotToLayer());
+  R('scene3d.exportGLB', 'selection?("scene"|"selected")', 'Export the 3D scene as a .glb file', a => GF.scene3d.exportGLB(a || {}));
+}

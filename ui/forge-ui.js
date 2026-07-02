@@ -251,7 +251,7 @@ window.GF = window.GF || {};
     });
   }
 
-  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool };
+  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool, openAIDialog };
 
   /* =================================================================
      Build dynamic UI
@@ -358,8 +358,8 @@ window.GF = window.GF || {};
   }
   function runIntent(kind) {
     switch (kind) {
-      case 'enhance':  $('#hero-enhance').click(); break;
-      case 'removebg': $('#hero-removebg').click(); break;
+      case 'enhance':  ACTIONS.enhance(); break;
+      case 'removebg': ACTIONS.removeBg(); break;
       case 'erase':    setTool('magicerase'); U.toast('Click the object you want to remove — it heals away'); break;
       case 'cutout':   setTool('wand'); U.toast('Tap the subject (background → ⇄ Invert), then ✂️ Cut out'); break;
       case 'genfill':  setTool('wand'); U.toast('Select a region, then ✦ Replace (AI)'); break;
@@ -544,28 +544,38 @@ window.GF = window.GF || {};
     $('#adj-apply').addEventListener('click', applyAdjust);
   }
 
-  function wireHero() {
-    const guard = fn => () => { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); };
-    $('#hero-enhance').addEventListener('click', guard(() => {
+  /* The four headline actions, named once. Every surface that offers them —
+     hero buttons, intent cards, wand bar, palette — calls these, never a
+     sibling button's click(). */
+  const ACTIONS = {
+    enhance() {
       const L = D.active(); GF.filters.applyToLayer(L, 'enhance', i => { GF.filters.autoLevels(i); GF.filters.hsl(i,0,10,0); });
       GF.view.requestRender(); refreshLayers(); U.toast('Enhanced');
-    }));
-    $('#hero-removebg').addEventListener('click', guard(() => {
+    },
+    removeBg() {
       // auto-upgrade to AI cutout when a remove.bg key is configured; else classic
       if (GF.ai && GF.ai.hasKey() && GF.ai.config().provider === 'removebg') {
         U.toast('Running AI cutout…'); GF.ai.run({}).catch(e => U.toast(e.message)); return;
       }
       busyHero('#hero-removebg', () => run('removeBackground'));
-    }));
-    $('#hero-erase').addEventListener('click', guard(() => {
+    },
+    magicErase() {
       // with a selection: heal it. Without: hand the user the one-click Magic Erase tool.
       if (!GF.select.has || !GF.select.has()) {
         setTool('magicerase'); U.toast('Click the object you want to remove');
         return;
       }
       busyHero('#hero-erase', () => run('contentAwareFill'));
-    }));
-    $('#hero-genfill').addEventListener('click', guard(openAIDialog));
+    },
+    genFill() { openAIDialog(); },
+  };
+
+  function wireHero() {
+    const guard = fn => () => { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); };
+    $('#hero-enhance').addEventListener('click', guard(ACTIONS.enhance));
+    $('#hero-removebg').addEventListener('click', guard(ACTIONS.removeBg));
+    $('#hero-erase').addEventListener('click', guard(ACTIONS.magicErase));
+    $('#hero-genfill').addEventListener('click', guard(ACTIONS.genFill));
   }
   function busyHero(sel, fn) {
     const el = $(sel); el.classList.add('busy');
@@ -871,53 +881,48 @@ window.GF = window.GF || {};
   /* =================================================================
      Command palette (⌘K) — fuzzy launcher for every action
      ================================================================= */
+  /* The palette is DERIVED, not hand-maintained: tools come from TOOLMAP +
+     SHORTCUTS, engine actions from the GF.api catalog (every command carrying
+     ui metadata), and only dialogs / composite UI actions are listed here. */
+  const TOOL_LABELS = {
+    move: 'Move', select: 'Select', wand: 'Magic wand', crop: 'Crop',
+    magicerase: 'Magic erase (one-click remove)', clone: 'Clone stamp', gradient: 'Gradient',
+    brush: 'Brush', eraser: 'Eraser', fill: 'Fill', text: 'Text',
+    shape: 'Shape', eyedropper: 'Eyedropper', scene3d: '3D workspace',
+  };
   function commandList() {
-    const tool = (l, t) => ({ group: 'Tools', label: l, run: () => setTool(t) });
-    const cmds = [
-      tool('Move', 'move'), tool('Select', 'select'), tool('Magic wand', 'wand'), tool('Crop', 'crop'),
-      tool('Magic erase (one-click remove)', 'magicerase'), tool('Clone stamp', 'clone'), tool('Gradient', 'gradient'),
-      tool('Brush', 'brush'), tool('Eraser', 'eraser'), tool('Fill', 'fill'), tool('Text', 'text'),
-      tool('Shape', 'shape'), tool('Eyedropper', 'eyedropper'),
+    const cmds = Object.keys(TOOL_LABELS).map(t => {
+      const key = Object.keys(SHORTCUTS).find(k => SHORTCUTS[k] === t);
+      return { group: 'Tools', label: TOOL_LABELS[t], hint: key ? key.toUpperCase() : undefined, run: () => setTool(t) };
+    });
+    cmds.push(
+      // dialogs + composite actions that live UI-side by nature
       { group: 'File', label: 'Open image…', run: pickFile },
       { group: 'File', label: 'New canvas…', run: openNewDialog },
       { group: 'File', label: 'Image size…', run: openImageSize },
       { group: 'File', label: 'Export…', hint: 'Ctrl+E', run: openExportDialog },
       { group: 'File', label: 'Save project', hint: 'Ctrl+S', run: () => GF.exporter.saveProject() },
-      { group: 'Edit', label: 'Undo', hint: 'Ctrl+Z', run: () => run('undo') },
-      { group: 'Edit', label: 'Redo', hint: 'Ctrl+Y', run: () => run('redo') },
-      { group: 'Edit', label: 'Select all', hint: 'Ctrl+A', run: () => run('selectAll') },
-      { group: 'Edit', label: 'Deselect', hint: 'Esc', run: () => run('deselect') },
-      { group: 'Edit', label: 'Invert selection', hint: 'Ctrl+I', run: () => run('invertSelection') },
       { group: 'Edit', label: 'Paste image', hint: 'Ctrl+V', run: () => U.toast('Press Ctrl/⌘V to paste an image') },
-      { group: 'Adjust', label: 'Auto enhance', run: () => $('#hero-enhance').click() },
+      { group: 'Adjust', label: 'Auto enhance', run: () => guarded(ACTIONS.enhance) },
       { group: 'Adjust', label: 'Curves…', hint: 'Ctrl+M', run: openCurves },
-      { group: 'Retouch', label: 'Remove background', run: () => $('#hero-removebg').click() },
-      { group: 'Retouch', label: 'Magic erase (content-aware)', run: () => $('#hero-erase').click() },
-      { group: 'Retouch', label: 'Generative fill (AI)…', run: openAIDialog },
-      { group: 'Retouch', label: 'Content-aware fill', run: () => guarded(() => run('contentAwareFill')) },
+      { group: 'Retouch', label: 'Remove background', run: () => guarded(ACTIONS.removeBg) },
+      { group: 'Retouch', label: 'Magic erase (content-aware)', run: () => guarded(ACTIONS.magicErase) },
       { group: 'Retouch', label: 'Color replace…', run: () => guarded(openColorReplace) },
       { group: 'Retouch', label: 'Smart upscale 2×', run: () => guarded(() => run('smartUpscale', { factor: 2, mode: 'photo' })) },
-      { group: 'Retouch', label: 'Ink outline (line art)', run: () => guarded(() => run('inkOutline', {})) },
-      { group: 'Retouch', label: 'Clean colors (flatten & sharpen)', run: () => guarded(() => run('cleanColors', {})) },
       { group: 'Layer', label: 'Layer style (outline / glow / shadow)…', run: () => guarded(openLayerStyle) },
-      { group: 'File', label: 'Export layers separately', run: () => guarded(() => run('exportLayers', {})) },
-      { group: 'Layer', label: 'New layer', run: () => run('addLayer', {}) },
-      { group: 'Layer', label: 'Duplicate layer', run: () => run('duplicateLayer') },
-      { group: 'Layer', label: 'Merge down', run: () => run('mergeDown') },
-      { group: 'Layer', label: 'Flatten image', run: () => run('flatten') },
-      { group: 'Layer', label: 'Add mask', run: () => run('addMask', { init: 'reveal' }) },
-      { group: 'Transform', label: 'Flip horizontal', run: () => run('flipLayer', { horizontal: true }) },
-      { group: 'Transform', label: 'Rotate 90°', run: () => run('rotateLayer', { cw: true }) },
-      { group: 'Transform', label: 'Trim to content', run: () => run('trim') },
       { group: 'View', label: 'Zoom in', hint: ']', run: () => zoomBtn(1.25) },
       { group: 'View', label: 'Zoom out', hint: '[', run: () => zoomBtn(0.8) },
       { group: 'View', label: 'Fit to screen', run: () => GF.view.zoomFit() },
       { group: 'View', label: 'Toggle light / dark theme', run: toggleTheme },
       { group: 'Help', label: 'Keyboard shortcuts', hint: '?', run: openCheatSheet },
-      { group: '3D', label: 'Open 3D workspace', run: () => setTool('scene3d') },
       { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) { GF.scene3d.snapshotToLayer(); setTool('move'); } else U.toast('Add a 3D object first'); } },
       { group: '3D', label: 'Export GLB (3D scene)', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') },
-    ];
+    );
+    // every ui-annotated engine command, straight from the catalog
+    GF.api.commands().forEach(c => cmds.push({
+      group: c.group, label: c.label, hint: c.hint,
+      run: () => c.needsDoc ? guarded(() => run(c.name, {})) : run(c.name, {}),
+    }));
     ADJ_LAYER_TYPES.forEach(t => cmds.push({ group: 'Adjustment', label: 'Add ' + t.label + ' layer', run: () => addAdjustmentLayer(t.kind) }));
     FILTERS.forEach(f => cmds.push({ group: 'Filters', label: 'Filter: ' + f.name, run: () => guarded(() => { GF.filters.applyToLayer(D.active(), f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name); }) }));
     if (GF.texture) {
@@ -1412,7 +1417,7 @@ window.GF = window.GF || {};
     { ic: '🩹', label: 'Erase & heal',  desc: 'Remove it, rebuild the background', fn: () => run('contentAwareFill') },
     { ic: '✂️', label: 'Cut out',       desc: 'Keep only this, hide the rest',     fn: cutOut },
     { ic: '🎨', label: 'Recolor',       desc: 'Shift this area’s colour',          fn: () => addAdjustmentLayer('hsl') },
-    { ic: '✦', label: 'Replace (AI)',  desc: 'Generate something new here',       fn: openAIDialog, ai: true },
+    { ic: '✦', label: 'Replace (AI)',  desc: 'Generate something new here',       fn: () => ACTIONS.genFill(), ai: true },
     { ic: '🪣', label: 'Fill',          desc: 'Flat-fill with your colour',        fn: fillSelection },
   ];
   /* Secondary refine/utility actions, tucked under "More". */
