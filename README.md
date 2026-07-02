@@ -1,48 +1,68 @@
 # PixelTriks
 
-A **general-purpose, AI-assisted image editor** (pixeltriks.com) that runs in any browser — your go-to
-tool for enhancing, retouching, cutting out, and creating images. Simple on the surface,
-deep underneath: the 80/20 of everyday editing is one tap away, with full pro depth
-(layers, masks, curves, channels) right behind it.
+A **general-purpose, AI-assisted image editor with a built-in 3D workspace**
+(pixeltriks.com) that runs in any browser. Two things, done deeply:
 
-Open **`index.html`** (double-click — the classic core runs from `file://`, no build step).
+1. **Image alteration & enhancement** — retouch, cut out, recolor, adjust, filter,
+   with layers/masks/curves underneath.
+2. **3D + GLB** — import GLB/GLTF models (or add primitives), pose them, texture them
+   with *your own images and designs*, then export a `.glb` or flatten a render back
+   onto the canvas as a normal layer. One canvas is the ops center for both.
 
-## What it does
+Open **`index.html`** (double-click — everything runs from `file://`, no build step).
 
-- **Open / import** any image (drag-drop or Open), or start a **New** canvas.
-- **Tools** — Move, Marquee/Smart-select (magic wand), Crop, Brush, Eraser, Fill, Text,
-  Shapes, Eyedropper. Selections constrain painting and filters.
-- **Adjust** (the 80/20) — Exposure, Contrast, Saturation, Warmth with **live,
-  non-destructive preview**; one-tap **Auto-enhance**; a strip of **filter presets**.
-- **Hero actions** — **Remove background**, **Magic erase** (content-aware fill over a
-  selection), and **Generative fill** (AI).
-- **Layers** — full stack, 16 blend modes, opacity, masks, and **non-destructive
-  adjustment layers** (Brightness/Contrast, Levels, Curves, Hue/Saturation, Posterize,
-  B&W, Invert, Auto Levels) — add with the **fx** button, double-click to re-edit, delete
-  to revert. Quick **Adjust** sliders also include **Vibrance** and **Clarity**.
-- **Pro tools** ("More") — content-aware fill, color replace, smart upscale, curves,
-  trim, flip/rotate, masks.
-- **Export** — PNG / JPEG / WebP at 1×/2×/0.5×, or save a project file.
-- **Responsive** — desktop panels on the right; on phones a bottom tool bar + a
-  summonable bottom-sheet panel, pinch-zoom/pan, and a floating touch companion.
+## Image editing
 
-### Power features
-- **Command palette** — press **⌘/Ctrl K** (or the search pill) for a Linear/Raycast-style
-  fuzzy launcher over *every* action: tools, adjustments, filters, retouch, layers,
-  transforms, modes, AI. Type, arrow, enter.
-- **Pro crop** — interactive crop rectangle with 8 handles, **aspect presets**
-  (Free · 1:1 · 4:5 · 16:9 · 9:16 · 3:2 · Original), a **rule-of-thirds overlay**, and a
-  **straighten** slider (arbitrary-angle, canvas auto-expands).
-- **Live histogram** in the Adjust panel (reflects the non-destructive preview), plus a
-  **hold-to-compare** before/after button.
-- **Image size** dialog (resample, lock aspect), **clipboard paste** (⌘V a screenshot
-  straight onto the canvas), **selection feather / grow**, a **keyboard cheat-sheet** (`?`),
-  and a **light / dark** theme toggle (dark-first, remembers your choice).
-- **Scrubbable history panel** (More tab) — every named step, click to jump back or forward.
-- **Re-editable text layers** — double-click a text layer to change the words, font, size,
-  colour or outline; the edit re-renders and saves into the project file.
-- **Installable PWA + autosave** — install PixelTriks as an app (served over http) and your work
-  autosaves to IndexedDB, with a "restore last session" prompt after a refresh or crash.
+- **Open / import** any image (drag-drop, paste, or Open), or start a **New** canvas.
+- **Tools** — Move, Marquee, Magic Wand, Magic Erase, Crop/Straighten, Brush, Eraser,
+  Clone stamp, Fill, Gradient, Text, Shapes, Eyedropper. Selections constrain painting
+  and filters.
+- **Adjust** — Exposure, Contrast, Saturation, Vibrance, Warmth, Clarity with **live,
+  non-destructive preview** + histogram + hold-to-compare; one-tap **Auto enhance**;
+  a strip of **filter presets**.
+- **Hero actions** — **Remove background**, **Magic erase** (content-aware), and
+  **Generative fill** (AI).
+- **Selection outcome bar** — make any selection and a bar of one-tap outcomes appears
+  right at it: Erase & heal, Cut out, Recolor, Replace (AI), Fill, plus refine actions.
+- **Layers** — full stack, 16 blend modes, opacity, masks, layer styles
+  (outline/glow/shadow/bevel/emboss), and **re-editable adjustment layers**
+  (Brightness/Contrast, Levels, Curves, Hue/Saturation, Posterize, B&W, Invert,
+  Auto Levels). Re-editable **text layers** (double-click to change).
+- **More tab** — scrubbable named history + the pro ops grid (content-aware fill,
+  color replace, smart upscale, curves, trim, flip/rotate, mask, ink outline,
+  clean colors, normal map, seamless tile).
+- **Export** — PNG / JPEG / WebP at 1×/2×/0.5×, split layers, GLB (when a 3D scene
+  exists), or save a `.forge.json` project.
+
+## 3D workspace (the ⬡ tool)
+
+- **Import** `.glb` / `.gltf` (drag-drop anywhere — the app jumps straight into 3D),
+  add primitives (box, sphere, cylinder, cone, torus, knot, capsule, plane, panel,
+  tile, hex, curved), or pull CC0 models from **Poly Haven**.
+- **Pose** — Orbit / Move / Rotate / Scale modes; click to select (Del removes,
+  F frames); exact numeric transforms (position / rotation / scale per axis).
+- **Texture with your images** — per object, use the whole document, any single layer,
+  or an imported image as the color map; normal/roughness maps bind by layer-name
+  convention or explicit pick. **Paint in 2D and the model updates live.**
+- **Light** — HDRI environments (file or Poly Haven) with proper reflections;
+  studio / transparent / solid backgrounds.
+- **Output** — **Export GLB** (whole scene or selected object), or **Flatten to
+  layer**: a document-resolution transparent render lands as a regular 2D layer and
+  you're back in the image editor.
+- 3D edits have their own undo stack; Ctrl+Z routes to whichever world you're in.
+
+Three.js (0.160) is vendored in `vendor/three/` — the 3D workspace works offline too.
+
+## Power features
+
+- **Command palette** — **⌘/Ctrl K**: a fuzzy launcher over *every* action. The list is
+  generated from the same command catalog agents use (`GF.api`), so it can't drift.
+- **Pro crop** — 8 handles, aspect presets, rule-of-thirds grid, arbitrary-angle
+  straighten with canvas auto-expand.
+- **Procedural textures** — clouds/wood/marble/bricks/checker/gradient/stone/metal/
+  grass/rust via `GF.api.run('generate', {kind})`, offline.
+- **Installable PWA + autosave** — install over http(s); work autosaves to IndexedDB
+  with crash-restore. Keyboard cheat-sheet (`?`), light/dark theme.
 
 ## AI (bring your own key)
 
@@ -59,38 +79,41 @@ If a request is blocked by the browser (common from `file://`), run the bundled
 zero-dependency CORS proxy and set its prefix in the ✦ AI dialog:
 
 ```bash
-node sprite/tools/proxy.js     # http://localhost:8787/?url=
+node tools/cors-proxy.js     # http://localhost:8787/?url=
 ```
 
 ## How it's built
 
-Classic scripts, no bundler, so the core works offline from a double-click:
+Classic scripts, no bundler, so the app works offline from a double-click:
 
 ```
 pixeltriks/
-  index.html        responsive single-page shell
-  core/             game-agnostic raster engine (global GF namespace):
+  index.html        responsive single-page shell (+ import map for three.js)
+  core/             raster + 3D engine (global GF namespace):
                     util · history · layers · filters · select · retouch ·
-                    tools · exporter · curves · api
-  ui/               forge-ui.js (the UI) + forge.css (design system, responsive)
+                    tools · exporter · curves · api · texgen · library · scene3d
+  ui/               forge-ui.js (2D UI) · scene3d-ui.js (3D panel/optbar) ·
+                    three-bundle.js (the one ES module: hands three.js to the
+                    classic-script world) · forge.css
   ai/               forge-ai.js (provider-agnostic AI adapter)
-  texture/          optional "Game / PBR" mode (normal/PBR maps, 3D preview, tiling)
-  sprite/           optional "Sprite / Pixel" mode (pixel art + animation)
+  vendor/three/     vendored Three.js 0.160 + addons (offline-first)
+  assets/models/    bundled sample GLBs (also e2e fixtures)
+  tools/            cors-proxy.js (optional AI helper)
+  tests/            browser e2e + userflow harnesses
 ```
 
 The UI drives the engine entirely through its public surface — chiefly
-`GF.api.run(name, args)` (a discoverable command catalog; `GF.api.describe()`), plus
-`GF.view`, `GF.doc`, `GF.filters`, `GF.retouch`, `GF.exporter`. That same API makes the
-whole app scriptable by an automated agent. The engine depends on the UI only through a
-tiny 6-method `GF.ui` contract.
-
-The former two-mode iframe shell is preserved as `legacy-shell.html`; `texture/` and
-`sprite/` remain fully functional and open standalone from the **More → Modes** panel.
+`GF.api.run(name, args)` over a **single discoverable command catalog**
+(`GF.api.describe()`), which now includes the AI (`aiGenerate`) and 3D
+(`scene3d.*`) commands; modules self-register via `GF.api.register`. Commands
+annotated with UI metadata surface automatically in the command palette. That same
+API makes the whole app scriptable by an automated agent. The engine depends on the
+UI only through a small `GF.ui` contract.
 
 ## Verifying
 
 ```bash
-node texture/tests/run.js     # core engine logic (pure, headless)
-# headless boot / smoke:
-google-chrome-stable --headless=new --screenshot=out.png file://$PWD/index.html
+bash tests/run-e2e.sh              # full feature audit incl. the 3D suite (software WebGL)
+bash tests/run-userflow.sh         # pointer/keyboard user flows, desktop
+bash tests/run-userflow-mobile.sh  # same, mobile viewport
 ```
