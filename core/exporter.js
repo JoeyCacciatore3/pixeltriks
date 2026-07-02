@@ -144,7 +144,11 @@ GF.exporter = (function () {
   }
 
   function handleFiles(files) {
-    for (const f of files) {
+    // 3D-ish drops (.glb/.gltf/.hdr, plus a .gltf's sibling .bin/textures) go
+    // to the 3D workspace as one batch so multi-file models resolve.
+    const list = Array.from(files);
+    if (GF.scene3d && list.some(f => /\.(glb|gltf|hdr)$/i.test(f.name))) { GF.scene3d.handleFiles(list); return; }
+    for (const f of list) {
       if (f.name.endsWith('.json')) loadProject(f);
       else if (f.type.startsWith('image/')) importImage(f);
       else U.toast('Unsupported file: ' + f.name);

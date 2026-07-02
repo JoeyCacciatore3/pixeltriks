@@ -43,8 +43,9 @@ GF.api = (function () {
     const luts = GF.filters.curveLuts(a.curves || {});
     GF.filters.applyToLayer(L(), 'curves', img => GF.filters.curves(img, luts));
   });
-  cmd('undo', '', 'Undo', () => GF.history.undo(D.doc));
-  cmd('redo', '', 'Redo', () => GF.history.redo(D.doc));
+  // While the 3D workspace is active, undo/redo route to its scene stack.
+  cmd('undo', '', 'Undo', () => (GF.scene3d && GF.scene3d.isActive()) ? GF.scene3d.hist.undo() : GF.history.undo(D.doc));
+  cmd('redo', '', 'Redo', () => (GF.scene3d && GF.scene3d.isActive()) ? GF.scene3d.hist.redo() : GF.history.redo(D.doc));
 
   /* --- painting --- */
   cmd('paint', 'points([[x,y],…]), color?, size?, erase?(bool)', 'Stroke a polyline on the active layer or its mask (respects selection)', a => {

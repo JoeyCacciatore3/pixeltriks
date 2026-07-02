@@ -533,6 +533,92 @@
       $('.fs-modal .text-btn').click();
     });
 
+    /* ---------- 3D WORKSPACE ---------- */
+    // Headless Chrome may lack WebGL (SwiftShader); soft-skip so the 2D suite
+    // stays green everywhere. Full 3D coverage needs a real browser.
+    const webgl = (() => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; } })();
+    let s3ok = false;
+    if (!webgl || !GF.scene3d) log('3d: suite skipped (no WebGL here)', true, 'soft-skip');
+    else {
+      await t('3d: engine boots, mode + host + 2D canvas intact', async () => {
+        freshDoc(120, 120);
+        clickTool('scene3d');
+        s3ok = await GF.scene3d.enter();          // setTool kicked it off; await the async boot
+        if (!s3ok) throw new Error('engine failed to load');
+        if (document.body.dataset.mode !== '3d') throw new Error('mode=' + document.body.dataset.mode);
+        if (!document.querySelector('#scene3d-host canvas')) throw new Error('no renderer canvas');
+        if (!$('#view-canvas')) throw new Error('2D canvas gone');
+      }, 30000);
+    }
+    if (s3ok) {
+      await t('3d: optbar shows interaction modes', () => {
+        if (!$('#s3-interact')) throw new Error('no interact seg');
+      });
+      await t('3d: add primitive -> object listed', async () => {
+        const id = await GF.scene3d.addPrimitive('box');
+        if (id == null) throw new Error('addPrimitive failed');
+        if (GF.scene3d.count() !== 1) throw new Error('count ' + GF.scene3d.count());
+        if (!document.querySelector('#s3-objects .layer-item')) throw new Error('object list empty');
+      });
+      await t('3d: setObject/getObject 9-DOF roundtrip', () => {
+        const id = GF.scene3d.selectedId();
+        GF.scene3d.setObject(id, { px: 0.5, py: -0.25, pz: 1, rx: 30, ry: 45, rz: 10, sx: 2, sy: 1.5, sz: 0.5 });
+        const g = GF.scene3d.getObject(id);
+        if (Math.abs(g.px - 0.5) > 1e-6 || g.ry !== 45 || Math.abs(g.sx - 2) > 1e-6) throw new Error(JSON.stringify(g));
+      });
+      await t('3d: material source = named layer (no throw)', () => {
+        const L = D.active();
+        GF.scene3d.setMaterial(GF.scene3d.selectedId(), { mapSource: 'layer:' + L.id });
+      });
+      await t('3d: scene undo routes via api, doc history untouched', () => {
+        const docUndo = GF.history.info().undo.length;
+        const n = GF.scene3d.count();
+        GF.api.run('undo');    // undoes the material change (scene stack, not bitmap stack)
+        GF.api.run('undo');    // undoes the transform
+        if (GF.scene3d.count() !== n) throw new Error('object count changed unexpectedly');
+        GF.api.run('redo'); GF.api.run('redo');
+        if (GF.history.info().undo.length !== docUndo) throw new Error('doc history was touched');
+      });
+      await t('3d: flatten to layer at doc resolution + history label', () => {
+        const n = layerCount();
+        const lid = GF.scene3d.snapshotToLayer();
+        if (lid == null) throw new Error('no layer id');
+        if (layerCount() !== n + 1) throw new Error('layer not added');
+        const L = D.doc.layers.find(l => l.id === lid);
+        if (L.canvas.width !== D.doc.width || L.canvas.height !== D.doc.height) throw new Error('not doc resolution');
+        if ((GF.history.info().undo.slice(-1)[0] || '') !== '3D render') throw new Error('history label');
+        const px = U.ctx2d(L.canvas).getImageData(0, 0, L.canvas.width, L.canvas.height).data;
+        let lit = false; for (let i = 3; i < px.length; i += 4) if (px[i] > 0) { lit = true; break; }
+        if (!lit) throw new Error('flattened layer is blank');
+      });
+      await t('3d: export GLB produces a binary blob', async () => {
+        const orig = GF.util.downloadBlob;
+        let blob = null;
+        GF.util.downloadBlob = b => { blob = b; };
+        try { await GF.scene3d.exportGLB({}); } finally { GF.util.downloadBlob = orig; }
+        if (!blob || !blob.size) throw new Error('no blob');
+        if (blob.type !== 'model/gltf-binary') throw new Error('type ' + blob.type);
+      }, 30000);
+      await t('3d: import sample GLB (soft-skip if file:// blocks fetch)', async () => {
+        const id = await GF.scene3d.importModel('assets/models/cube.glb', 'cube');
+        if (id == null) log('3d: GLB fetch unavailable here', true, 'soft-skip');
+        else if (GF.scene3d.getObject(id).kind !== 'model') throw new Error('not a model');
+      }, 30000);
+      await t('3d: remove selected + scene undo restores it', () => {
+        const n = GF.scene3d.count(); if (!n) throw new Error('nothing to remove');
+        GF.scene3d.removeObject(GF.scene3d.listObjects()[0].id);
+        if (GF.scene3d.count() !== n - 1) throw new Error('not removed');
+        GF.scene3d.hist.undo();
+        if (GF.scene3d.count() !== n) throw new Error('undo did not restore');
+      });
+      await t('3d: exit restores 2D mode + tool dispatch', () => {
+        clickTool('move');
+        if (document.body.dataset.mode !== 'image') throw new Error('mode=' + document.body.dataset.mode);
+        clickTool('brush');
+        if (GF.view.view.tool !== 'brush') throw new Error('2D dispatch broken: ' + GF.view.view.tool);
+      });
+    } else if (webgl && GF.scene3d) log('3d: remaining tests skipped (engine unavailable)', true, 'soft-skip');
+
     /* ---------- FINISH ---------- */
     dump('done');
   }

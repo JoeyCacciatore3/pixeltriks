@@ -560,3 +560,32 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 @media (max-width: 420px) {
   .hero { flex-direction: column; align-items: flex-start; gap: .25rem; font-size: .9em; }
 }
+
+/* ============================= 3D WORKSPACE ============================= */
+/* WebGL host overlays the 2D canvas; visible only while body[data-mode="3d"] */
+#scene3d-host { position: absolute; inset: 0; display: none; background: transparent; }
+body[data-mode="3d"] #scene3d-host { display: block; }
+#scene3d-host canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+body[data-mode="3d"] #empty-state, body[data-mode="3d"] #sel-bar { display: none; }
+
+.s3-row { display: flex; gap: .4rem; align-items: center; margin: .35rem 0; flex-wrap: wrap; }
+.s3-row .text-btn { flex: 1; white-space: nowrap; }
+.s3-prims { margin-bottom: .4rem; }
+.s3-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
+.s3-num { display: grid; gap: .15rem; font-size: .72em; color: var(--ink-3); font-weight: 600; }
+.s3-num input { width: 100%; min-width: 0; padding: .3em .35em; border-radius: 7px;
+  border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: .95em; }
+.s3-status { font-size: .78em; color: var(--ink-3); margin: .5rem 0 0; }
+#s3-objects { margin-top: .4rem; }
+#s3-objects .layer-item { cursor: pointer; }
+
+/* Poly Haven picker */
+.ph-search { width: 100%; margin: .5rem 0; padding: .5em .7em; border-radius: 8px;
+  border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; }
+.ph-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem;
+  max-height: 46vh; overflow: auto; padding: .2rem; }
+.ph-card { display: grid; gap: .25rem; padding: .3rem; border-radius: 10px; background: transparent;
+  border: 1px solid var(--line); cursor: pointer; color: var(--ink-2); font-size: .72em; }
+.ph-card:hover { border-color: var(--accent); color: var(--ink); }
+.ph-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; }
+.ph-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

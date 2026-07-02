@@ -14,6 +14,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="ui/forge.css">
+<!-- Three.js (vendored, offline-first) — ui/three-bundle.js statically imports
+     it through this map and hands it to core/scene3d.js via window.__THREE_BUNDLE -->
+<script type="importmap">
+{ "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+<script type="module" src="ui/three-bundle.js"></script>
 </head>
 <body data-mode="image" data-ui="simple">
 
@@ -93,6 +102,9 @@
     <button class="tool" data-tool="eyedropper" data-adv title="Pick colour (I)" aria-label="Eyedropper">
       <svg viewBox="0 0 24 24"><path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="M15 6l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/></svg><span class="tlabel">Pick</span></button>
     <span class="rail-sep"></span>
+    <button class="tool" data-tool="scene3d" title="3D workspace — GLB models, primitives, texture with your images" aria-label="3D workspace">
+      <svg viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M12 11L4 6.5M12 11l8-4.5M12 11v9"/></svg><span class="tlabel">3D</span></button>
+    <span class="rail-sep"></span>
     <label class="tool color-tool" title="Brush colour">
       <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></label>
   </nav>
@@ -100,6 +112,8 @@
   <!-- VIEWPORT -->
   <section id="viewport" aria-label="Canvas">
     <canvas id="view-canvas"></canvas>
+    <!-- 3D workspace host — overlays the 2D canvas while body[data-mode="3d"] -->
+    <div id="scene3d-host"></div>
 
     <div id="empty-state" hidden>
       <div class="empty-card">
@@ -136,6 +150,7 @@
     <div class="panel-tabs" role="tablist">
       <button class="ptab" data-tab="adjust" role="tab">Adjust</button>
       <button class="ptab" data-tab="layers" role="tab">Layers</button>
+      <button class="ptab" data-tab="scene" role="tab">3D</button>
       <button class="ptab pro" data-tab="pro" role="tab">More</button>
     </div>
 
@@ -186,6 +201,9 @@
         <ul id="layer-list" class="layer-list"></ul>
       </div>
 
+      <!-- 3D TAB (content built by ui/scene3d-ui.js) -->
+      <div class="ptab-pane" data-pane="scene" hidden></div>
+
       <!-- PRO TAB -->
       <div class="ptab-pane" data-pane="pro" hidden>
         <h3 class="panel-h">History</h3>
@@ -212,7 +230,7 @@
 <div id="mode-overlay" hidden></div>
 
 <!-- hidden file input -->
-<input type="file" id="file-input" accept="image/*,.json,.gameforge.json,.forge.json" multiple hidden>
+<input type="file" id="file-input" accept="image/*,.json,.gameforge.json,.forge.json,.glb,.gltf,.hdr,.bin" multiple hidden>
 
 <!-- toast (engine's GF.util.toast targets #toast) -->
 <div id="toast" role="status" aria-live="polite"></div>
@@ -230,9 +248,13 @@
 <script src="core/api.js"></script>
 <!-- ===================== OPTIONAL: in-app PBR/texture tools ===================== -->
 <script src="modes/game-pbr.js"></script>
+<!-- ===================== 3D workspace + asset library ===================== -->
+<script src="core/library.js"></script>
+<script src="core/scene3d.js"></script>
 <!-- ============================= AI ============================= -->
 <script src="ai/forge-ai.js"></script>
 <!-- ============================= UI ============================= -->
 <script src="ui/forge-ui.js"></script>
+<script src="ui/scene3d-ui.js"></script>
 </body>
 </html>

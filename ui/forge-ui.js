@@ -252,7 +252,7 @@ window.GF = window.GF || {};
     });
   }
 
-  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog };
+  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool };
 
   /* =================================================================
      Build dynamic UI
@@ -424,16 +424,19 @@ window.GF = window.GF || {};
     $('#brush-color').addEventListener('input', e => { V().brush.color = e.target.value; });
   }
   function setTool(name) {
+    const prev = curTool;
     curTool = name;
     if (cropEl && name !== 'crop') stopCrop();
     cropMode = (name === 'crop');
+    if (prev === 'scene3d' && name !== 'scene3d' && GF.scene3dUI) GF.scene3dUI.exit();
     const eng = TOOLMAP[name] || name;
-    // crop uses its own overlay (not the engine marquee); park the engine on move
-    V().tool = (name === 'crop') ? 'move' : eng;
+    // crop and the 3D workspace use their own overlays; park the engine on move
+    V().tool = (name === 'crop' || name === 'scene3d') ? 'move' : eng;
     $$('#toolrail .tool').forEach(b => { const on = b.dataset.tool === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     buildOptbar(name);
     if (name === 'crop') startCrop();
     if (name === 'wand') showWandCoach();
+    if (name === 'scene3d' && GF.scene3dUI) GF.scene3dUI.enter();
   }
 
   /* First-run coach mark: the wand only pays off once you know "click → then an
@@ -504,6 +507,8 @@ window.GF = window.GF || {};
       html = `<span class="opt">Click on the canvas to place text</span>`;
     } else if (name === 'move' || name === 'eyedropper' || name === 'pan') {
       html = `<span class="opt">${name === 'move' ? 'Drag to move the active layer' : name === 'pan' ? 'Drag to pan · pinch to zoom' : 'Click to pick a color'}</span>`;
+    } else if (name === 'scene3d') {
+      html = GF.scene3dUI ? GF.scene3dUI.optbarHtml() : '';
     }
     if (html && GUIDES[name]) html += guideBtn(name);   // every tool gets a "?" guide
     if (!html) { bar.hidden = true; return; }
@@ -519,6 +524,7 @@ window.GF = window.GF || {};
   function selModeSeg() { return `<span class="opt">Mode</span>` + seg('sel-mode', [['replace','New'],['add','Add'],['subtract','Sub'],['intersect','Int']], V().selMode || 'replace'); }
   function guideBtn(name) { return `<button class="icon-btn sm guide-btn" data-guide="${name}" title="How to use this tool" aria-label="Tool guide">?</button>`; }
   function wireOptbar(name) {
+    if (name === 'scene3d' && GF.scene3dUI) { GF.scene3dUI.wireOptbar(); }
     const bind = (id, fn) => { const el = $('#'+id); if (el) el.addEventListener('input', () => { fn(el); const v = $('#'+id+'-v'); if (v) v.textContent = el.value; }); };
     bind('brush-size', el => V().brush.size = +el.value);
     bind('brush-op',   el => V().brush.opacity = +el.value / 100);
@@ -755,7 +761,8 @@ window.GF = window.GF || {};
              <label>Scale<select id="m-scale"><option value="1">1× (${D.doc.width}×${D.doc.height})</option><option value="2">2×</option><option value="0.5">0.5×</option></select></label></div>`,
       ok: 'Download',
       extra: [['Save project', () => { GF.exporter.saveProject(); closeModal(); }],
-              ['Export layers', () => { run('exportLayers', {}); closeModal(); }]],
+              ['Export layers', () => { run('exportLayers', {}); closeModal(); }],
+              ...(GF.scene3d && GF.scene3d.count() ? [['GLB (3D scene)', () => { GF.scene3d.exportGLB({}); closeModal(); }]] : [])],
       onOk: m => {
         const type = m.querySelector('#m-fmt').value, scale = +m.querySelector('#m-scale').value;
         GF.exporter.exportImage({ type, scale, quality: 0.92 });
@@ -880,9 +887,10 @@ window.GF = window.GF || {};
      ================================================================= */
   function setDims() { const el = $('#doc-dims'); if (el) el.textContent = D.doc.open ? (D.doc.width + '×' + D.doc.height) : ''; }
   function updateUndoRedo() {
+    const three = GF.scene3d && GF.scene3d.isActive();
     const u = $('#btn-undo'), r = $('#btn-redo');
-    if (u) u.disabled = !GF.history.canUndo();
-    if (r) r.disabled = !GF.history.canRedo();
+    if (u) u.disabled = three ? !GF.scene3d.hist.canUndo() : !GF.history.canUndo();
+    if (r) r.disabled = three ? !GF.scene3d.hist.canRedo() : !GF.history.canRedo();
     renderHistory();
   }
 
@@ -1599,6 +1607,15 @@ window.GF = window.GF || {};
           <li><b>Duplicate details</b> — more leaves, more windows, more crowd.</li>
           <li><b>Fix seams</b> — after Magic Erase, clone over any repeats it left.</li>
         </ul>` },
+    scene3d: { icon: '⬡', title: '3D workspace — models, GLB & your images',
+      body: `<p class="g-lead">Import GLB/GLTF models or add primitives, pose them, and texture them with the document, any layer, or an imported image. Export the scene as a <b>.glb</b>, or <b>Flatten to layer</b> to drop a doc-resolution render back onto the canvas and keep editing in 2D.</p>
+        <h4>Basics</h4><ul>
+          <li><b>Orbit / Move / Rotate / Scale</b> — pick a mode in the options bar; click any object to select it.</li>
+          <li><b>Texture</b> — in the 3D panel, set an object's texture to the whole document, one layer, or an imported image. Paint in 2D and the model updates live.</li>
+          <li><b>Environment</b> — load an HDRI (file or Poly Haven) for realistic lighting and reflections.</li>
+          <li><b>Keys</b> — <span class="kbd">Del</span> removes the selected object, <span class="kbd">F</span> frames it.</li>
+        </ul>
+        <p class="g-lead">Tip: drop a .glb anywhere on the app to jump straight into the 3D workspace.</p>` },
     gradient: { icon: '◧', title: 'Gradient — smooth colour blends',
       body: `<p class="g-lead">Drag across the canvas: the blend runs from your brush colour at the start of the drag to the end colour (or to transparent). Inside a selection, it fills only the selection.</p>
         <h4>Uses</h4><ul>

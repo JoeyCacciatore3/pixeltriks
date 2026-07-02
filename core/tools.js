@@ -311,6 +311,7 @@ GF.view = (function () {
   }
 
   function onWheel(e) {
+    if (document.body.dataset.mode === '3d') return;   // the 3D workspace owns the pointer
     e.preventDefault();
     if (!D.doc.open) return;
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
@@ -319,6 +320,7 @@ GF.view = (function () {
 
   /* ---------------- pointer handling ---------------- */
   function onDown(e) {
+    if (document.body.dataset.mode === '3d') return;   // the 3D workspace owns the pointer
     if (!D.doc.open) return;
     viewportEl.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });

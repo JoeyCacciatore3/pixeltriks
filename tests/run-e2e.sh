@@ -12,7 +12,9 @@ cd "$(dirname "$0")/.."
 CHROME="${CHROME:-google-chrome-stable}"
 
 node -e 'const fs=require("fs");let h=fs.readFileSync("index.html","utf8");fs.writeFileSync("index-e2e.html",h.replace("</body>","<script src=\"tests/e2e.js\"></script>\n</body>"));'
-OUT=$("$CHROME" --headless=new --disable-gpu --no-sandbox --allow-file-access-from-files \
+# --enable-unsafe-swiftshader (instead of --disable-gpu) provides software
+# WebGL so the 3D-workspace suite runs; it soft-skips where WebGL is absent.
+OUT=$("$CHROME" --headless=new --enable-unsafe-swiftshader --no-sandbox --allow-file-access-from-files \
   --window-size=1280,820 --virtual-time-budget=90000 \
   --dump-dom "file://$PWD/index-e2e.html" 2>/dev/null)
 rm -f index-e2e.html
