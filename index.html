@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f13">
+<meta name="color-scheme" content="dark light">
+<title>PixelTriks — Image Editor</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<!-- High-quality UI type (Inter); degrades to the system stack offline / on file:// -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="ui/forge.css">
+</head>
+<body data-mode="image" data-ui="simple">
+
+<!-- ============================= TOP BAR ============================= -->
+<header id="topbar">
+  <div class="tb-group tb-left">
+    <button class="icon-btn menu-btn" id="btn-menu" title="Menu" aria-label="Menu">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <span class="brand"><span class="brand-mark">◆</span><span class="brand-name">PixelTriks</span></span>
+    <button class="text-btn" id="btn-open">Open</button>
+    <button class="text-btn ghost" id="btn-new">New</button>
+  </div>
+
+  <div class="tb-group tb-center">
+    <button class="icon-btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+      <svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-redo" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>
+      <svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h1"/></svg>
+    </button>
+    <div class="zoom-pill">
+      <button class="icon-btn sm" id="btn-zoom-out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+      <button class="zoom-label" id="zoom-label" title="Fit to screen">100%</button>
+      <button class="icon-btn sm" id="btn-zoom-in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <span id="doc-dims" class="dims" aria-live="polite"></span>
+  </div>
+
+  <div class="tb-group tb-right">
+    <button class="palette-trigger" id="btn-palette" title="Search actions (Ctrl/⌘K)" aria-label="Command palette">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <span class="kbd">⌘K</span>
+    </button>
+    <button class="text-btn ghost ui-toggle" id="btn-simple" title="Switch between a Simple and a Pro interface" aria-label="Toggle Simple or Pro interface"><span class="ui-dot"></span><span class="ui-mode">Simple</span></button>
+    <button class="icon-btn" id="btn-theme" title="Toggle light / dark" aria-label="Toggle theme">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+    </button>
+    <button class="text-btn ai-btn" id="btn-ai" title="AI tools">✦ AI</button>
+    <button class="text-btn primary" id="btn-export">Export</button>
+  </div>
+</header>
+
+<!-- ===================== CONTEXTUAL TOOL OPTIONS ===================== -->
+<div id="optbar" hidden></div>
+
+<!-- ============================= STAGE ============================= -->
+<main id="stage">
+
+  <!-- LEFT TOOL RAIL (desktop) / BOTTOM BAR (mobile) -->
+  <nav id="toolrail" role="toolbar" aria-label="Tools">
+    <button class="tool" data-tool="move" title="Move (V)" aria-label="Move">
+      <svg viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg><span class="tlabel">Move</span></button>
+    <button class="tool" data-tool="select" title="Select area (M)" aria-label="Select">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3.5 3"/></svg><span class="tlabel">Select</span></button>
+    <button class="tool" data-tool="wand" title="Magic Wand (W)" aria-label="Magic wand">
+      <svg viewBox="0 0 24 24"><path d="M4 20L13 11"/><path d="M16 3l1.2 2.8L20 7l-2.8 1.2L16 11l-1.2-2.8L12 7l2.8-1.2z" fill="currentColor" stroke="none"/></svg><span class="tlabel">Wand</span></button>
+    <button class="tool" data-tool="magicerase" title="Magic Erase — click an object to remove it (J)" aria-label="Magic erase">
+      <svg viewBox="0 0 24 24"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M10.4 10.4h.01M13.6 13.6h.01M13.6 10.4h.01M10.4 13.6h.01"/></svg><span class="tlabel">Remove</span></button>
+    <button class="tool" data-tool="crop" title="Crop &amp; straighten (C)" aria-label="Crop">
+      <svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg><span class="tlabel">Crop</span></button>
+    <span class="rail-sep"></span>
+    <button class="tool" data-tool="brush" title="Brush (B)" aria-label="Brush">
+      <svg viewBox="0 0 24 24"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg><span class="tlabel">Brush</span></button>
+    <button class="tool" data-tool="eraser" title="Eraser (E)" aria-label="Eraser">
+      <svg viewBox="0 0 24 24"><path d="M7 21l-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="M5 11l9 9"/></svg><span class="tlabel">Eraser</span></button>
+    <button class="tool" data-tool="clone" data-adv title="Clone stamp — Alt-click a source, then paint (S)" aria-label="Clone stamp">
+      <svg viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M19.27 13.73A2.5 2.5 0 0 0 17.5 13h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5c0-.66-.26-1.3-.73-1.77Z"/><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/></svg><span class="tlabel">Clone</span></button>
+    <button class="tool" data-tool="fill" data-adv title="Fill (G)" aria-label="Fill">
+      <svg viewBox="0 0 24 24"><path d="M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11z"/><path d="M5 2l5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z" fill="currentColor" stroke="none"/></svg><span class="tlabel">Fill</span></button>
+    <button class="tool" data-tool="gradient" data-adv title="Gradient — drag to draw (D)" aria-label="Gradient">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7.5 8.5v7"/><path d="M11 8.5v7"/><path d="M14.5 10.5v3"/><path d="M17.5 11.75v.5"/></svg><span class="tlabel">Gradient</span></button>
+    <button class="tool" data-tool="text" title="Text (T)" aria-label="Text">
+      <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tlabel">Text</span></button>
+    <button class="tool" data-tool="shape" data-adv title="Shape (U)" aria-label="Shape">
+      <svg viewBox="0 0 24 24"><path d="M8.3 10a.7.7 0 0 1-.63-1.08L11.4 3a.7.7 0 0 1 1.2-.04L16.3 8.9a.7.7 0 0 1-.57 1.1z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/></svg><span class="tlabel">Shape</span></button>
+    <button class="tool" data-tool="eyedropper" data-adv title="Pick colour (I)" aria-label="Eyedropper">
+      <svg viewBox="0 0 24 24"><path d="M2 22l1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="M15 6l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z"/></svg><span class="tlabel">Pick</span></button>
+    <span class="rail-sep"></span>
+    <label class="tool color-tool" title="Brush colour">
+      <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></label>
+  </nav>
+
+  <!-- VIEWPORT -->
+  <section id="viewport" aria-label="Canvas">
+    <canvas id="view-canvas"></canvas>
+
+    <div id="empty-state" hidden>
+      <div class="empty-card">
+        <div class="empty-mark">◆</div>
+        <h1>What do you want to do?</h1>
+        <p>Pick a starting point — we’ll open your image and take you straight there.</p>
+        <div class="intent-grid">
+          <button class="intent" data-intent="enhance"><span class="in-ic">✨</span><b>Enhance a photo</b><small>Auto colour &amp; light</small></button>
+          <button class="intent" data-intent="removebg"><span class="in-ic">🪄</span><b>Remove background</b><small>One-tap cutout</small></button>
+          <button class="intent" data-intent="erase"><span class="in-ic">🩹</span><b>Erase an object</b><small>Heal it away</small></button>
+          <button class="intent" data-intent="cutout"><span class="in-ic">✂️</span><b>Cut out a subject</b><small>Isolate &amp; keep</small></button>
+          <button class="intent" data-intent="genfill"><span class="in-ic">✦</span><b>Generative edit</b><small>Replace with AI</small></button>
+          <button class="intent" data-intent="blank"><span class="in-ic">✚</span><b>Blank canvas</b><small>Start from scratch</small></button>
+        </div>
+        <div class="empty-actions">
+          <button class="text-btn ghost lg" id="empty-open">Just open an image</button>
+          <button class="text-btn ghost lg" id="empty-new" hidden>New canvas</button>
+        </div>
+        <p class="empty-hint">or drop a file anywhere</p>
+      </div>
+    </div>
+
+    <!-- floating single-touch companion (mobile) -->
+    <div id="touch-companion" hidden>
+      <button class="icon-btn" id="tc-undo" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1"/></svg></button>
+      <button class="icon-btn" id="tc-fit" aria-label="Fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="icon-btn" id="tc-redo" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h1"/></svg></button>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL (desktop) / BOTTOM SHEET (mobile) -->
+  <aside id="panel" data-tab="adjust">
+    <div class="panel-grip"></div>
+    <div class="panel-tabs" role="tablist">
+      <button class="ptab" data-tab="adjust" role="tab">Adjust</button>
+      <button class="ptab" data-tab="layers" role="tab">Layers</button>
+      <button class="ptab pro" data-tab="pro" role="tab">More</button>
+    </div>
+
+    <div class="panel-body">
+      <!-- ADJUST TAB -->
+      <div class="ptab-pane" data-pane="adjust">
+        <h3 class="panel-h first">One-tap fixes</h3>
+        <div class="hero-actions">
+          <button class="hero" id="hero-enhance"><span class="hi">✨</span>Auto enhance</button>
+          <button class="hero" id="hero-removebg"><span class="hi">✂️</span>Remove bg</button>
+          <button class="hero" id="hero-erase"><span class="hi">🩹</span>Magic erase</button>
+          <button class="hero ai" id="hero-genfill"><span class="hi">✦</span>Generative fill</button>
+        </div>
+
+        <h3 class="panel-h">Light &amp; colour</h3>
+        <canvas id="histogram" class="histogram" width="288" height="56" aria-hidden="true" title="Luminance histogram"></canvas>
+
+        <div class="adj-group" id="adj-sliders"><!-- sliders injected by JS --></div>
+
+        <div class="adj-row">
+          <button class="text-btn ghost" id="adj-compare" title="Hold to see the original">◐ Before</button>
+          <button class="text-btn ghost wide" id="adj-reset">Reset</button>
+          <button class="text-btn primary wide" id="adj-apply">Apply</button>
+        </div>
+
+        <h3 class="panel-h">Filters</h3>
+        <div class="filter-strip" id="filter-strip"><!-- presets injected --></div>
+      </div>
+
+      <!-- LAYERS TAB -->
+      <div class="ptab-pane" data-pane="layers" hidden>
+        <div class="layer-toolbar">
+          <button class="icon-btn sm" id="lyr-add" title="New layer"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button class="icon-btn sm" id="lyr-fx" title="Add adjustment layer (non-destructive)"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="15" r="5"/></svg></button>
+          <button class="icon-btn sm" id="lyr-style" title="Layer style — outline, glow, shadow, bevel, emboss"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></svg></button>
+          <button class="icon-btn sm" id="lyr-dup" title="Duplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4h12"/></svg></button>
+          <button class="icon-btn sm" id="lyr-merge" title="Merge down"><svg viewBox="0 0 24 24"><path d="M7 4h10M5 9h14M8 14h8M11 19h2"/></svg></button>
+          <button class="icon-btn sm danger" id="lyr-del" title="Delete"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></button>
+        </div>
+        <div class="layer-props">
+          <label class="mini">Blend
+            <select id="lyr-blend"></select>
+          </label>
+          <label class="mini">Opacity <span id="lyr-opacity-val">100%</span>
+            <input type="range" id="lyr-opacity" min="0" max="100" value="100">
+          </label>
+        </div>
+        <ul id="layer-list" class="layer-list"></ul>
+      </div>
+
+      <!-- PRO TAB -->
+      <div class="ptab-pane" data-pane="pro" hidden>
+        <h3 class="panel-h">History</h3>
+        <ul id="history-list" class="history-list"></ul>
+        <h3 class="panel-h">Pro tools</h3>
+        <div class="pro-grid" id="pro-grid"><!-- injected --></div>
+        <h3 class="panel-h">Modes</h3>
+        <div class="pro-grid">
+          <button class="pro-btn" data-mode-open="sprite">👾 Sprite / Pixel</button>
+          <button class="pro-btn" data-mode-open="texture">🧱 Game / PBR</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</main>
+
+<!-- mobile panel toggle -->
+<button id="panel-toggle" aria-label="Panels">
+  <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Adjust</span>
+</button>
+
+<!-- in-app mode overlay (Sprite / Game-PBR open here instead of a new tab) -->
+<div id="mode-overlay" hidden></div>
+
+<!-- hidden file input -->
+<input type="file" id="file-input" accept="image/*,.json,.gameforge.json,.forge.json" multiple hidden>
+
+<!-- toast (engine's GF.util.toast targets #toast) -->
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- ============================= ENGINE ============================= -->
+<script src="core/util.js"></script>
+<script src="core/history.js"></script>
+<script src="core/layers.js"></script>
+<script src="core/filters.js"></script>
+<script src="core/select.js"></script>
+<script src="core/retouch.js"></script>
+<script src="core/tools.js"></script>
+<script src="core/exporter.js"></script>
+<script src="core/curves.js"></script>
+<script src="core/api.js"></script>
+<!-- ===================== OPTIONAL: in-app PBR/texture tools ===================== -->
+<script src="modes/game-pbr.js"></script>
+<!-- ============================= AI ============================= -->
+<script src="ai/forge-ai.js"></script>
+<!-- ============================= UI ============================= -->
+<script src="ui/forge-ui.js"></script>
+</body>
+</html>

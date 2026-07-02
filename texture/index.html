@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#111317">
+<title>Forge Studio — Texture</title>
+<link rel="stylesheet" href="css/styles.css">
+<!-- Import map so the 3D preview can dynamic-import Three.js + addons (RGBELoader,
+     GLTFLoader) as a single ES-module instance. Online-only, like the preview itself. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<!-- ======================= TOP BAR ======================= -->
+<header id="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3z" fill="currentColor" opacity=".9"/><path d="M13 13h8v8h-8z" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <span class="brand-name">Forge Studio · Texture</span>
+  </div>
+  <div class="doc-meta">
+    <span id="doc-name" class="mono">untitled</span>
+    <span id="doc-dims" class="mono dim">—</span>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-help" class="icon-btn" title="Help & shortcuts (?)" aria-label="Help">?</button>
+    <button id="btn-undo" class="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>↶</button>
+    <button id="btn-redo" class="icon-btn" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>↷</button>
+    <span class="vsep"></span>
+    <button id="btn-zoom-out" class="icon-btn" title="Zoom out" aria-label="Zoom out">−</button>
+    <span id="zoom-label" class="mono dim">100%</span>
+    <button id="btn-zoom-in" class="icon-btn" title="Zoom in" aria-label="Zoom in">+</button>
+    <button id="btn-zoom-fit" class="icon-btn" title="Fit to view" aria-label="Fit to view">⛶</button>
+    <span class="vsep"></span>
+    <button id="btn-new" class="text-btn">New</button>
+    <button id="btn-library" class="text-btn">Library</button>
+    <button id="btn-open" class="text-btn">Import</button>
+    <button id="btn-save" class="text-btn">Save<span class="hide-sm"> project</span></button>
+    <button id="btn-export" class="text-btn primary">Export</button>
+  </div>
+</header>
+
+<div id="workspace">
+  <!-- ======================= TOOL RAIL ======================= -->
+  <nav id="toolrail" aria-label="Tools">
+    <button class="tool-btn" data-tool="move"   title="Move layer (V)"><svg viewBox="0 0 24 24"><path d="M12 2l3 3h-2v5h5V8l3 3-3 3v-2h-5v5h2l-3 3-3-3h2v-5H6v2l-3-3 3-3v2h5V5H9z" fill="currentColor"/></svg><span>Move</span></button>
+    <button class="tool-btn active" data-tool="brush"  title="Brush (B)"><svg viewBox="0 0 24 24"><path d="M20.7 4.6c-1-1-2.6-1-3.5 0L9 12.8l2.8 2.8 8.2-8.2c1-1 1-2.6 0-3.5zM7.6 14.2c-1.9 0-3.4 1.5-3.4 3.4 0 1.5-1.3 2.2-2.2 2.2.9 1.3 2.5 2.2 4 2.2 2.4 0 4.4-2 4.4-4.4z" fill="currentColor"/></svg><span>Brush</span></button>
+    <button class="tool-btn" data-tool="eraser" title="Eraser (E)"><svg viewBox="0 0 24 24"><path d="M16.2 3.6l4.2 4.2c.8.8.8 2 0 2.8l-9 9H6.8l-3.4-3.4c-.8-.8-.8-2 0-2.8l10-10c.8-.8 2-.8 2.8 0zM5.4 14.8L8.6 18h2l3-3-4.2-4.2z" fill="currentColor"/></svg><span>Erase</span></button>
+    <button class="tool-btn" data-tool="fill"   title="Fill (G)"><svg viewBox="0 0 24 24"><path d="M12 2.7l6.4 6.4c.8.8.8 2 0 2.8L13 17.3c-.8.8-2 .8-2.8 0L4.8 11.9c-.8-.8-.8-2 0-2.8L9 4.9 7.6 3.5 9 2.1zM19.5 14s2 2.4 2 3.7c0 1.1-.9 2-2 2s-2-.9-2-2c0-1.3 2-3.7 2-3.7zM5.6 10.5h11l-5.3 5.4z" fill="currentColor"/></svg><span>Fill</span></button>
+    <button class="tool-btn" data-tool="picker" title="Eyedropper (I)"><svg viewBox="0 0 24 24"><path d="M19.4 7.3l-2.7-2.7c-.8-.8-2-.8-2.8 0l-1.8 1.8-1.1-1.1-1.4 1.4 1.1 1.1-7 7V18h3.2l7-7 1.1 1.1 1.4-1.4-1.1-1.1 1.8-1.8c.8-.8.8-2 0-2.8zM7.1 16H5.9v-1.2l6.4-6.4 1.2 1.2z" fill="currentColor"/></svg><span>Pick</span></button>
+    <button class="tool-btn" data-tool="wand" title="Magic wand select (W) — Shift add, Alt subtract"><svg viewBox="0 0 24 24"><path d="M7.5 5.6l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1zM17 2l.7 1.8L19.5 4.5 17.7 5.2 17 7l-.7-1.8L14.5 4.5l1.8-.7zM13.9 8.6l1.5 1.5c.4.4.4 1 0 1.4l-8.4 8.4c-.4.4-1 .4-1.4 0l-1.5-1.5c-.4-.4-.4-1 0-1.4l8.4-8.4c.4-.4 1-.4 1.4 0zm-1.2 2.6l-6 6 .8.8 6-6z" fill="currentColor"/></svg><span>Wand</span></button>
+    <button class="tool-btn" data-tool="magiceraser" title="Magic eraser (X) — click a region to erase it"><svg viewBox="0 0 24 24"><path d="M16.2 3.6l4.2 4.2c.8.8.8 2 0 2.8l-9 9H6.8l-3.4-3.4c-.8-.8-.8-2 0-2.8l10-10c.8-.8 2-.8 2.8 0z" fill="currentColor" opacity=".55"/><path d="M14 2l.6 1.5L16 4l-1.4.6L14 6l-.6-1.4L12 4l1.4-.5zM20 11l.5 1.3 1.3.5-1.3.5L20 15l-.5-1.4-1.3-.5 1.3-.5z" fill="currentColor"/></svg><span>Magic</span></button>
+    <button class="tool-btn" data-tool="marquee" title="Select rectangle / ellipse / lasso (M) — Shift add, Alt subtract"><svg viewBox="0 0 24 24"><path d="M4 4h3v2H6v1H4zM10 4h4v2h-4zM17 4h3v3h-2V6h-1zM4 10h2v4H4zM18 10h2v4h-2zM4 17h2v1h1v2H4zM10 18h4v2h-4zM18 17h2v3h-3v-2h1z" fill="currentColor"/></svg><span>Select</span></button>
+    <button class="tool-btn" data-tool="gradient" title="Gradient (D) — drag from start to end"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="url(#gfgrad)"/><defs><linearGradient id="gfgrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="currentColor"/><stop offset="1" stop-color="currentColor" stop-opacity="0.1"/></linearGradient></defs></svg><span>Grad</span></button>
+    <button class="tool-btn" data-tool="shape" title="Shape: rectangle / ellipse / line (U)"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="10" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="4.5" fill="currentColor" opacity=".7"/></svg><span>Shape</span></button>
+    <button class="tool-btn" data-tool="text" title="Text (T) — click to place text"><svg viewBox="0 0 24 24"><path d="M5 4h14v4h-2V6h-4v12h2v2H9v-2h2V6H7v2H5z" fill="currentColor"/></svg><span>Text</span></button>
+    <button class="tool-btn" data-tool="clone" title="Clone stamp (C) — Alt-click source, then paint"><svg viewBox="0 0 24 24"><path d="M9 3h6v4h4v2H5V7h4zM6 10h12l-1 10H7z" fill="currentColor" opacity=".85"/></svg><span>Clone</span></button>
+    <button class="tool-btn" data-tool="pan"    title="Pan view (H or hold Space)"><svg viewBox="0 0 24 24"><path d="M11 4c0-.8.7-1.5 1.5-1.5S14 3.2 14 4v6h.5V5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5v7.6c0 3.5-2.5 6.4-6 6.4-2.4 0-4.3-1.2-5.4-3.2L3.6 11c-.4-.8 0-1.7.8-2 .6-.3 1.4-.1 1.8.5L7.5 12H8V6c0-.8.7-1.5 1.5-1.5S11 5.2 11 6z" fill="currentColor"/></svg><span>Pan</span></button>
+    <div class="rail-spacer"></div>
+    <label class="color-well" title="Brush color">
+      <input type="color" id="brush-color" value="#e8a33d">
+    </label>
+  </nav>
+
+  <!-- ======================= VIEWPORT ======================= -->
+  <main id="viewport-wrap">
+    <div id="tool-options" class="mono">
+      <span class="opt-group" id="opt-brush">
+        <label>SIZE <input type="range" id="brush-size" min="1" max="200" value="16"><b id="brush-size-val">16</b></label>
+        <label>OPACITY <input type="range" id="brush-opacity" min="1" max="100" value="100"><b id="brush-opacity-val">100</b></label>
+        <label>HARDNESS <input type="range" id="brush-hardness" min="0" max="100" value="100"><b id="brush-hardness-val">100</b></label>
+        <label>FLOW <input type="range" id="brush-flow" min="1" max="100" value="100"><b id="brush-flow-val">100</b></label>
+        <label>SPACING <input type="range" id="brush-spacing" min="1" max="100" value="25"><b id="brush-spacing-val">25</b></label>
+        <label>SHAPE <select id="brush-shape">
+          <option value="round" selected>Round</option>
+          <option value="square">Square</option>
+          <option value="line">Line</option>
+        </select></label>
+        <label class="chk"><input type="checkbox" id="brush-pixel"> PIXEL</label>
+      </span>
+      <span class="opt-group" id="opt-fill" hidden>
+        <label>TOLERANCE <input type="range" id="fill-tolerance" min="0" max="128" value="24"><b id="fill-tolerance-val">24</b></label>
+      </span>
+      <span class="opt-group" id="opt-wand" hidden>
+        <label>TOLERANCE <input type="range" id="wand-tolerance" min="0" max="128" value="32"><b id="wand-tolerance-val">32</b></label>
+        <label class="chk"><input type="checkbox" id="wand-contiguous" checked> CONTIGUOUS</label>
+        <label class="chk"><input type="checkbox" id="wand-defringe" checked> DEFRINGE</label>
+        <label class="chk" id="wand-heal-row" hidden><input type="checkbox" id="wand-heal"> HEAL (rebuild background)</label>
+      </span>
+      <span class="opt-group" id="opt-marquee" hidden>
+        <label>SHAPE <select id="marquee-shape">
+          <option value="rect">Rectangle</option>
+          <option value="ellipse">Ellipse</option>
+          <option value="lasso">Lasso</option>
+        </select></label>
+      </span>
+      <span class="opt-group" id="opt-gradient" hidden>
+        <label>TYPE <select id="grad-kind">
+          <option value="linear">Linear</option>
+          <option value="radial">Radial</option>
+        </select></label>
+        <label class="chk"><input type="checkbox" id="grad-toalpha" checked> TO TRANSPARENT</label>
+        <label>END <input type="color" id="grad-color2" value="#1a1d24"></label>
+      </span>
+      <span class="opt-group" id="opt-shape" hidden>
+        <label>KIND <select id="shape-kind">
+          <option value="rect">Rectangle</option>
+          <option value="ellipse">Ellipse</option>
+          <option value="line">Line</option>
+        </select></label>
+        <label class="chk"><input type="checkbox" id="shape-fill" checked> FILL</label>
+        <label class="chk"><input type="checkbox" id="shape-stroke"> STROKE</label>
+        <label>W <input type="range" id="shape-strokew" min="1" max="64" value="4"><b id="shape-strokew-val">4</b></label>
+      </span>
+      <span class="opt-group" id="opt-clone" hidden></span>
+      <span id="tool-hint" class="dim"></span>
+      <span id="sel-count" class="dim"></span>
+      <span id="cursor-pos" class="dim"></span>
+    </div>
+    <div id="viewport" tabindex="0" aria-label="Canvas viewport">
+      <canvas id="view-canvas"></canvas>
+    </div>
+    <div id="empty-state" hidden>
+      <p class="mono">NO DOCUMENT OPEN</p>
+      <button id="empty-new" class="text-btn primary">Create a canvas</button>
+      <button id="empty-lib" class="text-btn">Browse the Library</button>
+      <p class="dim" style="font-size:12px;margin-top:10px">…or drag an image anywhere onto this window. Press <b>?</b> any time for help.</p>
+    </div>
+  </main>
+
+  <!-- ======================= SIDE PANEL ======================= -->
+  <aside id="sidepanel">
+    <div id="panel-tabs" role="tablist">
+      <button class="ptab active" data-panel="layers"  role="tab">Layers</button>
+      <button class="ptab" data-panel="adjust" role="tab">Adjust</button>
+      <button class="ptab" data-panel="retouch" role="tab">Retouch</button>
+      <button class="ptab" data-panel="texture" role="tab">Texture</button>
+      <button class="ptab" data-panel="view3d" role="tab">3D</button>
+    </div>
+
+    <!-- LAYERS -->
+    <section id="panel-layers" class="panel" role="tabpanel">
+      <div class="layer-controls mono">
+        <label>BLEND
+          <select id="layer-blend">
+            <option value="source-over">Normal</option>
+            <option value="multiply">Multiply</option>
+            <option value="screen">Screen</option>
+            <option value="overlay">Overlay</option>
+            <option value="darken">Darken</option>
+            <option value="lighten">Lighten</option>
+            <option value="color-dodge">Color dodge</option>
+            <option value="color-burn">Color burn</option>
+            <option value="hard-light">Hard light</option>
+            <option value="soft-light">Soft light</option>
+            <option value="difference">Difference</option>
+            <option value="exclusion">Exclusion</option>
+            <option value="hue">Hue</option>
+            <option value="saturation">Saturation</option>
+            <option value="color">Color</option>
+            <option value="luminosity">Luminosity</option>
+          </select>
+        </label>
+        <label>OPACITY <input type="range" id="layer-opacity" min="0" max="100" value="100"><b id="layer-opacity-val">100</b></label>
+      </div>
+      <ul id="layer-list" aria-label="Layers"></ul>
+      <div class="panel-actions">
+        <button id="layer-add" class="mini-btn" title="New layer">+ Layer</button>
+        <button id="layer-dup" class="mini-btn" title="Duplicate layer">Duplicate</button>
+        <button id="layer-merge" class="mini-btn" title="Merge down (Ctrl+E)">Merge ↓</button>
+        <button id="layer-up" class="mini-btn" title="Move layer up">▲</button>
+        <button id="layer-down" class="mini-btn" title="Move layer down">▼</button>
+        <button id="layer-del" class="mini-btn danger" title="Delete layer">Delete</button>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">LAYER MASK</h3>
+        <p class="panel-hint">Non-destructive — hide parts without erasing pixels.</p>
+        <div class="grid-btns">
+          <button class="mini-btn" id="mask-add">Add mask</button>
+          <button class="mini-btn" id="mask-from-sel">From selection</button>
+          <button class="mini-btn" id="mask-invert">Invert</button>
+          <button class="mini-btn" id="mask-apply">Apply</button>
+          <button class="mini-btn danger" id="mask-remove">Remove</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="mask-edit"> Edit mask — paint white reveals, erase hides</label>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">ADJUSTMENT LAYER</h3>
+        <p class="panel-hint">Re-editable color/tone applied to the layers below.</p>
+        <div class="row-btns">
+          <select id="adj-kind">
+            <option value="brightnessContrast">Brightness / Contrast</option>
+            <option value="hsl">Hue / Saturation</option>
+            <option value="posterize">Posterize</option>
+            <option value="invert">Invert</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="autoLevels">Auto Levels</option>
+          </select>
+          <button class="mini-btn primary" id="adj-add">+ Add</button>
+        </div>
+        <div id="adj-params" hidden>
+          <p class="panel-hint">Editing the selected adjustment layer:</p>
+          <label class="slider-row" data-p="brightness">Brightness <input type="range" id="adjp-brightness" min="-100" max="100" value="0"><b>0</b></label>
+          <label class="slider-row" data-p="contrast">Contrast <input type="range" id="adjp-contrast" min="-100" max="100" value="0"><b>0</b></label>
+          <label class="slider-row" data-p="h">Hue <input type="range" id="adjp-h" min="-180" max="180" value="0"><b>0</b></label>
+          <label class="slider-row" data-p="s">Saturation <input type="range" id="adjp-s" min="-100" max="100" value="0"><b>0</b></label>
+          <label class="slider-row" data-p="l">Lightness <input type="range" id="adjp-l" min="-100" max="100" value="0"><b>0</b></label>
+          <label class="slider-row" data-p="levels">Levels <input type="range" id="adjp-levels" min="2" max="16" value="4"><b>4</b></label>
+          <label class="chk"><input type="checkbox" id="adj-clip"> Clip to layer below</label>
+        </div>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">TRANSFORM LAYER</h3>
+        <div class="grid-btns">
+          <button class="mini-btn" id="tf-flip-h">Flip H</button>
+          <button class="mini-btn" id="tf-flip-v">Flip V</button>
+          <button class="mini-btn" id="tf-rot-cw">Rotate ⟳</button>
+          <button class="mini-btn" id="tf-rot-ccw">Rotate ⟲</button>
+          <button class="mini-btn" id="tf-scale">Scale…</button>
+          <button class="mini-btn" id="tf-nineslice" title="Set 9-slice insets so the layer can export at any size with crisp corners">9-slice…</button>
+        </div>
+        <p class="panel-hint" id="ns-summary" hidden></p>
+        <h3 class="mono" style="margin-top:10px">TRANSFORM CANVAS</h3>
+        <div class="grid-btns">
+          <button class="mini-btn" id="tfc-flip-h">Flip H</button>
+          <button class="mini-btn" id="tfc-flip-v">Flip V</button>
+          <button class="mini-btn" id="tfc-rot-cw">Rotate ⟳</button>
+          <button class="mini-btn" id="tfc-rot-ccw">Rotate ⟲</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADJUST -->
+    <section id="panel-adjust" class="panel" role="tabpanel" hidden>
+      <p class="panel-hint">Applies to the active layer. Every change is undoable.</p>
+      <div class="adj-block">
+        <h3 class="mono">LIGHT</h3>
+        <label class="slider-row">Brightness <input type="range" id="adj-brightness" min="-100" max="100" value="0"><b>0</b></label>
+        <label class="slider-row">Contrast <input type="range" id="adj-contrast" min="-100" max="100" value="0"><b>0</b></label>
+        <div class="row-btns"><button class="mini-btn" id="adj-light-apply">Apply</button><button class="mini-btn" id="adj-light-reset">Reset</button></div>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">COLOR</h3>
+        <label class="slider-row">Hue <input type="range" id="adj-hue" min="-180" max="180" value="0"><b>0</b></label>
+        <label class="slider-row">Saturation <input type="range" id="adj-sat" min="-100" max="100" value="0"><b>0</b></label>
+        <label class="slider-row">Lightness <input type="range" id="adj-light" min="-100" max="100" value="0"><b>0</b></label>
+        <div class="row-btns"><button class="mini-btn" id="adj-color-apply">Apply</button><button class="mini-btn" id="adj-color-reset">Reset</button></div>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">ONE-CLICK</h3>
+        <div class="grid-btns">
+          <button class="mini-btn" data-quick="grayscale">Grayscale</button>
+          <button class="mini-btn" data-quick="invert">Invert</button>
+          <button class="mini-btn" data-quick="sharpen">Sharpen</button>
+          <button class="mini-btn" data-quick="blur">Blur</button>
+          <button class="mini-btn" data-quick="edge">Edge detect</button>
+          <button class="mini-btn" data-quick="autolevel">Auto levels</button>
+        </div>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">POSTERIZE / PIXELATE</h3>
+        <label class="slider-row">Levels <input type="range" id="adj-poster" min="2" max="32" value="8"><b>8</b></label>
+        <div class="row-btns"><button class="mini-btn" id="adj-poster-apply">Posterize</button></div>
+        <label class="slider-row">Block px <input type="range" id="adj-pixel" min="2" max="64" value="8"><b>8</b></label>
+        <div class="row-btns"><button class="mini-btn" id="adj-pixel-apply">Pixelate</button></div>
+      </div>
+      <div class="adj-block">
+        <h3 class="mono">CURVES</h3>
+        <p class="panel-hint">Drag the line to remap tones. Click to add a point; drag a point off the top/bottom to delete.</p>
+        <div class="curve-head mono">
+          <label>CHANNEL <select id="curve-channel">
+            <option value="rgb">RGB</option><option value="r">Red</option><option value="g">Green</option><option value="b">Blue</option>
+          </select></label>
+          <button class="mini-btn" id="curve-reset">Reset</button>
+        </div>
+        <canvas id="curve-canvas" width="248" height="200" class="curve-canvas"></canvas>
+        <div class="row-btns">
+          <button class="mini-btn" id="curve-apply">Apply once</button>
+          <button class="mini-btn primary" id="curve-adjlayer">+ Adjustment layer</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RETOUCH -->
+    <section id="panel-retouch" class="panel" role="tabpanel" hidden>
+      <p class="panel-hint">High-end tools for editing existing images. Select with the <b>Wand</b> (W), then erase or fill. Operations apply to the active layer.</p>
+
+      <div class="adj-block">
+        <h3 class="mono">INK / OUTLINE</h3>
+        <p class="panel-hint">Bolden lines — detect edges and draw bold outlines (to a new layer) so you can recolor regions cleanly.</p>
+        <label class="mono sel-row">PRESET <select id="ink-preset">
+          <option value="">Custom</option><option value="thin">Thin</option><option value="bold" selected>Bold</option><option value="comic">Comic</option>
+        </select></label>
+        <label class="slider-row">Sensitivity <input type="range" id="ink-sens" min="0" max="100" value="50"><b>50</b></label>
+        <label class="slider-row">Thickness <input type="range" id="ink-thick" min="1" max="8" value="2"><b>2</b></label>
+        <label class="color-row mono">INK <input type="color" id="ink-color" value="#1a1a1a"></label>
+        <label class="chk"><input type="checkbox" id="ink-newlayer" checked> To new layer</label>
+        <div class="row-btns"><button class="mini-btn primary" id="ink-apply">Add outlines</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">CLEAN COLORS</h3>
+        <p class="panel-hint">Remove edge blur &amp; color bleed — sharpen, flatten to N colors, defringe. <b>Split</b> puts each flat color on its own layer.</p>
+        <label class="mono sel-row">PRESET <select id="clean-preset">
+          <option value="">Custom</option><option value="poster">Poster 4</option><option value="flat" selected>Flat 8</option><option value="photo">Photo 16</option>
+        </select></label>
+        <label class="slider-row">Colors <input type="range" id="clean-colors" min="2" max="32" value="8"><b>8</b></label>
+        <label class="slider-row">Sharpen <input type="range" id="clean-sharp" min="0" max="200" value="60"><b>60</b></label>
+        <label class="chk"><input type="checkbox" id="clean-defringe" checked> Defringe edges</label>
+        <label class="chk"><input type="checkbox" id="clean-split"> Split each color to a layer</label>
+        <div class="row-btns"><button class="mini-btn primary" id="clean-apply">Clean colors</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">SELECTION</h3>
+        <div class="grid-btns">
+          <button class="mini-btn" id="sel-all">Select all</button>
+          <button class="mini-btn" id="sel-none">Deselect</button>
+          <button class="mini-btn" id="sel-invert">Invert</button>
+          <button class="mini-btn" id="sel-grow">Grow 2px</button>
+          <button class="mini-btn" id="sel-contract">Shrink 2px</button>
+          <button class="mini-btn" id="sel-feather">Feather 3px</button>
+          <button class="mini-btn" id="sel-copy">Layer via copy</button>
+          <button class="mini-btn" id="sel-cut">Cut to layer</button>
+          <button class="mini-btn" id="sel-lift">Lift &amp; heal</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="sel-cut-bevel"> Bevel the cut layer</label>
+        <p class="panel-hint"><b>Lift &amp; heal</b> = content-aware move: copies the selection to its own layer and reconstructs the hole it leaves behind — then use Move (V) to reposition it.</p>
+        <p class="panel-hint">Selections constrain <b>everything</b> — brush, fill, gradients, shapes and filters. <b>Shift</b>-click adds, <b>Alt</b>-click subtracts, <b>Esc</b> deselects, <b>Ctrl+A</b> all, <b>Ctrl+I</b> invert, <b>Ctrl+J</b> copy to layer, <b>Delete</b> erases.</p>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">MAGIC ERASER</h3>
+        <label class="slider-row">BG tolerance <input type="range" id="bg-tolerance" min="4" max="128" value="32"><b>32</b></label>
+        <label class="chk"><input type="checkbox" id="bg-defringe" checked> Defringe edges</label>
+        <div class="row-btns">
+          <button class="mini-btn primary" id="bg-remove">Remove background</button>
+          <button class="mini-btn" id="sel-erase">Erase selection</button>
+        </div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">CONTENT-AWARE FILL</h3>
+        <p class="panel-hint">Select an object, then fill it in from the surrounding texture (PatchMatch). Large regions are processed at reduced scale to stay responsive.</p>
+        <div class="row-btns"><button class="mini-btn primary" id="caf-apply">Fill selection</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">COLOR REPLACE</h3>
+        <label class="color-row mono">FROM <input type="color" id="cr-from" value="#ff0000">
+          <button class="mini-btn" id="cr-pick" title="Sample a color from the canvas">Pick</button>
+        </label>
+        <label class="slider-row">Tolerance <input type="range" id="cr-tol" min="0" max="160" value="48"><b>48</b></label>
+        <label class="slider-row">Softness <input type="range" id="cr-soft" min="1" max="120" value="32"><b>32</b></label>
+        <label class="mono sel-row">MODE
+          <select id="cr-mode">
+            <option value="hsl">Shift hue / sat / light</option>
+            <option value="to">Replace with target color</option>
+          </select>
+        </label>
+        <div id="cr-hsl">
+          <label class="slider-row">Hue <input type="range" id="cr-h" min="-180" max="180" value="0"><b>0</b></label>
+          <label class="slider-row">Saturation <input type="range" id="cr-s" min="-100" max="100" value="0"><b>0</b></label>
+          <label class="slider-row">Lightness <input type="range" id="cr-l" min="-100" max="100" value="0"><b>0</b></label>
+        </div>
+        <label class="color-row mono" id="cr-to-row" hidden>TO <input type="color" id="cr-to" value="#00a3ff"></label>
+        <div class="row-btns"><button class="mini-btn primary" id="cr-apply">Apply recolor</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">LAYER FX</h3>
+        <p class="panel-hint">Sticker-style effects built from the active layer's silhouette — each lands on its own layer <b>behind</b> the original, so the source stays editable.</p>
+        <label class="color-row mono">COLOR <input type="color" id="fx-color" value="#000000"></label>
+        <label class="slider-row">Size <input type="range" id="fx-size" min="1" max="32" value="4"><b>4</b></label>
+        <label class="slider-row">Bevel angle <input type="range" id="fx-angle" min="0" max="360" value="135"><b>135</b></label>
+        <label class="slider-row">Bevel depth <input type="range" id="fx-depth" min="10" max="200" value="100"><b>100</b></label>
+        <div class="grid-btns">
+          <button class="mini-btn" id="fx-outline">Outline</button>
+          <button class="mini-btn" id="fx-glow">Glow</button>
+          <button class="mini-btn" id="fx-shadow">Drop shadow</button>
+          <button class="mini-btn" id="fx-bevel">Bevel</button>
+          <button class="mini-btn" id="fx-emboss">Emboss</button>
+        </div>
+        <p class="panel-hint">Bevel/Emboss add depth edges <b>onto</b> the layer (using its angle &amp; depth); Outline/Glow/Shadow add a layer behind it.</p>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">SMART UPSCALE</h3>
+        <div class="two-col">
+          <label class="mono sel-row">FACTOR
+            <select id="up-factor"><option value="2">2×</option><option value="4">4×</option></select>
+          </label>
+          <label class="mono sel-row">MODE
+            <select id="up-mode"><option value="pixel">Pixel art (Scale2x)</option><option value="photo">Photo (smooth)</option></select>
+          </label>
+        </div>
+        <div class="row-btns"><button class="mini-btn primary" id="up-apply">Upscale document</button></div>
+      </div>
+    </section>
+
+    <!-- TEXTURE -->
+    <section id="panel-texture" class="panel" role="tabpanel" hidden>
+      <p class="panel-hint">Game-asset generators. Results land on new layers, ready to export.</p>
+
+      <div class="adj-block">
+        <h3 class="mono">✨ MATERIAL WIZARD</h3>
+        <p class="panel-hint">One click runs the whole pipeline on the active layer: seamless tile → albedo → normal → height/AO/roughness → packed ORM, all named so the 3D preview wires up automatically.</p>
+        <label class="chk"><input type="checkbox" id="wiz-tileable" checked> Make it tileable first</label>
+        <div class="row-btns"><button class="mini-btn primary" id="wiz-material">Make game-ready material</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">NORMAL MAP</h3>
+        <label class="slider-row">Strength <input type="range" id="nm-strength" min="1" max="20" value="5"><b>5</b></label>
+        <label class="chk"><input type="checkbox" id="nm-invert-y"> Invert Y (DirectX)</label>
+        <label class="chk"><input type="checkbox" id="nm-wrap" checked> Wrap edges (tileable)</label>
+        <div class="row-btns"><button class="mini-btn primary" id="nm-generate">Generate from layer</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">PBR SET</h3>
+        <p class="panel-hint">Height, ambient occlusion, and roughness estimated from the active layer.</p>
+        <div class="row-btns"><button class="mini-btn primary" id="pbr-generate">Generate height / AO / roughness</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">SEAMLESS TILE</h3>
+        <label class="slider-row">Blend width % <input type="range" id="tile-blend" min="5" max="45" value="20"><b>20</b></label>
+        <div class="row-btns">
+          <button class="mini-btn primary" id="tile-make">Make tileable</button>
+          <button class="mini-btn" id="tile-preview">Preview 3×3</button>
+        </div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">PALETTE</h3>
+        <label class="slider-row">Colors <input type="range" id="pal-count" min="2" max="32" value="8"><b>8</b></label>
+        <div class="row-btns">
+          <button class="mini-btn" id="pal-extract">Extract</button>
+          <button class="mini-btn" id="pal-reduce">Reduce layer to palette</button>
+        </div>
+        <div id="pal-swatches" aria-label="Extracted palette"></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">DITHERING</h3>
+        <label class="mono sel-row">METHOD
+          <select id="dither-method">
+            <option value="fs">Floyd–Steinberg</option>
+            <option value="bayer">Ordered (Bayer 4×4)</option>
+          </select>
+        </label>
+        <label class="mono sel-row">PALETTE
+          <select id="dither-palette">
+            <option value="gameboy">Game Boy (4 greens)</option>
+            <option value="gray4">Grayscale ×4</option>
+            <option value="extracted">Extracted palette</option>
+          </select>
+        </label>
+        <div class="row-btns"><button class="mini-btn primary" id="dither-apply">Apply dithering</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">CHANNELS</h3>
+        <div class="grid-btns">
+          <button class="mini-btn" data-chan="r">View R</button>
+          <button class="mini-btn" data-chan="g">View G</button>
+          <button class="mini-btn" data-chan="b">View B</button>
+          <button class="mini-btn" data-chan="a">View A</button>
+        </div>
+        <p class="panel-hint">Channel packer — pick a source layer per channel (uses each layer's luminance). Standard ORM order: AO→R, Roughness→G, Metallic→B.</p>
+        <div class="mono sel-row pack-row">R <select id="pack-r"></select></div>
+        <div class="mono sel-row pack-row">G <select id="pack-g"></select></div>
+        <div class="mono sel-row pack-row">B <select id="pack-b"></select></div>
+        <div class="row-btns"><button class="mini-btn primary" id="pack-apply">Pack channels → new layer</button></div>
+      </div>
+
+      <div class="adj-block">
+        <h3 class="mono">CANVAS</h3>
+        <div class="grid-btns">
+          <button class="mini-btn" id="canvas-resize">Resize canvas…</button>
+          <button class="mini-btn" id="canvas-flatten">Flatten all layers</button>
+          <button class="mini-btn" id="canvas-trim" title="Crop the document to the visible content">Trim to content</button>
+          <button class="mini-btn" id="canvas-reveal" title="Grow the document to show everything pushed off-canvas">Reveal all</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3D PREVIEW -->
+    <section id="panel-view3d" class="panel" role="tabpanel" hidden>
+      <p class="panel-hint">Live material preview (Three.js, loaded on demand — needs internet once).</p>
+      <div class="mono sel-row">SHAPE
+        <select id="p3d-shape">
+          <option value="sphere">Sphere</option>
+          <option value="cube">Cube</option>
+          <option value="cylinder">Cylinder</option>
+          <option value="cone">Cone</option>
+          <option value="capsule">Capsule</option>
+          <option value="plane">Plane</option>
+          <option value="torus">Torus knot</option>
+        </select>
+      </div>
+      <label class="chk"><input type="checkbox" id="p3d-usenormal" checked> Use layer named “normal” as normal map</label>
+      <label class="chk"><input type="checkbox" id="p3d-userough" checked> Use layer named “roughness” as roughness map</label>
+      <div class="row-btns">
+        <button class="mini-btn primary" id="p3d-start">Start preview</button>
+        <button class="mini-btn" id="p3d-refresh">Refresh maps</button>
+        <button class="mini-btn" id="p3d-clearenv">Clear env</button>
+      </div>
+      <p class="panel-hint">Tip: open the <b>Library</b> → Backgrounds → “Use in 3D” to light the material with a real HDRI.</p>
+      <div id="p3d-container"></div>
+      <p id="p3d-status" class="panel-hint mono"></p>
+
+      <div class="adj-block">
+        <h3 class="mono">3D BUILDER</h3>
+        <p class="panel-hint">Compose primitives into a simple 3D asset — skin them with your canvas, light with an HDRI, then snapshot the render to a layer or export a <b>.glb</b> for any engine.</p>
+        <div class="row-btns">
+          <select id="b3d-kind">
+            <optgroup label="Solid">
+              <option value="box">Box</option><option value="sphere">Sphere</option>
+              <option value="cylinder">Cylinder</option><option value="cone">Cone</option>
+              <option value="torus">Torus</option>
+            </optgroup>
+            <optgroup label="Flat (texture &amp; export)">
+              <option value="plane">Plane</option>
+              <option value="panel">Panel / Card</option>
+              <option value="tile">Tile</option>
+              <option value="hex">Hex tile</option>
+              <option value="curved">Curved panel</option>
+            </optgroup>
+          </select>
+          <button class="mini-btn primary" id="b3d-add">+ Add</button>
+        </div>
+        <div class="mono sel-row">OBJECT <select id="b3d-list"></select> <button class="mini-btn danger" id="b3d-del" title="Delete object">✕</button></div>
+        <label class="slider-row">X <input type="range" id="b3d-x" min="-200" max="200" value="0"><b>0</b></label>
+        <label class="slider-row">Y <input type="range" id="b3d-y" min="-200" max="200" value="0"><b>0</b></label>
+        <label class="slider-row">Z <input type="range" id="b3d-z" min="-200" max="200" value="0"><b>0</b></label>
+        <label class="slider-row">Spin <input type="range" id="b3d-rot" min="0" max="360" value="0"><b>0</b></label>
+        <label class="slider-row">Tilt <input type="range" id="b3d-tilt" min="-90" max="90" value="0"><b>0</b></label>
+        <label class="slider-row">Size <input type="range" id="b3d-scale" min="10" max="300" value="100"><b>100</b></label>
+        <label class="chk"><input type="checkbox" id="b3d-tex" checked> Use canvas as texture</label>
+        <label class="color-row mono">COLOR <input type="color" id="b3d-color" value="#cccccc"></label>
+        <div class="row-btns">
+          <button class="mini-btn primary" id="b3d-snap">Snapshot → layer</button>
+          <button class="mini-btn" id="b3d-glb">Export .glb</button>
+        </div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<!-- Mobile bottom drawer handle -->
+<button id="drawer-toggle" class="mono" aria-label="Toggle panels">PANELS ▴</button>
+
+<!-- ======================= DIALOGS ======================= -->
+<dialog id="dlg-new">
+  <form method="dialog" id="form-new">
+    <h2>New canvas</h2>
+    <label class="mono sel-row">PRESET
+      <select id="new-preset">
+        <optgroup label="Textures (power of two)">
+          <option value="256x256">256 × 256</option>
+          <option value="512x512" selected>512 × 512</option>
+          <option value="1024x1024">1024 × 1024</option>
+          <option value="2048x2048">2048 × 2048</option>
+          <option value="4096x4096">4096 × 4096</option>
+        </optgroup>
+        <optgroup label="Sprites / tiles">
+          <option value="16x16">16 × 16</option>
+          <option value="32x32">32 × 32</option>
+          <option value="64x64">64 × 64</option>
+          <option value="128x128">128 × 128</option>
+        </optgroup>
+        <optgroup label="Screens">
+          <option value="1920x1080">1920 × 1080 (HD)</option>
+          <option value="3840x2160">3840 × 2160 (4K)</option>
+        </optgroup>
+        <optgroup label="Custom">
+          <option value="custom">Custom…</option>
+        </optgroup>
+      </select>
+    </label>
+    <div id="new-custom" class="two-col" hidden>
+      <label class="mono">W <input type="number" id="new-w" min="1" max="8192" value="512"></label>
+      <label class="mono">H <input type="number" id="new-h" min="1" max="8192" value="512"></label>
+    </div>
+    <label class="mono sel-row">BACKGROUND
+      <select id="new-bg">
+        <option value="transparent">Transparent</option>
+        <option value="white">White</option>
+        <option value="black">Black</option>
+      </select>
+    </label>
+    <menu>
+      <button value="cancel" class="text-btn">Cancel</button>
+      <button value="ok" class="text-btn primary" id="new-ok">Create</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-export">
+  <form method="dialog" id="form-export">
+    <h2>Export image</h2>
+    <label class="mono sel-row">FORMAT
+      <select id="exp-format">
+        <option value="image/png">PNG (lossless, alpha)</option>
+        <option value="image/webp">WebP</option>
+        <option value="image/jpeg">JPEG (no alpha)</option>
+      </select>
+    </label>
+    <label class="slider-row">Quality <input type="range" id="exp-quality" min="10" max="100" value="92"><b>92</b></label>
+    <label class="mono sel-row">SCALE
+      <select id="exp-scale">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+    </label>
+    <label class="chk"><input type="checkbox" id="exp-active-only"> Active layer only</label>
+    <label class="chk"><input type="checkbox" id="exp-split-layers"> All layers (one file per visible layer)</label>
+    <label class="chk"><input type="checkbox" id="exp-nineslice"> 9-slice the active layer to a target size</label>
+    <div class="two-col" id="exp-nineslice-size" hidden>
+      <label class="mono">W <input type="number" id="exp-ns-w" min="1" max="8192" value="256"></label>
+      <label class="mono">H <input type="number" id="exp-ns-h" min="1" max="8192" value="256"></label>
+    </div>
+    <menu>
+      <button value="cancel" class="text-btn">Cancel</button>
+      <button value="ok" class="text-btn primary">Download</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-resize">
+  <form method="dialog" id="form-resize">
+    <h2>Resize canvas</h2>
+    <div class="two-col">
+      <label class="mono">W <input type="number" id="rs-w" min="1" max="8192"></label>
+      <label class="mono">H <input type="number" id="rs-h" min="1" max="8192"></label>
+    </div>
+    <label class="chk"><input type="checkbox" id="rs-scale" checked> Scale layer content (off = crop/extend)</label>
+    <menu>
+      <button value="cancel" class="text-btn">Cancel</button>
+      <button value="ok" class="text-btn primary">Resize</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-nineslice">
+  <form method="dialog" id="form-nineslice">
+    <h2>9-slice insets</h2>
+    <p class="panel-hint">Pixels in from each edge. Corners stay 1:1; edges stretch on one axis; the centre stretches both. Set 0 / 0 / 0 / 0 (or click Clear) to disable.</p>
+    <div class="two-col">
+      <label class="mono">TOP <input type="number" id="ns-top" min="0" max="4096" value="8"></label>
+      <label class="mono">RIGHT <input type="number" id="ns-right" min="0" max="4096" value="8"></label>
+    </div>
+    <div class="two-col">
+      <label class="mono">BOTTOM <input type="number" id="ns-bottom" min="0" max="4096" value="8"></label>
+      <label class="mono">LEFT <input type="number" id="ns-left" min="0" max="4096" value="8"></label>
+    </div>
+    <menu>
+      <button value="cancel" class="text-btn">Cancel</button>
+      <button value="clear" class="text-btn" id="ns-clear">Clear</button>
+      <button value="ok" class="text-btn primary">Apply</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-help" class="lib-dialog">
+  <div class="lib-head">
+    <h2 style="margin:0;font-size:16px">Help — tools, shortcuts &amp; recipes</h2>
+    <button id="help-close" class="icon-btn" title="Close" aria-label="Close" style="margin-left:auto">✕</button>
+  </div>
+  <div id="help-body" class="help-body"></div>
+</dialog>
+
+<dialog id="dlg-text">
+  <form method="dialog" id="form-text">
+    <h2>Add text</h2>
+    <textarea id="text-content" rows="3" placeholder="Your text…" style="width:100%;resize:vertical"></textarea>
+    <div class="two-col">
+      <label class="mono sel-row">FONT
+        <select id="text-font">
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Courier New', monospace">Courier</option>
+          <option value="Impact, sans-serif" selected>Impact</option>
+          <option value="'Comic Sans MS', cursive">Comic</option>
+          <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+        </select>
+      </label>
+      <label class="mono">SIZE <input type="number" id="text-size" min="6" max="512" value="48"></label>
+    </div>
+    <div class="two-col">
+      <label class="chk"><input type="checkbox" id="text-bold" checked> Bold</label>
+      <label class="chk"><input type="checkbox" id="text-italic"> Italic</label>
+    </div>
+    <label class="color-row mono">COLOR <input type="color" id="text-color" value="#ffffff"></label>
+    <label class="color-row mono">OUTLINE <input type="color" id="text-outline-color" value="#000000">
+      <span class="mono" style="font-size:11px">W</span> <input type="number" id="text-outline-w" min="0" max="40" value="0" style="width:60px">
+    </label>
+    <menu>
+      <button value="cancel" class="text-btn">Cancel</button>
+      <button value="ok" class="text-btn primary">Add as layer</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="dlg-library" class="lib-dialog">
+  <div class="lib-head">
+    <div class="lib-tabs" role="tablist">
+      <button class="lib-tab active" data-lib="procedural">Procedural</button>
+      <button class="lib-tab" data-lib="shapes">Shapes</button>
+      <button class="lib-tab" data-lib="textures">Textures</button>
+      <button class="lib-tab" data-lib="hdris">Backgrounds</button>
+      <button class="lib-tab" data-lib="models">3D Models</button>
+    </div>
+    <input id="lib-search" class="lib-search mono" type="search" placeholder="Search…">
+    <label class="mono lib-ctl">RES <select id="lib-res"><option>1k</option><option selected>2k</option><option>4k</option><option>8k</option></select></label>
+    <label class="mono lib-ctl">IMPORT <select id="lib-action"></select></label>
+    <button id="lib-close" class="icon-btn" title="Close" aria-label="Close">✕</button>
+  </div>
+  <p id="lib-status" class="panel-hint mono"></p>
+  <div id="lib-grid" class="lib-grid"></div>
+  <p class="lib-credit mono">Online assets: <b>Poly Haven</b> (CC0, no attribution) · icon search: <b>Iconify</b> (MIT/Apache/ISC/CC-BY sets — check a set's license before commercial use). Procedural textures &amp; shapes work fully offline.</p>
+</dialog>
+
+<div id="toast" class="mono" role="status" aria-live="polite"></div>
+<input type="file" id="file-input" accept="image/*,.json" multiple hidden>
+
+<script src="js/util.js"></script>
+<script src="js/history.js"></script>
+<script src="js/layers.js"></script>
+<script src="js/filters.js"></script>
+<script src="js/texture.js"></script>
+<script src="js/select.js"></script>
+<script src="js/retouch.js"></script>
+<script src="js/curves.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/exporter.js"></script>
+<script src="js/preview3d.js"></script>
+<script src="js/library.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<!-- Forge Studio bridge (no-op when this editor is opened standalone) -->
+<script src="../js/forge-bridge.js"></script>
+</body>
+</html>

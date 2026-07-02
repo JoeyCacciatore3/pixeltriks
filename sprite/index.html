@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Forge Studio — Sprite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="viewport"><canvas id="livePrev" width="56" height="56"></canvas></div>
+    <div>
+      <h1>FORGE STUDIO</h1>
+      <span id="projLabel" class="sub">sprite &middot; 32&times;32</span>
+    </div>
+  </div>
+  <nav>
+    <button class="btn" id="btnNew">New</button>
+    <button class="btn" id="btnOpen">Open</button>
+    <button class="btn" id="btnSave">Save</button>
+    <button class="btn" id="btnImport">Import image</button>
+    <div class="menu-wrap">
+      <button class="btn" id="btnExportMenu">Export &#9662;</button>
+      <div class="menu" id="exportMenu">
+        <button class="btn" id="btnExportSheet">Sprite sheet + atlas JSON</button>
+        <button class="btn" id="btnExportFrame">Current frame PNG</button>
+      </div>
+    </div>
+    <button class="btn ember" id="btnAI">AI Bridge</button>
+  </nav>
+</header>
+
+<main>
+  <aside class="tools">
+    <span class="eyebrow">Tools</span>
+    <button class="tool" data-tool="pencil" title="Pencil (B)">&#9999;</button>
+    <button class="tool" data-tool="eraser" title="Eraser (E)">&#9633;</button>
+    <button class="tool" data-tool="fill"   title="Fill (G)">&#9639;</button>
+    <button class="tool" data-tool="line"   title="Line (L)">&#9585;</button>
+    <button class="tool" data-tool="wand"   title="Magic wand &mdash; isolate a region (W). Shift-click selects the color everywhere.">&#10022;</button>
+    <button class="tool" data-tool="move"   title="Move selection or layer (V)">&#10021;</button>
+    <button class="tool" data-tool="picker" title="Eyedropper (I)">&#8857;</button>
+    <button class="tool" data-tool="pan"    title="Pan (H, or hold Space)">&#10018;</button>
+    <hr>
+    <span class="eyebrow">Selection</span>
+    <div class="sel-info" id="selInfo">No selection</div>
+    <button class="btn small" id="btnSelExtract" title="Move the selected region onto its own layer so it can be edited or regenerated independently">Isolate &rarr; layer</button>
+    <button class="btn small" id="btnSelClear">Clear (Esc)</button>
+    <hr>
+    <button class="btn small" id="btnUndo" title="Ctrl+Z">Undo</button>
+    <button class="btn small" id="btnRedo" title="Ctrl+Shift+Z">Redo</button>
+  </aside>
+
+  <section class="stage-wrap">
+    <canvas id="stage"></canvas>
+    <div class="stage-bar">
+      <span id="coords" class="mono">&mdash;</span>
+      <span class="spacer"></span>
+      <label><input type="checkbox" id="chkOnion"> Onion</label>
+      <label><input type="checkbox" id="chkGrid" checked> Grid</label>
+      <button class="btn small" id="btnZoomOut">&minus;</button>
+      <button class="btn small" id="btnZoomFit">Fit</button>
+      <button class="btn small" id="btnZoomIn">+</button>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="panel">
+      <span class="eyebrow">Layers</span>
+      <div class="list" id="layersList"></div>
+      <div class="panel-row">
+        <label class="mono" style="flex:1">OPACITY <input type="range" id="layerOpacity" min="0" max="100" value="100" style="width:100%"></label>
+      </div>
+      <div class="panel-row">
+        <label class="mono" style="flex:1">BLEND <select id="layerBlend" style="width:100%">
+          <option value="source-over">Normal</option>
+          <option value="multiply">Multiply</option>
+          <option value="screen">Screen</option>
+          <option value="overlay">Overlay</option>
+          <option value="darken">Darken</option>
+          <option value="lighten">Lighten</option>
+          <option value="color-dodge">Color dodge</option>
+          <option value="color-burn">Color burn</option>
+          <option value="hard-light">Hard light</option>
+          <option value="soft-light">Soft light</option>
+          <option value="difference">Difference</option>
+          <option value="exclusion">Exclusion</option>
+          <option value="hue">Hue</option>
+          <option value="saturation">Saturation</option>
+          <option value="color">Color</option>
+          <option value="luminosity">Luminosity</option>
+        </select></label>
+      </div>
+      <div class="panel-row">
+        <button class="btn small" id="btnLayerAdd">+ Add</button>
+        <button class="btn small" id="btnLayerUp" title="Raise">&uarr;</button>
+        <button class="btn small" id="btnLayerDown" title="Lower">&darr;</button>
+        <button class="btn small" id="btnLayerDel">Delete</button>
+      </div>
+    </div>
+    <div class="panel">
+      <span class="eyebrow">Palette</span>
+      <div class="swatches" id="paletteGrid"></div>
+      <div class="panel-row">
+        <input type="color" id="colorInput" value="#df7126" title="Pick a new color">
+        <button class="btn small" id="btnColorAdd">Add</button>
+        <button class="btn small" id="btnPalFromSprite" title="Rebuild the palette from the pixels in this project">From sprite</button>
+        <button class="btn small" id="btnRecolor" title="Pick a color to replace, then its replacement &mdash; applies to every frame and layer. Instant variants.">Recolor</button>
+      </div>
+      <div class="hint" id="recolorHint"></div>
+    </div>
+    <div class="panel">
+      <span class="eyebrow">Animation tags</span>
+      <div class="list" id="tagsList"></div>
+      <div class="panel-row">
+        <input type="text" id="tagName" placeholder="walk" maxlength="24">
+        <input type="number" id="tagFrom" min="0" value="0" title="From frame">
+        <input type="number" id="tagTo" min="0" value="0" title="To frame">
+        <button class="btn small" id="btnTagAdd">Tag</button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer class="timeline">
+  <div class="transport">
+    <button class="btn" id="btnPlay">&#9654; Play</button>
+    <select id="playRange" title="What to play"></select>
+    <label class="mono">fps <input type="number" id="fpsInput" min="1" max="60" value="8"></label>
+  </div>
+  <div class="frames" id="framesStrip"></div>
+  <div class="frame-ops">
+    <button class="btn small" id="btnFrameAdd" title="Add empty frame">+</button>
+    <button class="btn small" id="btnFrameDup" title="Duplicate frame">&#10697;</button>
+    <button class="btn small" id="btnFrameDel" title="Delete frame">&times;</button>
+  </div>
+</footer>
+
+<!-- New project -->
+<div class="modal" id="modalNew">
+  <div class="dialog">
+    <h2>New project</h2>
+    <label>Name <input type="text" id="npName" value="sprite" maxlength="40"></label>
+    <div class="panel-row">
+      <label>W <input type="number" id="npW" min="1" max="512" value="32"></label>
+      <label>H <input type="number" id="npH" min="1" max="512" value="32"></label>
+    </div>
+    <div class="panel-row">
+      <button class="btn small" data-preset="16x16">16</button>
+      <button class="btn small" data-preset="32x32">32</button>
+      <button class="btn small" data-preset="48x48">48</button>
+      <button class="btn small" data-preset="64x64">64</button>
+      <button class="btn small" data-preset="96x96">96</button>
+    </div>
+    <div class="panel-row right">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn ember" id="btnCreate">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import image -->
+<div class="modal" id="modalImport">
+  <div class="dialog">
+    <h2>Import image</h2>
+    <p class="hint" id="importInfo"></p>
+    <div class="import-choice">
+      <div>
+        <h3>Single image</h3>
+        <p class="hint">Placed on a new layer at the current frame. Larger images are clipped to the canvas.</p>
+        <button class="btn ember" id="btnImportSingle">Import as layer</button>
+      </div>
+      <div>
+        <h3>Sprite sheet</h3>
+        <p class="hint">Sliced into frames on a new layer. A fresh project adopts the frame size automatically.</p>
+        <div class="panel-row">
+          <label>Frame W <input type="number" id="shW" min="1" value="32"></label>
+          <label>Frame H <input type="number" id="shH" min="1" value="32"></label>
+        </div>
+        <button class="btn ember" id="btnImportSheet">Slice into frames</button>
+      </div>
+    </div>
+    <div class="panel-row right"><button class="btn" data-close>Cancel</button></div>
+  </div>
+</div>
+
+<!-- AI Bridge -->
+<div class="modal" id="modalAI">
+  <div class="dialog wide">
+    <h2>AI Bridge</h2>
+    <p class="hint">Call any image-generation API &mdash; PixelLab, Retro Diffusion, a local ComfyUI &mdash; and import what comes back.
+       Keys live only in this field for this session; nothing is stored. If the browser blocks the request (CORS),
+       run <span class="mono">node tools/proxy.js</span> and prefix the URL with <span class="mono">http://localhost:8787/?url=</span></p>
+    <div class="panel-row">
+      <select id="aiMethod"><option>POST</option><option>GET</option></select>
+      <input type="text" id="aiUrl" class="grow" placeholder="https://api.example.com/v2/generate">
+    </div>
+    <label>Headers (JSON) <textarea id="aiHeaders" rows="2" placeholder='{"Authorization": "Bearer YOUR_KEY"}'></textarea></label>
+    <label>Body <textarea id="aiBody" rows="4" placeholder='{"description": "knight with ember sword", "image_size": {"width": 32, "height": 32}}'></textarea></label>
+    <div class="panel-row">
+      <button class="btn ember" id="btnAiSend">Send request</button>
+      <span class="mono" id="aiStatus"></span>
+    </div>
+    <div class="ai-results" id="aiImages"></div>
+    <pre class="mono resp" id="aiResp"></pre>
+    <div class="panel-row right"><button class="btn" data-close>Close</button></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<input type="file" id="fileOpen" accept=".json,application/json" hidden>
+<input type="file" id="fileImport" accept="image/*" hidden>
+
+<script src="js/core.js"></script>
+<script src="js/app.js"></script>
+<!-- Forge Studio bridge (no-op when this editor is opened standalone) -->
+<script src="../js/forge-bridge.js"></script>
+</body>
+</html>
