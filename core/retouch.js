@@ -348,35 +348,6 @@ GF.retouch = (function () {
     D.doc.activeId = L.id;     // keep the artwork active for further edits
   }
 
-  /* ---------------- material wizard (one-click PBR pipeline) ---------------- */
-
-  /** Chain the texture generators end-to-end on one layer:
-      (seamless) albedo → normal → height/AO/roughness → packed ORM,
-      named so the 3D preview and channel tools pick everything up. */
-  function materialWizard(L, tileable) {
-    if (!L || !L.canvas) { U.toast('Pick a pixel layer (not an adjustment layer)'); return; }
-    GF.history.push(D.doc, 'material wizard');
-    const w = D.doc.width, h = D.doc.height;
-    const base = D.docAligned(L);
-    const albedoCnv = tileable ? GF.texture.makeSeamless(base, 20) : base.canvas;
-    const mk = (name, cnv, hidden) => {
-      const NL = D.addLayer(name);
-      U.ctx2d(NL.canvas).drawImage(cnv, 0, 0);
-      NL.visible = !hidden;
-      return NL;
-    };
-    const albedo = mk(L.name + ' albedo', albedoCnv, false);
-    const srcObj = { canvas: albedoCnv, x: 0, y: 0 };
-    mk(L.name + ' normal', GF.texture.normalMap(srcObj, 5, false, true), true);
-    const set = GF.texture.pbrSet(srcObj);
-    mk(L.name + ' height', set.height, true);
-    const ao = mk(L.name + ' ao', set.ao, true);
-    const rough = mk(L.name + ' roughness', set.roughness, true);
-    mk(L.name + ' ORM', GF.texture.packChannels(ao, rough, null, w, h), true);
-    L.visible = false;             // wizard output replaces the raw source visually
-    D.doc.activeId = albedo.id;
-  }
-
   /* ---------------- ink / outline (bolden lines) ---------------- */
 
   /** Detect edges (Sobel) and paint bold ink lines — to a new "lines" layer
@@ -503,6 +474,6 @@ GF.retouch = (function () {
   }
 
   return { eraseSelection, removeBackground, defringe, colorReplace,
-           contentAwareFill, smartUpscale, applyDocEdit, layerFX, materialWizard,
+           contentAwareFill, smartUpscale, applyDocEdit, layerFX,
            inkOutline, cleanColors, cutToLayer };
 })();

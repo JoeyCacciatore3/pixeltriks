@@ -123,7 +123,6 @@ GF.api = (function () {
   cmd('cleanColors', 'colors?(2-64), sharpen?(0-2), defringe?(bool), splitLayers?(bool)', 'Deblur + quantize to flat colors (kills edge blur/bleed); splitLayers puts each color on its own layer', a => GF.retouch.cleanColors(L(), a),
       { group: 'Retouch', label: 'Clean colors (flatten & sharpen)', needsDoc: true });
   cmd('cutToLayer', 'cut?(bool=true), bevel?(bool)', 'Cut the current selection onto its own layer (optionally beveled)', a => GF.retouch.cutToLayer(L(), a));
-  cmd('materialWizard', 'tileable?(bool)', 'Full PBR pipeline: albedo/normal/AO/rough/ORM layers', a => GF.retouch.materialWizard(L(), a.tileable !== false));
   cmd('smartUpscale', 'factor(2|4), mode?("pixel"|"photo")', 'Upscale the document', a => GF.retouch.smartUpscale(a.factor || 2, a.mode || 'pixel'));
   cmd('filter', 'name("grayscale"|"invert"|"blur"|"sharpen"|"edge"|"autoLevels"), …', 'Apply a one-shot filter (respects selection)', a => GF.filters.applyToLayer(L(), a.name, img => GF.filters[a.name](img)));
   cmd('brightnessContrast', 'brightness(-100..100), contrast(-100..100)', 'Adjust the active layer', a => GF.filters.applyToLayer(L(), 'bc', img => GF.filters.brightnessContrast(img, a.brightness || 0, a.contrast || 0)));
@@ -136,17 +135,10 @@ GF.api = (function () {
       { group: 'Transform', label: 'Trim to content', needsDoc: true });
   cmd('generate', 'kind(clouds|wood|marble|bricks|checker|gradient|stone|metal|grass|rust), asLayer?', 'Procedural texture', a => GF.library.generateProcedural(a.kind, D.doc.open ? D.doc.width : 512, D.doc.open ? D.doc.height : 512, !!a.asLayer));
 
-  /* --- brush / 9-slice / export (cross-mode handoff surface) --- */
+  /* --- brush / export --- */
   cmd('setBrushShape', 'shape("round"|"square"|"line"), pixel?(bool)',
     'Switch the brush head shape (and optional pixel snapping)',
     a => { const v = GF.view.view; if (a.shape) v.brush.shape = a.shape; if (a.pixel !== undefined) v.brush.pixel = !!a.pixel; });
-  cmd('setNineSlice', 'top, right, bottom, left',
-    'Set 9-slice insets on the active layer (pixels). Lets exporters scale it to any size with crisp corners.',
-    a => { const l = L(); l.nineSlice = { top: a.top | 0, right: a.right | 0, bottom: a.bottom | 0, left: a.left | 0 }; });
-  cmd('clearNineSlice', '', 'Remove 9-slice insets from the active layer', () => { L().nineSlice = null; });
-  cmd('export9Slice', 'w, h, type?("image/png"|"image/webp"|"image/jpeg"), quality?(0-1)',
-    'Render the active layer at (w, h) using its 9-slice insets and download it',
-    a => GF.exporter.exportImage({ type: a.type || 'image/png', quality: a.quality ?? 0.92, scale: 1, nineSliceTarget: { w: a.w, h: a.h } }));
   cmd('exportLayers', 'type?("image/png"|"image/webp"|"image/jpeg"), scale?, quality?(0-1)',
     'Export every visible layer as a separate file (Pixelorama-style split export)',
     a => GF.exporter.exportImage({ splitLayers: true, type: a.type || 'image/png', scale: a.scale || 1, quality: a.quality ?? 0.92 }),

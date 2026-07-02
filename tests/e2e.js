@@ -155,9 +155,7 @@
     if (GF.texture) {
       await t('pro: Normal map adds layer', () => { freshDoc(); const n = layerCount(); proBtn('Normal map').click(); if (layerCount() !== n + 1) throw new Error('no layer'); });
       await t('pro: Seamless tile', () => { freshDoc(); proBtn('Seamless tile').click(); });
-      await t('pro: PBR material adds layers', () => { freshDoc(); const n = layerCount(); proBtn('PBR material').click(); if (layerCount() <= n + 2) throw new Error('only ' + (layerCount() - n)); });
-      await t('pro: Retro dither', () => { freshDoc(); proBtn('Retro dither').click(); });
-    } else log('pro: PBR tools present', false, 'GF.texture not loaded');
+    } else log('pro: texture tools present', false, 'GF.texture not loaded');
 
     /* ---------- UNDO / REDO ---------- */
     await t('undo/redo via top buttons + disabled state', () => {

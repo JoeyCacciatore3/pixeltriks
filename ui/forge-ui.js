@@ -307,12 +307,10 @@ window.GF = window.GF || {};
       ['Ink outline', () => run('inkOutline', {})],
       ['Clean colors', () => run('cleanColors', {})],
     ];
-    // In-app PBR / texture tools (only when the texture engine is loaded)
+    // texture helpers (image work + texturing 3D models)
     if (GF.texture) tools.push(
       ['Normal map', makeNormalMap],
       ['Seamless tile', makeSeamless],
-      ['PBR material', () => run('materialWizard', { tileable: true })],
-      ['Retro dither', retroDither],
     );
     grid.innerHTML = '';
     tools.forEach(([label, fn]) => {
@@ -335,11 +333,6 @@ window.GF = window.GF || {};
     GF.history.push(D.doc, 'seamless');
     const c = U.makeCanvas(D.doc.width, D.doc.height); U.ctx2d(c).drawImage(s, 0, 0);
     L.canvas = c; L.x = 0; L.y = 0; refreshLayers(); GF.view.requestRender(); U.toast('Seamless tile');
-  }
-  function retroDither() {
-    const L = D.active();
-    GF.filters.applyToLayer(L, 'dither', img => GF.texture.ditherFS(img, GF.texture.extractPalette(L, 8)));
-    GF.view.requestRender(); refreshLayers(); U.toast('Retro dither');
   }
 
   /* =================================================================
@@ -926,7 +919,7 @@ window.GF = window.GF || {};
     ADJ_LAYER_TYPES.forEach(t => cmds.push({ group: 'Adjustment', label: 'Add ' + t.label + ' layer', run: () => addAdjustmentLayer(t.kind) }));
     FILTERS.forEach(f => cmds.push({ group: 'Filters', label: 'Filter: ' + f.name, run: () => guarded(() => { GF.filters.applyToLayer(D.active(), f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name); }) }));
     if (GF.texture) {
-      const map = { 'Normal map': makeNormalMap, 'Seamless tile': makeSeamless, 'PBR material': () => run('materialWizard', { tileable: true }), 'Retro dither': retroDither };
+      const map = { 'Normal map': makeNormalMap, 'Seamless tile': makeSeamless };
       Object.keys(map).forEach(l => cmds.push({ group: 'Texture', label: l, run: () => guarded(map[l]) }));
     }
     return cmds;

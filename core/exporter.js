@@ -13,18 +13,6 @@ GF.exporter = (function () {
     // the list of blobs so callers/tests can introspect.
     if (opts.splitLayers) return exportLayersSeparate(opts);
 
-    // 9-slice export: when active layer has insets and a target size is set,
-    // render the layer scaled by 9-slice rules instead of the document.
-    const A = D.active();
-    if (opts.nineSliceTarget && A && A.nineSlice) {
-      const target = D.renderNineSliced(A, opts.nineSliceTarget.w, opts.nineSliceTarget.h);
-      const ext9 = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }[opts.type] || 'png';
-      const blob9 = await U.canvasToBlob(target, opts.type, opts.quality);
-      U.downloadBlob(blob9, (D.doc.name || 'texture') + '-' + (A.name || 'layer') + '-' + target.width + 'x' + target.height + '.' + ext9);
-      U.toast('Exported ' + target.width + '×' + target.height + ' 9-slice ' + ext9.toUpperCase());
-      return blob9;
-    }
-
     const src = opts.activeOnly
       ? (() => {
           const L = D.active();
