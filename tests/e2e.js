@@ -191,15 +191,6 @@
     /* ---------- ZOOM ---------- */
     await t('zoom in/out + label', () => { freshDoc(); const z0 = GF.view.view.zoom; $('#btn-zoom-in').click(); if (GF.view.view.zoom <= z0) throw new Error('no zoom'); $('#zoom-label').click(); /* fit */ if (!/%$/.test($('#zoom-label').textContent)) throw new Error('label'); });
 
-    /* ---------- MODES ---------- */
-    await t('mode overlay opens with iframe + back closes', () => {
-      $('[data-mode-open=sprite]').click();
-      const ov = $('#mode-overlay');
-      if (ov.hidden || !ov.querySelector('iframe')) throw new Error('overlay not open');
-      $('#mode-back').click();
-      if (!ov.hidden) throw new Error('overlay not closed');
-    });
-
     /* ---------- AI adapter ---------- */
     await t('AI config/setConfig/hasKey + key masking', () => {
       GF.ai.setConfig({ provider: 'fal', key: 'secret12345' });

@@ -210,11 +210,6 @@
         <ul id="history-list" class="history-list"></ul>
         <h3 class="panel-h">Pro tools</h3>
         <div class="pro-grid" id="pro-grid"><!-- injected --></div>
-        <h3 class="panel-h">Modes</h3>
-        <div class="pro-grid">
-          <button class="pro-btn" data-mode-open="sprite">👾 Sprite / Pixel</button>
-          <button class="pro-btn" data-mode-open="texture">🧱 Game / PBR</button>
-        </div>
       </div>
     </div>
   </aside>
@@ -226,11 +221,8 @@
   <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>Adjust</span>
 </button>
 
-<!-- in-app mode overlay (Sprite / Game-PBR open here instead of a new tab) -->
-<div id="mode-overlay" hidden></div>
-
 <!-- hidden file input -->
-<input type="file" id="file-input" accept="image/*,.json,.gameforge.json,.forge.json,.glb,.gltf,.hdr,.bin" multiple hidden>
+<input type="file" id="file-input" accept="image/*,.json,.forge.json,.glb,.gltf,.hdr,.bin" multiple hidden>
 
 <!-- toast (engine's GF.util.toast targets #toast) -->
 <div id="toast" role="status" aria-live="polite"></div>

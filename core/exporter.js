@@ -94,7 +94,7 @@ GF.exporter = (function () {
   function saveProject() {
     const json = JSON.stringify(D.serialize());
     const blob = new Blob([json], { type: 'application/json' });
-    U.downloadBlob(blob, (D.doc.name || 'untitled') + '.gameforge.json');
+    U.downloadBlob(blob, (D.doc.name || 'untitled') + '.forge.json');
     U.toast('Project saved');
   }
 

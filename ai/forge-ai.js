@@ -13,7 +13,7 @@
 
    CORS: pages opened from file:// (or a different origin than the API) may be
    blocked by the browser. Set a `proxy` prefix (e.g. the bundled
-   sprite/tools/proxy.js at http://localhost:8787/?url=) to forward the request.
+   tools/cors-proxy.js at http://localhost:8787/?url=) to forward the request.
    ============================================================ */
 'use strict';
 window.GF = window.GF || {};
@@ -184,7 +184,7 @@ GF.ai = (function () {
     } catch (e) {
       // CORS / network failures from file:// are common — guide the user
       if (e instanceof TypeError && /fetch|network/i.test(e.message || '')) {
-        throw new Error('Request blocked (CORS/offline). Run sprite/tools/proxy.js and set the proxy prefix in ✦ AI.');
+        throw new Error('Request blocked (CORS/offline). Run tools/cors-proxy.js and set the proxy prefix in ✦ AI.');
       }
       throw e;
     }

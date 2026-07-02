@@ -345,13 +345,6 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .size-card.on { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent-2); }
 .size-card small { display: block; color: var(--ink-3); font-weight: 400; }
 
-/* in-app mode overlay (Sprite / Game-PBR) */
-#mode-overlay { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column;
-  background: var(--bg); animation: fade .2s ease; }
-#mode-overlay .mode-bar { flex: 0 0 auto; height: var(--bar-h); display: flex; align-items: center;
-  gap: .6rem; padding: 0 .8rem; background: var(--bg-2); border-bottom: 1px solid var(--line); }
-#mode-overlay .mode-title { font-weight: 700; color: var(--ink-2); }
-#mode-overlay iframe { flex: 1 1 auto; width: 100%; border: 0; background: var(--bg); }
 
 /* ---------------------- accessibility ---------------------- */
 :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }

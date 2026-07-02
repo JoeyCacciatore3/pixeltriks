@@ -1,8 +1,8 @@
 'use strict';
-/* PixelForge CORS proxy — forwards AI Bridge requests that browsers block.
+/* PixelTriks CORS proxy — forwards AI Bridge requests that browsers block.
    Node stdlib only, no dependencies.
 
-   Run:   node tools/proxy.js  [port]      (default 8787)
+   Run:   node tools/cors-proxy.js  [port]      (default 8787)
    Use:   prefix the AI Bridge URL with  http://localhost:8787/?url=
           e.g.  http://localhost:8787/?url=https://api.pixellab.ai/v2/generate-image-pixflux
 

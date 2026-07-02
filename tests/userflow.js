@@ -170,7 +170,6 @@
 
     /* --- dialogs / modes / export --- */
     await step('image size resize', () => { $('#btn-menu').click(); $('.fs-modal [data-a=size]').click(); const m = $('.fs-modal'); m.querySelector('#is-lock').click(); m.querySelector('#is-w').value = 480; Array.prototype.find.call(m.querySelectorAll('.text-btn'), b => /Resize/.test(b.textContent)).click(); });
-    await step('open Sprite mode overlay + back', () => { $('[data-mode-open=sprite]').click(); if (!$('#mode-overlay iframe')) throw new Error('mode overlay no iframe'); $('#mode-back').click(); });
     await step('export PNG', async () => { const b = await GF.exporter.exportImage({ type: 'image/png', scale: 1, quality: .9 }); if (!b || !b.size) throw new Error('no blob'); });
     await step('theme toggle x2', () => { $('#btn-theme').click(); $('#btn-theme').click(); });
     await step('cheat sheet open/close', () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })); const m = $('.fs-modal .cheat'); if (!m) throw new Error('no cheat sheet'); document.querySelector('.fs-modal .text-btn').click(); });

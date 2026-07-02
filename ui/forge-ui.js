@@ -575,7 +575,6 @@ window.GF = window.GF || {};
     $('.ptab').classList.add('on'); // default Adjust
     $('#adj-reset').addEventListener('click', resetAdjust);
     $('#adj-apply').addEventListener('click', applyAdjust);
-    $$('[data-mode-open]').forEach(b => b.addEventListener('click', () => openMode(b.dataset.modeOpen)));
   }
 
   function wireHero() {
@@ -868,20 +867,6 @@ window.GF = window.GF || {};
     });
   }
 
-  function openMode(mode) {
-    const url = mode === 'sprite' ? 'sprite/index.html' : 'texture/index.html';
-    const title = mode === 'sprite' ? '👾 Sprite / Pixel' : '🧱 Game / PBR';
-    const ov = $('#mode-overlay');
-    ov.innerHTML =
-      `<div class="mode-bar">
-         <button class="text-btn ghost" id="mode-back">← Back to Image</button>
-         <span class="mode-title">${title}</span>
-       </div>
-       <iframe src="${url}" title="${title}" allow="clipboard-write"></iframe>`;
-    ov.hidden = false;
-    $('#mode-back').addEventListener('click', () => { ov.hidden = true; ov.innerHTML = ''; });
-  }
-
   /* =================================================================
      Helpers
      ================================================================= */
@@ -962,8 +947,9 @@ window.GF = window.GF || {};
       { group: 'View', label: 'Fit to screen', run: () => GF.view.zoomFit() },
       { group: 'View', label: 'Toggle light / dark theme', run: toggleTheme },
       { group: 'Help', label: 'Keyboard shortcuts', hint: '?', run: openCheatSheet },
-      { group: 'Modes', label: 'Sprite / Pixel mode', run: () => openMode('sprite') },
-      { group: 'Modes', label: 'Game / PBR mode', run: () => openMode('texture') },
+      { group: '3D', label: 'Open 3D workspace', run: () => setTool('scene3d') },
+      { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) { GF.scene3d.snapshotToLayer(); setTool('move'); } else U.toast('Add a 3D object first'); } },
+      { group: '3D', label: 'Export GLB (3D scene)', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') },
     ];
     ADJ_LAYER_TYPES.forEach(t => cmds.push({ group: 'Adjustment', label: 'Add ' + t.label + ' layer', run: () => addAdjustmentLayer(t.kind) }));
     FILTERS.forEach(f => cmds.push({ group: 'Filters', label: 'Filter: ' + f.name, run: () => guarded(() => { GF.filters.applyToLayer(D.active(), f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name); }) }));
