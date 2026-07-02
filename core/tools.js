@@ -16,11 +16,10 @@ GF.view = (function () {
     // crisp pixel-art output; orthogonal to shape (a round brush can still be pixel).
     brush: { size: 16, opacity: 1, color: '#e8a33d', pixel: false, shape: 'round', hardness: 100, flow: 100, spacing: 25 },
     fillTolerance: 24,
-    wand: { tolerance: 32, contiguous: true, defringe: true, heal: false },
+    wand: { tolerance: 32, contiguous: true, defringe: true, heal: false, antialias: true },
     marquee: { shape: 'rect' },                       // rect | ellipse | lasso
     gradient: { kind: 'linear', color2: '#1a1d24', toAlpha: true },
     shape: { kind: 'rect', fill: true, stroke: false, strokeW: 4 },
-    cloneSource: null,                                // doc-space {x,y}
     spacePan: false
   };
 
@@ -213,18 +212,6 @@ GF.view = (function () {
       ctx.restore();
     }
 
-    // clone-stamp source crosshair
-    if (view.tool === 'clone' && view.cloneSource) {
-      const s = view.cloneSource, r = 6 / view.zoom;
-      ctx.save();
-      ctx.strokeStyle = '#7fd0ff'; ctx.lineWidth = 1.5 / view.zoom;
-      ctx.beginPath();
-      ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y);
-      ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x, s.y + r);
-      ctx.stroke();
-      ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.8, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-    }
   }
 
   /** Render the current gradient drag to a doc-sized canvas (selection-clipped). */
@@ -399,16 +386,6 @@ GF.view = (function () {
       gradDrag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
     } else if (tool === 'shape') {
       shapeDrag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, square: e.shiftKey };
-    } else if (tool === 'clone') {
-      if (e.altKey || e.ctrlKey) {
-        view.cloneSource = { x: p.x, y: p.y };
-        U.toast('Clone source set — now paint to stamp from it');
-        requestRender();
-      } else if (!view.cloneSource) {
-        U.toast('Alt-click (or Ctrl-click) to set the clone source first');
-      } else {
-        if (beginStroke('clone', p)) stampTo(p);
-      }
     } else if (tool === 'text') {
       GF.ui.openTextDialog(p);
     }
@@ -548,8 +525,8 @@ GF.view = (function () {
     requestRender();
   }
 
-  /* ---------------- brush / eraser / clone ---------------- */
-  function beginStroke(mode, startPt) {
+  /* ---------------- brush / eraser ---------------- */
+  function beginStroke(mode) {
     const L = D.active();
     if (!L) return false;
     const maskMode = D.doc.maskEdit && L.mask;
@@ -561,12 +538,6 @@ GF.view = (function () {
       canvas: U.makeCanvas(D.doc.width, D.doc.height)
     };
     stroke.ctx = U.ctx2d(stroke.canvas);
-    if (mode === 'clone') {
-      // snapshot the layer in doc space so cloning never feeds on itself,
-      // and lock the source offset for the whole stroke
-      stroke.src = D.docAligned(L).canvas;
-      stroke.offset = { x: startPt.x - view.cloneSource.x, y: startPt.y - view.cloneSource.y };
-    }
     lastDocPt = null;
     return true;
   }
@@ -606,25 +577,6 @@ GF.view = (function () {
   function stampTo(p) {
     const s = stroke.ctx;
     const size = view.brush.size;
-    if (stroke.mode === 'clone') {
-      // stamp circles of the snapshot, shifted by the stroke's locked offset
-      const from = lastDocPt || p;
-      const steps = Math.max(1, Math.ceil(Math.hypot(p.x - from.x, p.y - from.y) / Math.max(1, size / 4)));
-      for (let i = 0; i <= steps; i++) {
-        const x = from.x + (p.x - from.x) * (i / steps);
-        const y = from.y + (p.y - from.y) * (i / steps);
-        s.save();
-        s.beginPath();
-        s.arc(x, y, size / 2, 0, Math.PI * 2);
-        s.clip();
-        s.drawImage(stroke.src, stroke.offset.x, stroke.offset.y);
-        s.restore();
-      }
-      lastDocPt = p;
-      maskStroke();
-      requestRender();
-      return;
-    }
     const shape = view.brush.shape || 'round';
     s.strokeStyle = stroke.mode === 'eraser' ? '#000' : view.brush.color;
     s.fillStyle = s.strokeStyle;

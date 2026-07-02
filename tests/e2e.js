@@ -478,10 +478,11 @@
     });
 
     /* ---------- PRO SELECTIONS + GUIDES ---------- */
-    await t('wand optbar: mode/sample/AA/guide', () => {
+    await t('wand optbar: mode/sample/guide (AA always on)', () => {
       freshDoc(); clickTool('wand');
-      ['#sel-mode', '#wand-sample', '#wand-aa'].forEach(s => { if (!$(s)) throw new Error('missing ' + s); });
+      ['#sel-mode', '#wand-sample'].forEach(s => { if (!$(s)) throw new Error('missing ' + s); });
       if (!$('.guide-btn')) throw new Error('no guide button');
+      if (!GF.view.view.wand.antialias) throw new Error('anti-alias should default on');
     });
     await t('wand intersect mode (no throw)', () => {
       freshDoc(); GF.api.run('selectRect', { x: 0, y: 0, w: 120, h: 120 });

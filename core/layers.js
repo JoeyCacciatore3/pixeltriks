@@ -57,43 +57,6 @@ GF.doc = (function () {
     curves: 'Curves', levels: 'Levels',
   };
 
-  /** Render a layer with 9-slice scaling to a target (w, h) canvas.
-      Insets clamp to the source dimensions so degenerate values still
-      render something sensible instead of throwing. */
-  function renderNineSliced(L, targetW, targetH) {
-    const s = L.canvas;
-    const sw = s.width, sh = s.height;
-    const ns = L.nineSlice || { top: 0, right: 0, bottom: 0, left: 0 };
-    const t = Math.max(0, Math.min(ns.top    | 0, Math.floor(sh / 2)));
-    const b = Math.max(0, Math.min(ns.bottom | 0, Math.floor(sh / 2)));
-    const l = Math.max(0, Math.min(ns.left   | 0, Math.floor(sw / 2)));
-    const r = Math.max(0, Math.min(ns.right  | 0, Math.floor(sw / 2)));
-
-    const out = U.makeCanvas(Math.max(1, targetW | 0), Math.max(1, targetH | 0));
-    const x = U.ctx2d(out);
-    x.imageSmoothingEnabled = false; // crisp stretches; flip on per-cell below if needed
-
-    const sCenterW = Math.max(0, sw - l - r);
-    const sCenterH = Math.max(0, sh - t - b);
-    const dCenterW = Math.max(0, out.width  - l - r);
-    const dCenterH = Math.max(0, out.height - t - b);
-
-    // 9 cells: tl, t, tr, l, c, r, bl, b, br
-    // corners — copy 1:1
-    if (l && t) x.drawImage(s, 0,        0,        l, t, 0,              0,              l, t);
-    if (r && t) x.drawImage(s, sw - r,   0,        r, t, out.width - r,  0,              r, t);
-    if (l && b) x.drawImage(s, 0,        sh - b,   l, b, 0,              out.height - b, l, b);
-    if (r && b) x.drawImage(s, sw - r,   sh - b,   r, b, out.width - r,  out.height - b, r, b);
-    // edges — stretch the one open axis
-    if (sCenterW && t)        x.drawImage(s, l,      0,      sCenterW, t,        l,              0,              dCenterW, t);
-    if (sCenterW && b)        x.drawImage(s, l,      sh - b, sCenterW, b,        l,              out.height - b, dCenterW, b);
-    if (sCenterH && l)        x.drawImage(s, 0,      t,      l,        sCenterH, 0,              t,              l,        dCenterH);
-    if (sCenterH && r)        x.drawImage(s, sw - r, t,      r,        sCenterH, out.width - r,  t,              r,        dCenterH);
-    // center — stretch both axes
-    if (sCenterW && sCenterH) x.drawImage(s, l,      t,      sCenterW, sCenterH, l,              t,              dCenterW, dCenterH);
-    return out;
-  }
-
   function newDocument(w, h, bg, name) {
     doc.width = w; doc.height = h;
     doc.layers = [];
@@ -537,7 +500,7 @@ GF.doc = (function () {
            deleteActive, moveActive, mergeDown, flatten, composite, resize,
            bakeOffset, docAligned, flipLayer, rotateLayer90, scaleLayer,
            flipCanvas, rotateCanvas90, trimToContent, revealAll,
-           renderNineSliced, serialize, deserialize,
+           serialize, deserialize,
            addMask, removeMask, invertMask, applyMask, maskedLayerCanvas,
            addAdjustment, setAdjust, paintTarget, previewedCanvas, setPreview, clearPreview };
 })();

@@ -354,7 +354,6 @@ window.GF = window.GF || {};
   function wireTopbar() {
     $('#btn-open').addEventListener('click', pickFile);
     $('#empty-open').addEventListener('click', () => { pendingIntent = null; pickFile(); });
-    $('#btn-new').addEventListener('click', openNewDialog);
     $('#empty-new').addEventListener('click', openNewDialog);
     wireIntents();
     $('#btn-undo').addEventListener('click', () => run('undo'));
@@ -434,8 +433,7 @@ window.GF = window.GF || {};
       html = selModeSeg()
            + optSlider('Tolerance', 'wand-tol', 0, 128, V().wand.tolerance)
            + `<label class="opt"><input type="checkbox" id="wand-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`
-           + seg('wand-sample', [['all','All layers'],['layer','Layer']], V().wand.sample || 'all')
-           + `<label class="opt"><input type="checkbox" id="wand-aa" ${V().wand.antialias ? 'checked' : ''}> Anti-alias</label>`;
+           + seg('wand-sample', [['all','All layers'],['layer','Layer']], V().wand.sample || 'all');
     } else if (name === 'select') {
       html = selModeSeg()
            + seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
@@ -491,7 +489,6 @@ window.GF = window.GF || {};
     segWire('shp-kind',  v => V().shape.kind = v);
     segWire('sel-mode', v => V().selMode = v);
     segWire('wand-sample', v => { V().wand.sample = v; reWand(); });
-    chk('wand-aa', v => { V().wand.antialias = v; reWand(); });
     const gb = $('.guide-btn'); if (gb) gb.addEventListener('click', () => openToolGuide(gb.dataset.guide));
     const fea = $('#sel-feather'); if (fea) fea.addEventListener('click', () => GF.select.has() ? run('featherSelection', { px: 4 }) : U.toast('Make a selection first'));
     const grw = $('#sel-grow'); if (grw) grw.addEventListener('click', () => GF.select.has() ? run('growSelection', { px: 4 }) : U.toast('Make a selection first'));
@@ -702,22 +699,41 @@ window.GF = window.GF || {};
     });
   }
 
+  /* One export hub, grouped by destination — replaces the old form + a pile
+     of extra footer buttons. */
   function openExportDialog() {
-    if (!D.doc.open) return U.toast('Nothing to export yet');
+    const has3d = GF.scene3d && GF.scene3d.count();
+    if (!D.doc.open && !has3d) return U.toast('Nothing to export yet');
     modal({
       title: 'Export',
-      body: `<div class="row"><label>Format<select id="m-fmt"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label>
-             <label>Scale<select id="m-scale"><option value="1">1× (${D.doc.width}×${D.doc.height})</option><option value="2">2×</option><option value="0.5">0.5×</option></select></label></div>`,
-      ok: 'Download',
-      extra: [['Save project', () => { GF.exporter.saveProject(); closeModal(); }],
-              ['Export layers', () => { run('exportLayers', {}); closeModal(); }],
-              ...(GF.scene3d && GF.scene3d.count() ? [
-                ['GLB (3D scene)', () => { GF.scene3d.exportGLB({}); closeModal(); }],
-                ['Web page (3D)', () => { closeModal(); GF.scene3dUI.publishDialog(); }],
-              ] : [])],
+      body: (D.doc.open ? `
+        <h4 class="m-sec">Image</h4>
+        <div class="row"><label>Format<select id="m-fmt"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label>
+        <label>Scale<select id="m-scale"><option value="1">1× (${D.doc.width}×${D.doc.height})</option><option value="2">2×</option><option value="0.5">0.5×</option></select></label></div>` : '')
+      + (has3d ? `
+        <h4 class="m-sec">3D scene</h4>
+        <div class="row m-actions">
+          <button class="text-btn ghost" data-x="glb">GLB model</button>
+          <button class="text-btn ghost" data-x="page">Interactive web page…</button>
+        </div>` : '')
+      + `
+        <h4 class="m-sec">Project</h4>
+        <div class="row m-actions">
+          <button class="text-btn ghost" data-x="save">Save project file</button>
+          ${D.doc.open ? '<button class="text-btn ghost" data-x="layers">Layers as files</button>' : ''}
+        </div>`,
+      ok: D.doc.open ? 'Download image' : 'Close',
+      noCancel: !D.doc.open,
+      mount: m => m.querySelectorAll('[data-x]').forEach(b => b.addEventListener('click', () => {
+        closeModal();
+        ({ glb: () => GF.scene3d.exportGLB({}),
+           page: () => GF.scene3dUI.publishDialog(),
+           save: () => GF.exporter.saveProject(),
+           layers: () => run('exportLayers', {}) })[b.dataset.x]();
+      })),
       onOk: m => {
-        const type = m.querySelector('#m-fmt').value, scale = +m.querySelector('#m-scale').value;
-        GF.exporter.exportImage({ type, scale, quality: 0.92 });
+        if (!D.doc.open) return;
+        GF.exporter.exportImage({ type: m.querySelector('#m-fmt').value, scale: +m.querySelector('#m-scale').value, quality: 0.92 });
       }
     });
   }
@@ -1496,8 +1512,7 @@ window.GF = window.GF || {};
         <h4>Options</h4><ul>
           <li><b>Tolerance</b> — how close in colour a pixel must be to get selected. Low = picky, high = grabs more.</li>
           <li><b>Contiguous</b> — on: only the connected blob you clicked. Off: every matching pixel in the image.</li>
-          <li><b>Sample</b> — <b>All layers</b> reads the blended image; <b>Layer</b> reads only the active layer's own pixels.</li>
-          <li><b>Anti-alias</b> — softens the selection edge by 1px for clean composites.</li>
+          <li><b>Sample</b> — <b>All layers</b> reads the blended image; <b>Layer</b> reads only the active layer's own pixels. Edges are always anti-aliased for clean composites.</li>
           <li><b>Mode</b> — New / Add / Subtract / Intersect. Hold <span class="kbd">⇧</span> to add, <span class="kbd">⌥</span> to subtract, <span class="kbd">⇧⌥</span> to intersect — without changing the button.</li>
         </ul>
         <h4>What to do next</h4>

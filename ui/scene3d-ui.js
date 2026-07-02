@@ -54,7 +54,7 @@ GF.scene3dUI = (function () {
     return `<span class="seg" id="s3-interact">${seg}</span>`
       + `<span class="opt s3-hint">Click an object to select it</span>`
       + `<button class="text-btn primary" id="s3-flatten-ob">⬇ Flatten to layer</button>`
-      + `<button class="text-btn ghost" id="s3-export-ob">Export GLB</button>`;
+      + `<button class="text-btn ghost" id="s3-publish-ob">🌐 Publish…</button>`;
   }
   function wireOptbar() {
     const seg = $('#s3-interact');
@@ -64,7 +64,7 @@ GF.scene3dUI = (function () {
       S().setInteract(b.dataset.v);
     }));
     const fl = $('#s3-flatten-ob'); if (fl) fl.addEventListener('click', flattenAndReturn);
-    const ex = $('#s3-export-ob'); if (ex) ex.addEventListener('click', () => S().exportGLB({}));
+    const pb = $('#s3-publish-ob'); if (pb) pb.addEventListener('click', publishDialog);
   }
   function flattenAndReturn() {
     const id = S().snapshotToLayer();
@@ -84,9 +84,9 @@ GF.scene3dUI = (function () {
       <div class="s3-row"><button class="text-btn primary" id="m3-run">✨ Create 3D</button></div>
 
       <h3 class="panel-h">Objects</h3>
-      ${PRIM_GROUPS.map(([label, prims]) =>
-        `<div class="s3-sub">${label}</div>
-         <div class="pro-grid s3-prims">${prims.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div>`
+      ${PRIM_GROUPS.map(([label, prims], gi) =>
+        `<details class="s3-group"${gi === 0 ? ' open' : ''}><summary>${label} <span class="s3-count">${prims.length}</span></summary>
+         <div class="pro-grid s3-prims">${prims.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div></details>`
       ).join('')}
       <div class="s3-row">
         <button class="text-btn ghost" id="s3-import">Import model…</button>
@@ -262,8 +262,10 @@ GF.scene3dUI = (function () {
           <input type="range" id="s3-rough" min="0" max="100" value="${Math.round(t.mat.roughness * 100)}"></label>
         <label class="mini"><span class="s3-top">Metalness<span class="s3-val" id="s3-metal-v">${t.mat.metalness.toFixed(2)}</span></span>
           <input type="range" id="s3-metal" min="0" max="100" value="${Math.round(t.mat.metalness * 100)}"></label>
-        <label class="mini">Normal map<select id="s3-normal">${mapOpts(t.mat.normalSource, 'normal')}</select></label>
-        <label class="mini">Roughness map<select id="s3-roughmap">${mapOpts(t.mat.roughSource, 'roughness')}</select></label>
+        <details class="s3-group"><summary>Advanced maps</summary>
+          <label class="mini">Normal map<select id="s3-normal">${mapOpts(t.mat.normalSource, 'normal')}</select></label>
+          <label class="mini">Roughness map<select id="s3-roughmap">${mapOpts(t.mat.roughSource, 'roughness')}</select></label>
+        </details>
       </div>`;
 
     const id = t.id;

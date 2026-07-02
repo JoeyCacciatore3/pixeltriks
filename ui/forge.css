@@ -484,7 +484,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .tb-center { gap: .15rem; }
   /* keep the top bar inside the viewport: Open/New/Save live in the ☰ menu,
      zoom is pinch + the touch companion's Fit */
-  #btn-new, #btn-open, #doc-dims, .zoom-pill { display: none; }
+  #btn-open, #doc-dims, .zoom-pill { display: none; }
   .tb-right .text-btn { padding: .45em .7em; }
 
   /* tool rail -> bottom bar */
@@ -545,8 +545,13 @@ body[data-mode="3d"] #empty-state, body[data-mode="3d"] #sel-bar { display: none
 .s3-row { display: flex; gap: .4rem; align-items: center; margin: .35rem 0; flex-wrap: wrap; }
 .s3-row .text-btn { flex: 1; white-space: nowrap; }
 .s3-prims { margin-bottom: .4rem; }
-.s3-sub { font-size: .68em; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--ink-3); font-weight: 700; margin: .55rem 0 .3rem; }
+/* collapsible groups (shape catalog, advanced maps) */
+.s3-group { margin: .2rem 0; }
+.s3-group summary { cursor: pointer; font-size: .68em; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; padding: .3rem 0; user-select: none; }
+.s3-group summary:hover { color: var(--ink-2); }
+.s3-group[open] summary { margin-bottom: .25rem; }
+.s3-count { opacity: .55; font-weight: 600; margin-left: .25rem; }
 .s3-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
 .s3-num { display: grid; gap: .15rem; font-size: .72em; color: var(--ink-3); font-weight: 600; }
 .s3-num input { width: 100%; min-width: 0; padding: .3em .35em; border-radius: 7px;
@@ -555,12 +560,18 @@ body[data-mode="3d"] #empty-state, body[data-mode="3d"] #sel-bar { display: none
 /* label row with a right-aligned value — matches the Adjust tab's slider rhythm */
 .s3-top { display: flex; justify-content: space-between; align-items: baseline; }
 .s3-val { color: var(--ink-3); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* export hub sections */
+.m-sec { font-size: .68em; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; margin: .9rem 0 .4rem; }
+.m-sec:first-child { margin-top: 0; }
+.m-actions .text-btn { flex: 1; }
+
 /* AI dialog "Advanced" disclosure */
 .ai-adv summary { cursor: pointer; color: var(--ink-3); font-size: .85em; font-weight: 600; margin: .2rem 0; }
 .ai-adv[open] summary { margin-bottom: .5rem; }
 @media (max-width: 880px) {
   /* keep the 3D options bar to one tidy row on phones */
-  .s3-hint, #s3-export-ob { display: none; }
+  .s3-hint, #s3-publish-ob { display: none; }
 }
 #s3-objects { margin-top: .4rem; }
 #s3-objects .layer-item { cursor: pointer; }
