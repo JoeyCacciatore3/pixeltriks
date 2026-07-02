@@ -37,8 +37,10 @@ Open **`index.html`** (double-click — everything runs from `file://`, no build
 ## 3D workspace (the ⬡ tool)
 
 - **Import** `.glb` / `.gltf` (drag-drop anywhere — the app jumps straight into 3D),
-  add primitives (box, sphere, cylinder, cone, torus, knot, capsule, plane, panel,
-  tile, hex, curved), or pull CC0 models from **Poly Haven**.
+  add primitives — Basics (sphere, box, rounded box, cylinder, cone, pyramid, prism,
+  capsule, dome, torus, torus knot, pipe), Crystals (tetra/octa/dodeca/icosahedron,
+  faceted gem), Flat (plane, panel, disc, ring, tile, hex, curved wall), Extras
+  (star, heart, arrow, steps) — or pull CC0 models from **Poly Haven**.
 - **Pose** — Orbit / Move / Rotate / Scale modes; click to select (Del removes,
   F frames); exact numeric transforms (position / rotation / scale per axis).
 - **Texture with your images** — per object, use the whole document, any single layer,

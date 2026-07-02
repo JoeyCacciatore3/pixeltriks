@@ -546,6 +546,24 @@
         if (GF.scene3d.count() !== 1) throw new Error('count ' + GF.scene3d.count());
         if (!document.querySelector('#s3-objects .layer-item')) throw new Error('object list empty');
       });
+      await t('3d: every shape in the catalog builds', async () => {
+        const KINDS = ['sphere', 'roundedbox', 'cylinder', 'cone', 'pyramid', 'prism', 'capsule',
+          'hemisphere', 'torus', 'torusknot', 'pipe', 'tetrahedron', 'octahedron', 'dodecahedron',
+          'icosahedron', 'gem', 'plane', 'panel', 'disc', 'ring', 'tile', 'hex', 'curved',
+          'star', 'heart', 'arrow', 'steps'];
+        const before = GF.scene3d.count();
+        for (const k of KINDS) {
+          const id = await GF.scene3d.addPrimitive(k);
+          if (id == null) throw new Error(k + ' failed to build');
+        }
+        if (GF.scene3d.count() !== before + KINDS.length) throw new Error('count mismatch');
+        // clean up so the rest of the 3D suite sees the expected scene:
+        // one selected box and an empty scene-undo stack
+        for (const o of GF.scene3d.listObjects()) { if (o.id !== 1) GF.scene3d.removeObject(o.id); }
+        if (GF.scene3d.count() !== 1) throw new Error('cleanup failed: ' + GF.scene3d.count());
+        GF.scene3d.hist.clear();
+        GF.scene3d.select(1);
+      }, 30000);
       await t('3d: setObject/getObject 9-DOF roundtrip', () => {
         const id = GF.scene3d.selectedId();
         GF.scene3d.setObject(id, { px: 0.5, py: -0.25, pz: 1, rx: 30, ry: 45, rz: 10, sx: 2, sy: 1.5, sz: 0.5 });

@@ -1,7 +1,7 @@
 /* PixelTriks — service worker (offline app shell).
    Registers only over http(s); a no-op when the app is opened from file://. */
 'use strict';
-const CACHE = 'forge-v11';
+const CACHE = 'forge-v12';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './ui/forge.css', './ui/forge-ui.js', './ui/scene3d-ui.js', './ui/three-bundle.js',
@@ -15,6 +15,7 @@ const ASSETS = [
   './vendor/three/addons/loaders/GLTFLoader.js',
   './vendor/three/addons/loaders/RGBELoader.js',
   './vendor/three/addons/exporters/GLTFExporter.js',
+  './vendor/three/addons/geometries/RoundedBoxGeometry.js',
   './vendor/three/addons/utils/BufferGeometryUtils.js',
   './vendor/three/addons/utils/TextureUtils.js',
   './assets/models/cube.glb', './assets/models/sphere.glb',

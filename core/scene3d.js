@@ -260,8 +260,10 @@ GF.scene3d = (function () {
   /* =================================================================
      Materials
      ================================================================= */
+  // open/flat geometry is only usable double-sided
+  const TWO_SIDED_PRIMS = ['plane', 'panel', 'curved', 'disc', 'ring', 'pipe', 'hemisphere'];
   function defaultMat(kind, prim) {
-    const flat = (prim === 'plane' || prim === 'panel' || prim === 'curved');
+    const flat = TWO_SIDED_PRIMS.includes(prim);
     return {
       mapSource: (kind === 'model') ? null : (D.doc.open ? 'composite' : null),
       normalSource: 'auto:normal', roughSource: 'auto:roughness',
@@ -315,29 +317,100 @@ GF.scene3d = (function () {
   function attach(o) { sceneRoot.add(o.node); if (!objects.includes(o)) objects.push(o); o.node.visible = o.visible; emit(); }
   function detach(o) { sceneRoot.remove(o.node); const i = objects.indexOf(o); if (i >= 0) objects.splice(i, 1); if (selectedId === o.id) select(null); emit(); }
 
+  /** Faceted look for crystals/gems: flat per-face normals instead of the
+      smooth spherical shading PolyhedronGeometry ships with. */
+  function facet(g) {
+    const ng = g.index ? g.toNonIndexed() : g;
+    ng.computeVertexNormals();
+    return ng;
+  }
+  function extrudeShape(builder, depth) {
+    const T = THREE, s = new T.Shape();
+    builder(s);
+    const g = new T.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2 });
+    g.center();
+    return g;
+  }
+  function starPath(s, points, R, r) {
+    for (let i = 0; i < points * 2; i++) {
+      const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+      const rr = (i % 2) ? r : R;
+      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+      i ? s.lineTo(x, y) : s.moveTo(x, y);
+    }
+    s.closePath();
+  }
   function primGeo(kind) {
     const T = THREE;
     switch (kind) {
-      case 'box':      return new T.BoxGeometry(1, 1, 1);
-      case 'cylinder': return new T.CylinderGeometry(0.5, 0.5, 1, 32);
-      case 'cone':     return new T.ConeGeometry(0.5, 1, 32);
-      case 'torus':    return new T.TorusGeometry(0.45, 0.18, 16, 48);
-      case 'torusknot':return new T.TorusKnotGeometry(0.45, 0.16, 128, 24);
+      /* ---- basics ---- */
+      case 'box':        return new T.BoxGeometry(1, 1, 1);
+      case 'roundedbox': return new LIB.RoundedBoxGeometry(1.05, 1.05, 1.05, 4, 0.12);
+      case 'cylinder':   return new T.CylinderGeometry(0.5, 0.5, 1, 32);
+      case 'cone':       return new T.ConeGeometry(0.5, 1, 32);
+      case 'pyramid':    return facet(new T.ConeGeometry(0.68, 0.9, 4, 1));
+      case 'prism':      return facet(new T.CylinderGeometry(0.58, 0.58, 1, 3, 1));
+      case 'capsule':    return new T.CapsuleGeometry(0.4, 0.6, 8, 24);
+      case 'hemisphere': return new T.SphereGeometry(0.62, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+      case 'torus':      return new T.TorusGeometry(0.45, 0.18, 16, 48);
+      case 'torusknot':  return new T.TorusKnotGeometry(0.45, 0.16, 128, 24);
+      case 'pipe':       return new T.CylinderGeometry(0.32, 0.32, 1.2, 32, 1, true);
+      /* ---- crystals (faceted platonic solids + a lathe-cut gem) ---- */
+      case 'tetrahedron':  return facet(new T.TetrahedronGeometry(0.72));
+      case 'octahedron':   return facet(new T.OctahedronGeometry(0.66));
+      case 'dodecahedron': return facet(new T.DodecahedronGeometry(0.62));
+      case 'icosahedron':  return facet(new T.IcosahedronGeometry(0.62));
+      case 'gem': {
+        const pts = [new T.Vector2(0.001, -0.55), new T.Vector2(0.44, 0.02), new T.Vector2(0.3, 0.3), new T.Vector2(0.001, 0.38)];
+        return facet(new T.LatheGeometry(pts, 8));
+      }
+      /* ---- flat texturable shapes (signboards, tiles, backdrops) ---- */
       case 'plane':    return new T.PlaneGeometry(1, 1);
-      case 'capsule':  return new T.CapsuleGeometry(0.4, 0.6, 8, 24);
-      // flat texturable shapes (signboards, tiles, backdrops)
       case 'panel':    return new T.BoxGeometry(1.4, 0.9, 0.06);
+      case 'disc':     return new T.CircleGeometry(0.62, 48);
+      case 'ring':     return new T.RingGeometry(0.3, 0.62, 48);
       case 'tile':     return new T.BoxGeometry(1, 0.1, 1);
       case 'hex':      return new T.CylinderGeometry(0.6, 0.6, 0.12, 6);
       case 'curved':   return new T.CylinderGeometry(1, 1, 1.1, 48, 1, true, -Math.PI / 3, (2 * Math.PI) / 3);
-      default:         return new T.SphereGeometry(0.55, 48, 32);
+      /* ---- extras (extruded outlines + built structures) ---- */
+      case 'star':  return extrudeShape(s => starPath(s, 5, 0.62, 0.27), 0.2);
+      case 'heart': return extrudeShape(s => {
+        s.moveTo(0.25, 0.25);
+        s.bezierCurveTo(0.25, 0.25, 0.2, 0, 0, 0);
+        s.bezierCurveTo(-0.3, 0, -0.3, 0.35, -0.3, 0.35);
+        s.bezierCurveTo(-0.3, 0.55, -0.1, 0.77, 0.25, 0.95);
+        s.bezierCurveTo(0.6, 0.77, 0.8, 0.55, 0.8, 0.35);
+        s.bezierCurveTo(0.8, 0.35, 0.8, 0, 0.5, 0);
+        s.bezierCurveTo(0.35, 0, 0.25, 0.25, 0.25, 0.25);
+      }, 0.2).rotateZ(Math.PI);   // the classic path is drawn point-up
+      case 'arrow': return extrudeShape(s => {
+        s.moveTo(-0.6, -0.14); s.lineTo(0.08, -0.14); s.lineTo(0.08, -0.34);
+        s.lineTo(0.62, 0); s.lineTo(0.08, 0.34); s.lineTo(0.08, 0.14);
+        s.lineTo(-0.6, 0.14); s.closePath();
+      }, 0.16);
+      case 'steps': {
+        const n = 4, step = 0.85 / n, parts = [];
+        for (let i = 0; i < n; i++) {
+          const h = (i + 1) * step;
+          const g = new T.BoxGeometry(1, h, step);
+          g.translate(0, h / 2 - 0.425, -0.425 + (i + 0.5) * step);
+          parts.push(g);
+        }
+        return LIB.mergeGeometries(parts);
+      }
+      default: return new T.SphereGeometry(0.55, 48, 32);
     }
   }
+  const PRIM_LABELS = {
+    roundedbox: 'Rounded box', torusknot: 'Torus knot', hemisphere: 'Dome',
+    hex: 'Hex tile', curved: 'Curved wall',
+  };
+  function primLabel(prim) { return PRIM_LABELS[prim] || prim.charAt(0).toUpperCase() + prim.slice(1); }
   async function addPrimitive(kind) {
     try { await ensureRenderer(); } catch (e) { return null; }
     const prim = kind || 'sphere', id = nextId++;
     const o = {
-      id, name: prim.charAt(0).toUpperCase() + prim.slice(1) + ' ' + id, kind: 'primitive', prim,
+      id, name: primLabel(prim) + ' ' + id, kind: 'primitive', prim,
       node: null, visible: true, mat: defaultMat('primitive', prim), _origMats: new Map()
     };
     o.material = new THREE.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
@@ -689,7 +762,7 @@ if (GF.api && GF.api.register) {
   const R = GF.api.register;
   R('scene3d.enter', '', 'Open the 3D workspace', () => GF.ui.setTool('scene3d'));
   R('scene3d.exit', '', 'Leave the 3D workspace (back to image editing)', () => GF.ui.setTool('move'));
-  R('scene3d.addPrimitive', 'kind(box|sphere|cylinder|cone|torus|torusknot|capsule|plane|panel|tile|hex|curved)', 'Add a primitive to the 3D scene', a => GF.scene3d.addPrimitive(a.kind || 'box'));
+  R('scene3d.addPrimitive', 'kind(sphere|box|roundedbox|cylinder|cone|pyramid|prism|capsule|hemisphere|torus|torusknot|pipe|tetrahedron|octahedron|dodecahedron|icosahedron|gem|plane|panel|disc|ring|tile|hex|curved|star|heart|arrow|steps)', 'Add a primitive to the 3D scene', a => GF.scene3d.addPrimitive(a.kind || 'box'));
   R('scene3d.importModel', 'url, name?', 'Import a GLB/GLTF model into the 3D scene', a => GF.scene3d.importModel(a.url, a.name));
   R('scene3d.list', '', 'List the 3D scene objects', () => GF.scene3d.listObjects());
   R('scene3d.setObject', 'id, px?, py?, pz?, rx?(deg), ry?, rz?, sx?, sy?, sz?, scale?', 'Transform a 3D object', a => GF.scene3d.setObject(a.id, a));

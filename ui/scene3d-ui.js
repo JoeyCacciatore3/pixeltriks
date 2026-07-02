@@ -12,10 +12,23 @@ GF.scene3dUI = (function () {
   const S = () => GF.scene3d;
 
   // plain text, matching the More tab's pro-grid style (no mixed-weight glyphs)
-  const PRIMS = [
-    ['sphere', 'Sphere'], ['box', 'Box'], ['cylinder', 'Cylinder'], ['cone', 'Cone'],
-    ['torus', 'Torus'], ['torusknot', 'Torus knot'], ['capsule', 'Capsule'], ['plane', 'Plane'],
-    ['panel', 'Panel'], ['tile', 'Tile'], ['hex', 'Hex tile'], ['curved', 'Curved wall'],
+  const PRIM_GROUPS = [
+    ['Basics', [
+      ['sphere', 'Sphere'], ['box', 'Box'], ['roundedbox', 'Rounded box'], ['cylinder', 'Cylinder'],
+      ['cone', 'Cone'], ['pyramid', 'Pyramid'], ['prism', 'Prism'], ['capsule', 'Capsule'],
+      ['hemisphere', 'Dome'], ['torus', 'Torus'], ['torusknot', 'Torus knot'], ['pipe', 'Pipe'],
+    ]],
+    ['Crystals', [
+      ['tetrahedron', 'Tetra'], ['octahedron', 'Octa'], ['dodecahedron', 'Dodeca'],
+      ['icosahedron', 'Icosa'], ['gem', 'Gem'],
+    ]],
+    ['Flat', [
+      ['plane', 'Plane'], ['panel', 'Panel'], ['disc', 'Disc'], ['ring', 'Ring'],
+      ['tile', 'Tile'], ['hex', 'Hex tile'], ['curved', 'Curved wall'],
+    ]],
+    ['Extras', [
+      ['star', 'Star'], ['heart', 'Heart'], ['arrow', 'Arrow'], ['steps', 'Steps'],
+    ]],
   ];
   const SAMPLES = ['cube', 'sphere', 'cylinder', 'cone', 'plane'];
 
@@ -65,7 +78,10 @@ GF.scene3dUI = (function () {
     const pane = $('.ptab-pane[data-pane="scene"]'); if (!pane) return;
     pane.innerHTML = `
       <h3 class="panel-h first">Objects</h3>
-      <div class="pro-grid s3-prims">${PRIMS.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div>
+      ${PRIM_GROUPS.map(([label, prims]) =>
+        `<div class="s3-sub">${label}</div>
+         <div class="pro-grid s3-prims">${prims.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div>`
+      ).join('')}
       <div class="s3-row">
         <button class="text-btn ghost" id="s3-import">Import model…</button>
         <button class="text-btn ghost" id="s3-ph-model">Poly Haven…</button>

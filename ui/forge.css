@@ -563,6 +563,8 @@ body[data-mode="3d"] #empty-state, body[data-mode="3d"] #sel-bar { display: none
 .s3-row { display: flex; gap: .4rem; align-items: center; margin: .35rem 0; flex-wrap: wrap; }
 .s3-row .text-btn { flex: 1; white-space: nowrap; }
 .s3-prims { margin-bottom: .4rem; }
+.s3-sub { font-size: .68em; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; margin: .55rem 0 .3rem; }
 .s3-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; }
 .s3-num { display: grid; gap: .15rem; font-size: .72em; color: var(--ink-3); font-weight: 600; }
 .s3-num input { width: 100%; min-width: 0; padding: .3em .35em; border-radius: 7px;

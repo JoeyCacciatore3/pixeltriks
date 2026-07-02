@@ -11,6 +11,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-window.__THREE_BUNDLE = { THREE, OrbitControls, GLTFLoader, RGBELoader, GLTFExporter };
+window.__THREE_BUNDLE = { THREE, OrbitControls, GLTFLoader, RGBELoader, GLTFExporter, RoundedBoxGeometry, mergeGeometries };
 window.dispatchEvent(new Event('three-bundle-ready'));
