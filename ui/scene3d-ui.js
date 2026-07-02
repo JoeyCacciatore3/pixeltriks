@@ -77,7 +77,13 @@ GF.scene3dUI = (function () {
     built = true;
     const pane = $('.ptab-pane[data-pane="scene"]'); if (!pane) return;
     pane.innerHTML = `
-      <h3 class="panel-h first">Objects</h3>
+      <h3 class="panel-h first">Make 3D — from your image</h3>
+      <label class="mini">Converter<select id="m3-kind"></select></label>
+      <div id="m3-opts"></div>
+      <p class="s3-status" id="m3-src"></p>
+      <div class="s3-row"><button class="text-btn primary" id="m3-run">✨ Create 3D</button></div>
+
+      <h3 class="panel-h">Objects</h3>
       ${PRIM_GROUPS.map(([label, prims]) =>
         `<div class="s3-sub">${label}</div>
          <div class="pro-grid s3-prims">${prims.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div>`
@@ -148,7 +154,42 @@ GF.scene3dUI = (function () {
 
     S().setStatusCallback(msg => { const el = $('#s3-status'); if (el) el.textContent = msg; });
     S().onChange(refresh);
+    wireMake3d();
     wireKeys();
+  }
+
+  /* ---- Make 3D (renders whatever GF.make3d has registered) ---- */
+  function wireMake3d() {
+    const kind = $('#m3-kind'), optsHost = $('#m3-opts'), runBtn = $('#m3-run');
+    if (!kind || !GF.make3d) return;
+    const items = GF.make3d.list();
+    kind.innerHTML = items.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
+    const renderOpts = () => {
+      const def = items.find(c => c.key === kind.value);
+      const hint = def ? `<p class="s3-status" style="margin:.2rem 0 .4rem">${def.desc}</p>` : '';
+      optsHost.innerHTML = hint + (def ? def.options.map(o =>
+        `<label class="mini"><span class="s3-top">${o.label}<span class="s3-val" id="m3v-${o.key}">${o.def}</span></span>
+         <input type="range" id="m3o-${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" value="${o.def}"></label>`).join('') : '');
+      if (def) def.options.forEach(o => {
+        const el = $('#m3o-' + o.key);
+        el.addEventListener('input', () => { $('#m3v-' + o.key).textContent = el.value; });
+      });
+    };
+    kind.addEventListener('change', renderOpts);
+    renderOpts();
+    runBtn.addEventListener('click', async () => {
+      const def = items.find(c => c.key === kind.value); if (!def) return;
+      const opts = {};
+      def.options.forEach(o => { const el = $('#m3o-' + o.key); if (el) opts[o.key] = +el.value; });
+      runBtn.disabled = true;
+      try { await GF.make3d.run(kind.value, opts); }
+      catch (e) { U.toast(e.message); }
+      finally { runBtn.disabled = false; }
+    });
+  }
+  function refreshMakeSource() {
+    const el = $('#m3-src');
+    if (el && GF.make3d) el.textContent = 'Converts ' + GF.make3d.sourceLabel() + '.';
   }
 
   /* ---- object list ---- */
@@ -284,7 +325,7 @@ GF.scene3dUI = (function () {
     if (r) r.disabled = three ? !S().hist.canRedo() : !GF.history.canRedo();
   }
 
-  function refresh() { renderObjects(); renderInspector(); updateUndoButtons(); }
+  function refresh() { renderObjects(); renderInspector(); updateUndoButtons(); refreshMakeSource(); }
 
   /* ---- keyboard (only while the workspace is active) ---- */
   let keysWired = false;

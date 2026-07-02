@@ -273,7 +273,7 @@ GF.scene3d = (function () {
   }
   function applyMaterial(o) {
     if (!o || !THREE) return;
-    if (o.kind === 'model' && o.mat.keepOriginal) { restoreOriginalMats(o); return; }
+    if (o.mat.keepOriginal && o.kind !== 'primitive') { restoreOriginalMats(o); return; }
     const m = o.material;
     const flipY = o.kind !== 'model';   // glTF UVs are top-left origin — no flip
     m.map = o.mat.mapSource ? texFor(o.mat.mapSource, true, flipY) : null;
@@ -453,6 +453,36 @@ GF.scene3d = (function () {
         resolve(o.id);
       }, undefined, () => { setStatus('Could not load that model.'); U.toast('Could not load that model'); resolve(null); });
     });
+  }
+
+  /** Engine access for generators (GF.make3d): boots the renderer if needed
+      and hands back the shared THREE instance + addon bundle. */
+  async function engine() {
+    await ensureRenderer();
+    return { THREE, LIB };
+  }
+
+  /** Adopt a generated geometry/Object3D as a first-class scene object.
+      textureCanvas (optional) becomes a snapshot image source so the object
+      keeps its look even if the 2D document changes afterwards.
+      keepOriginal: the node manages its own materials (e.g. layer stacks). */
+  function addGenerated(input, name, opts) {
+    if (!THREE) return null;   // callers go through make3d.run, which boots the engine first
+    opts = opts || {};
+    const id = nextId++;
+    const o = {
+      id, name: (name || 'Generated') + ' ' + id, kind: 'generated', prim: null,
+      node: null, visible: true, mat: defaultMat('generated'), _origMats: new Map()
+    };
+    o.mat.keepOriginal = !!opts.keepOriginal;
+    o.mat.doubleSided = !!opts.doubleSided;
+    o.material = new THREE.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
+    o.node = input.isObject3D ? input : new THREE.Mesh(input, o.material);
+    o.mat.mapSource = opts.textureCanvas ? addImageSource(opts.textureCanvas, o.name) : null;
+    attach(o); applyMaterial(o); select(o.id);
+    hist.push('make ' + (name || '3D'), () => detach(o), () => { attach(o); applyMaterial(o); });
+    if (!isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');
+    return o.id;
   }
 
   /** Route dropped/picked 3D-ish files: .glb/.gltf → import, .hdr → environment.
@@ -741,7 +771,7 @@ GF.scene3d = (function () {
     // lifecycle
     enter, exit, isActive, onChange, setStatusCallback: fn => { statusCb = fn; },
     // objects
-    addPrimitive, importModel, handleFiles, removeObject, setVisible,
+    addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, setVisible,
     listObjects, getObject, setObject, byId, count,
     // selection / interaction
     select, selectedId: () => selectedId, setInteract, getInteract, pick, frame,

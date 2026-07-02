@@ -662,6 +662,36 @@
         GF.scene3d.hist.undo();
         if (GF.scene3d.count() !== n) throw new Error('undo did not restore');
       });
+      await t('make3d: extrude cutout traces alpha shape (with hole) into geometry', async () => {
+        GF.api.run('newDoc', { w: 200, h: 200 });   // transparent
+        const c = U.ctx2d(D.active().canvas);
+        c.fillStyle = '#c83737'; c.beginPath(); c.arc(100, 100, 70, 0, 7); c.fill();
+        c.globalCompositeOperation = 'destination-out';
+        c.beginPath(); c.arc(100, 100, 25, 0, 7); c.fill();
+        c.globalCompositeOperation = 'source-over';
+        const n = GF.scene3d.count();
+        const id = await GF.make3d.run('cutout', { depth: 0.3 });
+        if (id == null) throw new Error('no object created');
+        if (GF.scene3d.count() !== n + 1) throw new Error('count ' + GF.scene3d.count());
+        const o = GF.scene3d.byId(id);
+        const pos = o.node.geometry.attributes.position;
+        if (!pos || pos.count < 50) throw new Error('degenerate geometry: ' + (pos && pos.count));
+        if (!o.mat.mapSource || o.mat.mapSource.indexOf('image:') !== 0) throw new Error('no snapshot texture: ' + o.mat.mapSource);
+      }, 30000);
+      await t('make3d: relief + lathe + layer stack all build', async () => {
+        freshDoc(120, 120);
+        for (const k of ['relief', 'lathe', 'layers']) {
+          const id = await GF.make3d.run(k, {});
+          if (id == null) throw new Error(k + ' failed');
+        }
+      }, 30000);
+      await t('make3d: registered in the api catalog', () => {
+        const names = GF.api.describe().map(c => c.name);
+        ['make3d.run', 'make3d.cutout', 'make3d.relief', 'make3d.lathe', 'make3d.layers'].forEach(n => {
+          if (names.indexOf(n) < 0) throw new Error('missing ' + n);
+        });
+        if (GF.make3d.list().length < 4) throw new Error('registry too small');
+      });
       await t('3d: exit restores 2D mode + tool dispatch', () => {
         clickTool('move');
         if (document.body.dataset.mode !== 'image') throw new Error('mode=' + document.body.dataset.mode);
