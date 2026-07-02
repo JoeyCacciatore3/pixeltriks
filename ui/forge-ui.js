@@ -20,12 +20,12 @@ window.GF = window.GF || {};
   const TOOLMAP = {
     move:'move', select:'marquee', wand:'wand', crop:'marquee',
     brush:'brush', eraser:'eraser', fill:'fill', text:'text',
-    shape:'shape', eyedropper:'picker', pan:'pan',
-    magicerase:'magiceraser', clone:'clone', gradient:'gradient'
+    shape:'shape', pan:'pan',
+    magicerase:'magiceraser', gradient:'gradient'
   };
   const SHORTCUTS = { v:'move', m:'select', w:'wand', c:'crop', b:'brush',
-    e:'eraser', g:'fill', t:'text', u:'shape', i:'eyedropper', h:'pan',
-    j:'magicerase', s:'clone', d:'gradient' };
+    e:'eraser', g:'fill', t:'text', u:'shape', h:'pan',
+    j:'magicerase', d:'gradient' };
 
   const BLENDS = [
     ['source-over','Normal'],['multiply','Multiply'],['screen','Screen'],['overlay','Overlay'],
@@ -51,10 +51,7 @@ window.GF = window.GF || {};
     { name:'B&W',     fn:i => GF.filters.grayscale(i) },
     { name:'Pop',     fn:i => { GF.filters.autoLevels(i); GF.filters.hsl(i,0,18,0); } },
     { name:'Warm',    fn:i => warmth(i, 28) },
-    { name:'Cool',    fn:i => warmth(i, -28) },
-    { name:'Noir',    fn:i => { GF.filters.grayscale(i); GF.filters.brightnessContrast(i,-4,26); } },
     { name:'Sharp',   fn:i => GF.filters.sharpen(i) },
-    { name:'Soft',    fn:i => GF.filters.blur(i) },
     { name:'Invert',  fn:i => GF.filters.invert(i) },
     { name:'Vivid',   fn:i => { GF.filters.hsl(i,0,38,0); GF.filters.brightnessContrast(i,2,12); } },
   ];
@@ -98,11 +95,10 @@ window.GF = window.GF || {};
     buildAdjustUI();
     buildFilters();
     buildBlendOptions();
-    buildProTools();
     wireTopbar();
     wireTools();
     wirePanel();
-    wireHero();
+    wireTexture();
     wireLayers();
     wireKeyboard();
     wireDropAndFiles();
@@ -309,32 +305,11 @@ window.GF = window.GF || {};
     const sel = $('#lyr-blend'); sel.innerHTML = '';
     BLENDS.forEach(([v, label]) => { const o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); });
   }
-  function buildProTools() {
-    const grid = $('#pro-grid'); if (!grid) return;
-    const tools = [
-      ['Content-aware fill', () => run('contentAwareFill')],
-      ['Color replace', openColorReplace],
-      ['Smart upscale 2×', () => run('smartUpscale', { factor: 2, mode: 'photo' })],
-      ['Add mask', () => run('addMask', { init: 'reveal' })],
-      ['Curves', openCurves],
-      ['Trim to content', () => run('trim')],
-      ['Flip H', () => run('flipLayer', { horizontal: true })],
-      ['Rotate 90°', () => run('rotateLayer', { cw: true })],
-      ['Layer style…', openLayerStyle],
-      ['Ink outline', () => run('inkOutline', {})],
-      ['Clean colors', () => run('cleanColors', {})],
-    ];
-    // texture helpers (image work + texturing 3D models)
-    if (GF.texture) tools.push(
-      ['Normal map', makeNormalMap],
-      ['Seamless tile', makeSeamless],
-    );
-    grid.innerHTML = '';
-    tools.forEach(([label, fn]) => {
-      const b = document.createElement('button'); b.className = 'pro-btn'; b.textContent = label;
-      b.addEventListener('click', () => { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); });
-      grid.appendChild(b);
-    });
+  /* the Image tab's Texture row — everything else lives in the ⌘K palette */
+  function wireTexture() {
+    const bind = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', () => { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); }); };
+    bind('#tex-normal', makeNormalMap);
+    bind('#tex-seamless', makeSeamless);
   }
 
   function addCanvasLayer(name, cnv) {
@@ -363,16 +338,16 @@ window.GF = window.GF || {};
     $$('.intent').forEach(b => b.addEventListener('click', () => {
       const kind = b.dataset.intent;
       if (kind === 'blank') { pendingIntent = null; openNewDialog(); return; }
+      // scene-first cards act immediately — no file required
+      if (kind === 'scene') { pendingIntent = null; setTool('scene3d'); return; }
+      if (kind === 'texturemodel') { pendingIntent = null; setTool('scene3d'); U.toast('Drop a .glb anywhere, or use Import model… in the 3D panel'); return; }
       pendingIntent = kind; pickFile();
     }));
   }
   function runIntent(kind) {
     switch (kind) {
-      case 'enhance':  ACTIONS.enhance(); break;
-      case 'removebg': ACTIONS.removeBg(); break;
-      case 'erase':    setTool('magicerase'); U.toast('Click the object you want to remove — it heals away'); break;
-      case 'cutout':   setTool('wand'); U.toast('Tap the subject (background → ⇄ Invert), then ✂️ Cut out'); break;
-      case 'genfill':  setTool('wand'); U.toast('Select a region, then ✦ Replace (AI)'); break;
+      case 'image3d': setTool('scene3d'); U.toast('Pick a converter under Make 3D — Extrude cutout turns your subject into a 3D piece'); break;
+      case 'edit':    break;   // just an open — the full editor is the destination
     }
   }
 
@@ -448,10 +423,6 @@ window.GF = window.GF || {};
            + seg('me-mode', [['heal','Heal (rebuild)'],['erase','Erase (transparent)']], V().wand.heal ? 'heal' : 'erase')
            + optSlider('Tolerance', 'me-tol', 0, 128, V().wand.tolerance)
            + `<label class="opt"><input type="checkbox" id="me-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`;
-    } else if (name === 'clone') {
-      html = `<span class="opt"><span class="kbd">Alt</span>-click a source, then paint</span>`
-           + optSlider('Size', 'brush-size', 1, 200, V().brush.size)
-           + optSlider('Opacity', 'brush-op', 0, 100, Math.round((V().brush.opacity ?? 1) * 100));
     } else if (name === 'gradient') {
       html = seg('grad-kind', [['linear','Linear'],['radial','Radial']], V().gradient.kind || 'linear')
            + `<label class="opt"><input type="checkbox" id="grad-alpha" ${V().gradient.toAlpha ? 'checked' : ''}> Fade to transparent</label>`
@@ -464,14 +435,12 @@ window.GF = window.GF || {};
            + optSlider('Tolerance', 'wand-tol', 0, 128, V().wand.tolerance)
            + `<label class="opt"><input type="checkbox" id="wand-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`
            + seg('wand-sample', [['all','All layers'],['layer','Layer']], V().wand.sample || 'all')
-           + `<label class="opt"><input type="checkbox" id="wand-aa" ${V().wand.antialias ? 'checked' : ''}> Anti-alias</label>`
-           + `<button class="text-btn ghost" id="sel-menu">Select ▾</button>`;
+           + `<label class="opt"><input type="checkbox" id="wand-aa" ${V().wand.antialias ? 'checked' : ''}> Anti-alias</label>`;
     } else if (name === 'select') {
       html = selModeSeg()
            + seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
            + `<button class="text-btn ghost" id="sel-feather">Feather</button>`
-           + `<button class="text-btn ghost" id="sel-grow">Grow</button>`
-           + `<button class="text-btn ghost" id="sel-menu">Select ▾</button>`;
+           + `<button class="text-btn ghost" id="sel-grow">Grow</button>`;
     } else if (name === 'shape') {
       html = seg('shp-kind', [['rect','Rect'],['ellipse','Ellipse'],['line','Line']], V().shape.kind)
            + `<label class="opt"><input type="checkbox" id="shp-fill" ${V().shape.fill ? 'checked':''}> Fill</label>`;
@@ -482,8 +451,8 @@ window.GF = window.GF || {};
            + `<button class="text-btn ghost" id="crop-cancel">Cancel</button>`;
     } else if (name === 'text') {
       html = `<span class="opt">Click on the canvas to place text</span>`;
-    } else if (name === 'move' || name === 'eyedropper' || name === 'pan') {
-      html = `<span class="opt">${name === 'move' ? 'Drag to move the active layer' : name === 'pan' ? 'Drag to pan · pinch to zoom' : 'Click to pick a color'}</span>`;
+    } else if (name === 'move' || name === 'pan') {
+      html = `<span class="opt">${name === 'move' ? 'Drag to move the active layer' : 'Drag to pan · pinch to zoom'}</span>`;
     } else if (name === 'scene3d') {
       html = GF.scene3dUI ? GF.scene3dUI.optbarHtml() : '';
     }
@@ -523,7 +492,6 @@ window.GF = window.GF || {};
     segWire('sel-mode', v => V().selMode = v);
     segWire('wand-sample', v => { V().wand.sample = v; reWand(); });
     chk('wand-aa', v => { V().wand.antialias = v; reWand(); });
-    const sm = $('#sel-menu'); if (sm) sm.addEventListener('click', openSelectMenu);
     const gb = $('.guide-btn'); if (gb) gb.addEventListener('click', () => openToolGuide(gb.dataset.guide));
     const fea = $('#sel-feather'); if (fea) fea.addEventListener('click', () => GF.select.has() ? run('featherSelection', { px: 4 }) : U.toast('Make a selection first'));
     const grw = $('#sel-grow'); if (grw) grw.addEventListener('click', () => GF.select.has() ? run('growSelection', { px: 4 }) : U.toast('Make a selection first'));
@@ -555,8 +523,7 @@ window.GF = window.GF || {};
   }
 
   /* The four headline actions, named once. Every surface that offers them —
-     hero buttons, intent cards, wand bar, palette — calls these, never a
-     sibling button's click(). */
+     wand bar, palette, api — calls these, never a sibling button's click(). */
   const ACTIONS = {
     enhance() {
       const L = D.active(); GF.filters.applyToLayer(L, 'enhance', i => { GF.filters.autoLevels(i); GF.filters.hsl(i,0,10,0); });
@@ -580,17 +547,11 @@ window.GF = window.GF || {};
     genFill() { openAIDialog(); },
   };
 
-  function wireHero() {
-    const guard = fn => () => { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); };
-    $('#hero-enhance').addEventListener('click', guard(ACTIONS.enhance));
-    $('#hero-removebg').addEventListener('click', guard(ACTIONS.removeBg));
-    $('#hero-erase').addEventListener('click', guard(ACTIONS.magicErase));
-    $('#hero-genfill').addEventListener('click', guard(ACTIONS.genFill));
-  }
+  /* defer so any pending UI state paints before the (synchronous, heavy) op runs */
   function busyHero(sel, fn) {
-    const el = $(sel); el.classList.add('busy');
-    // defer so the .busy state paints before the (synchronous, heavy) op runs
-    setTimeout(() => { try { fn(); } finally { el.classList.remove('busy'); } }, 30);
+    const el = $(sel);
+    if (el) el.classList.add('busy');
+    setTimeout(() => { try { fn(); } finally { if (el) el.classList.remove('busy'); } }, 30);
   }
 
   /* Layer styles — the engine's layerFX (outline/glow/shadow/bevel/emboss),
@@ -901,9 +862,9 @@ window.GF = window.GF || {};
      ui metadata), and only dialogs / composite UI actions are listed here. */
   const TOOL_LABELS = {
     move: 'Move', select: 'Select', wand: 'Magic wand', crop: 'Crop',
-    magicerase: 'Magic erase (one-click remove)', clone: 'Clone stamp', gradient: 'Gradient',
+    magicerase: 'Magic erase (one-click remove)', gradient: 'Gradient',
     brush: 'Brush', eraser: 'Eraser', fill: 'Fill', text: 'Text',
-    shape: 'Shape', eyedropper: 'Eyedropper', scene3d: '3D workspace',
+    shape: 'Shape', scene3d: '3D workspace',
   };
   function commandList() {
     const cmds = Object.keys(TOOL_LABELS).map(t => {
@@ -923,6 +884,8 @@ window.GF = window.GF || {};
       { group: 'Retouch', label: 'Remove background', run: () => guarded(ACTIONS.removeBg) },
       { group: 'Retouch', label: 'Color replace…', run: () => guarded(openColorReplace) },
       { group: 'Retouch', label: 'Smart upscale 2×', run: () => guarded(() => run('smartUpscale', { factor: 2, mode: 'photo' })) },
+      { group: 'Select', label: 'Select subject', run: () => guarded(selectSubject) },
+      { group: 'Select', label: 'Color range…', run: () => guarded(openColorRange) },
       { group: 'Layer', label: 'Layer style (outline / glow / shadow)…', run: () => guarded(openLayerStyle) },
       { group: 'View', label: 'Zoom in', hint: ']', run: () => zoomBtn(1.25) },
       { group: 'View', label: 'Zoom out', hint: '[', run: () => zoomBtn(0.8) },
@@ -1056,10 +1019,12 @@ window.GF = window.GF || {};
      ================================================================= */
   function openCheatSheet() {
     const rows = [
-      ['Command palette', '⌘/Ctrl K'], ['Tools', 'V M W C B E G T U I'], ['Pan', 'Space / H'],
+      ['Command palette', '⌘/Ctrl K'], ['Tools', 'V M W J C B E G D T U'], ['Pan', 'Space / H'],
+      ['Pick colour', 'Alt-click (brush/fill)'], ['Curves', '⌘M'],
       ['Undo / Redo', '⌘Z / ⌘⇧Z'], ['Save project', '⌘S'], ['Export', '⌘E'],
       ['Select all / Invert', '⌘A / ⌘I'], ['Deselect', 'Esc'], ['Paste image', '⌘V'],
       ['Zoom out / in', '[ / ]'], ['Fit to screen', 'click %'], ['Shortcuts', '?'],
+      ['3D: remove / frame object', 'Del / F'],
     ];
     modal({
       title: 'Keyboard shortcuts',
@@ -1217,15 +1182,12 @@ window.GF = window.GF || {};
     { kind: 'levels', label: 'Levels' },
     { kind: 'curves', label: 'Curves' },
     { kind: 'hsl', label: 'Hue / Saturation' },
-    { kind: 'posterize', label: 'Posterize' },
     { kind: 'grayscale', label: 'Black & White' },
-    { kind: 'invert', label: 'Invert' },
-    { kind: 'autoLevels', label: 'Auto Levels' },
   ];
-  const ADJ_EDITABLE = ['brightnessContrast', 'hsl', 'posterize', 'levels', 'curves'];
+  const ADJ_EDITABLE = ['brightnessContrast', 'hsl', 'levels', 'curves'];
   function adjustDefaults(kind) {
     return ({ brightnessContrast: { brightness: 0, contrast: 0 }, hsl: { h: 0, s: 0, l: 0 },
-      posterize: { levels: 5 }, levels: { black: 0, white: 255, gamma: 1 }, curves: { curves: {} } })[kind] || {};
+      levels: { black: 0, white: 255, gamma: 1 }, curves: { curves: {} } })[kind] || {};
   }
   function openAddAdjustment() {
     if (!D.doc.open) return U.toast('Open an image first');
@@ -1257,7 +1219,6 @@ window.GF = window.GF || {};
     let body = '', isCurves = false;
     if (kind === 'brightnessContrast') body = adjModalSlider('Brightness', 'brightness', p.brightness || 0, -100, 100) + adjModalSlider('Contrast', 'contrast', p.contrast || 0, -100, 100);
     else if (kind === 'hsl') body = adjModalSlider('Hue', 'h', p.h || 0, -180, 180) + adjModalSlider('Saturation', 's', p.s || 0, -100, 100) + adjModalSlider('Lightness', 'l', p.l || 0, -100, 100);
-    else if (kind === 'posterize') body = adjModalSlider('Levels', 'levels', p.levels || 5, 2, 16);
     else if (kind === 'levels') body = adjModalSlider('Black point', 'black', p.black || 0, 0, 254) + adjModalSlider('White point', 'white', p.white == null ? 255 : p.white, 1, 255) + adjModalSlider('Gamma', 'gamma', Math.round((p.gamma || 1) * 100), 10, 300, 0.01);
     else if (kind === 'curves') { isCurves = true; body = `<canvas id="al-curve" width="300" height="220" style="border-radius:8px;touch-action:none;box-shadow:inset 0 0 0 1px var(--line)"></canvas><div class="seg" id="al-ch" style="margin-top:.6rem"><button data-v="rgb" class="on">RGB</button><button data-v="r">R</button><button data-v="g">G</button><button data-v="b">B</button></div>`; }
     modal({
@@ -1370,27 +1331,8 @@ window.GF = window.GF || {};
     GF.view.requestRender();
   }
 
-  function openSelectMenu() {
-    if (!D.doc.open) return U.toast('Open an image first');
-    const has = GF.select.has();
-    const ops = [
-      ['Grow 4px', () => GF.select.grow(4), has],
-      ['Contract 4px', () => GF.select.contract(4), has],
-      ['Feather 3px', () => GF.select.feather(3), has],
-      ['Smooth', () => GF.select.smooth(2), has],
-      ['Select similar', () => U.toast('Shift-click the wand to add similar areas, or use Color range'), true],
-      ['Color range…', openColorRange, true],
-      ['Select subject', () => { GF.select.selectBackground(composImg(), 32); GF.select.invert(); }, true],
-      ['Invert (⌘I)', () => GF.select.invert(), has],
-      ['Select all (⌘A)', () => GF.select.selectAll(), true],
-      ['Deselect (Esc)', () => GF.select.clear(), has],
-    ];
-    modal({
-      title: 'Select', sub: 'Refine or build a selection',
-      body: `<div class="pro-grid">${ops.map((o, i) => `<button class="pro-btn${o[2] ? '' : ' dis'}" data-i="${i}">${o[0]}</button>`).join('')}</div>`,
-      ok: 'Close', noCancel: true,
-      mount: m => m.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => { const o = ops[+b.dataset.i]; if (!o[2]) return; closeModal(); o[1](); GF.view.requestRender(); }))
-    });
+  function selectSubject() {
+    GF.select.selectBackground(composImg(), 32); GF.select.invert(); GF.view.requestRender();
   }
   function openColorRange() {
     if (!D.doc.open) return;
@@ -1454,7 +1396,9 @@ window.GF = window.GF || {};
     ['⌗ Crop to this',  () => cropToSelection()],
     ['⇄ Invert',        () => { GF.select.invert(); GF.view.requestRender(); }],
     ['◌ Grow 4px',      () => { GF.select.grow(4); GF.view.requestRender(); }],
+    ['◎ Contract 4px',  () => { GF.select.contract(4); GF.view.requestRender(); }],
     ['◠ Feather 4px',   () => { GF.select.feather(4); GF.view.requestRender(); }],
+    ['∿ Smooth',        () => { GF.select.smooth(2); GF.view.requestRender(); }],
     ['🗑 Delete',        deleteSelection],
   ];
 
@@ -1570,14 +1514,13 @@ window.GF = window.GF || {};
           <li><b>Mode</b> — New / Add / Subtract / Intersect (or <span class="kbd">⇧</span>/<span class="kbd">⌥</span>).</li>
           <li><b>Feather / Grow</b> — soften or expand the edge.</li></ul>
         <h4>Uses</h4><ul><li>Constrain any tool or filter to the marquee.</li><li><b>⌗ Crop</b> to the selection.</li><li><b>◫ Mask</b> a layer to the shape.</li></ul>` },
-    brush: { icon: '🖌', title: 'Brush', body: `<p class="g-lead">Paint with the current colour. Size, Opacity and a crisp Pixel mode in the options bar. Strokes respect the active selection — paint inside a marquee and nothing spills out.</p>` },
+    brush: { icon: '🖌', title: 'Brush', body: `<p class="g-lead">Paint with the current colour. Size, Opacity and a crisp Pixel mode in the options bar. Strokes respect the active selection — paint inside a marquee and nothing spills out. <span class="kbd">Alt</span>-click anywhere to pick that colour.</p>` },
     eraser: { icon: '🩹', title: 'Eraser', body: `<p class="g-lead">Erase to transparency. Respects the active selection. For removing objects cleanly, prefer <b>Magic erase</b> (content-aware) over manual erasing.</p>` },
     fill: { icon: '🪣', title: 'Fill', body: `<p class="g-lead">Flood-fill connected pixels within Tolerance with the current colour. Inside a selection, the fill is clipped to it.</p>` },
     crop: { icon: '⌗', title: 'Crop & Straighten', body: `<p class="g-lead">Drag the handles, pick an aspect preset, and use the rule-of-thirds grid to compose. The Straighten slider rotates and auto-expands the canvas. You can also select a region and use <b>Crop to selection</b>.</p>` },
     text: { icon: 'T', title: 'Text', body: `<p class="g-lead">Click to place text. Pick a font, size, colour and outline. Text stays <b>re-editable</b> — double-click a text layer to change the words or style any time.</p>` },
     move: { icon: '✛', title: 'Move', body: `<p class="g-lead">Drag to reposition the active layer. Content moved off-canvas is never lost.</p>` },
     shape: { icon: '▭', title: 'Shape', body: `<p class="g-lead">Drag to draw a rectangle, ellipse or line. Hold <span class="kbd">⇧</span> for a perfect square/circle.</p>` },
-    eyedropper: { icon: '⊙', title: 'Eyedropper', body: `<p class="g-lead">Click to sample a colour from the image into your brush colour.</p>` },
     magicerase: { icon: '🩹', title: 'Magic Erase — one-click object removal',
       body: `<p class="g-lead">Click an object or colour region and it's gone — in one step.</p>
         <h4>Options</h4><ul>
@@ -1586,13 +1529,6 @@ window.GF = window.GF || {};
           <li><b>Tolerance</b> — how much of the surrounding colour gets included per click.</li>
         </ul>
         <p class="g-lead">Tip: several small clicks beat one big one. For precise control, use the <b>Wand</b> instead — select first, review, then choose an action.</p>` },
-    clone: { icon: '⌖', title: 'Clone Stamp — paint with another part of the image',
-      body: `<p class="g-lead"><span class="kbd">Alt</span>-click (or <span class="kbd">Ctrl</span>-click) the spot you want to copy <i>from</i>, then paint where you want it to appear. A crosshair shows your source as you go.</p>
-        <h4>Uses</h4><ul>
-          <li><b>Remove blemishes &amp; wires</b> — clone clean texture over them.</li>
-          <li><b>Duplicate details</b> — more leaves, more windows, more crowd.</li>
-          <li><b>Fix seams</b> — after Magic Erase, clone over any repeats it left.</li>
-        </ul>` },
     scene3d: { icon: '⬡', title: '3D workspace — models, GLB & your images',
       body: `<p class="g-lead">Import GLB/GLTF models or add primitives, pose them, and texture them with the document, any layer, or an imported image. Export the scene as a <b>.glb</b>, or <b>Flatten to layer</b> to drop a doc-resolution render back onto the canvas and keep editing in 2D.</p>
         <h4>Basics</h4><ul>

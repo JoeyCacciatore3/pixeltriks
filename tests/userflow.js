@@ -80,10 +80,10 @@
 
   async function runDesktop() {
     /* --- edge: everything must be safe BEFORE a document exists --- */
-    await step('no-doc: tools + hero + palette are safe', () => {
+    await step('no-doc: tools + texture + palette are safe', () => {
       ['brush', 'move', 'crop', 'select', 'fill', 'text', 'wand'].forEach(t => tool(t));
       const p = pt(.5, .5); down(p); up(p);                 // a click on the empty canvas
-      $('#hero-enhance').click(); $('#hero-removebg').click(); $('#hero-erase').click();
+      $('#tex-normal').click(); $('#tex-seamless').click();  // should toast, not throw
       $('#lyr-add').click(); $('#lyr-fx').click(); const m = $('.fs-modal'); if (m) Array.prototype.find.call(m.querySelectorAll('.text-btn'), b => /Close|Cancel/.test(b.textContent)).click();
       $('#btn-undo').click(); $('#btn-redo').click();
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
@@ -96,7 +96,7 @@
     await step('brush stroke (drag)', async () => { tool('brush'); const ci = $('#brush-color'); ci.value = '#ff2299'; ci.dispatchEvent(new Event('input')); const before = D.active().canvas.toDataURL(); await drag(pt(.2, .3), pt(.7, .65), 10); if (D.active().canvas.toDataURL() === before) throw new Error('brush left no marks'); });
     await step('eraser stroke (drag)', async () => { tool('eraser'); await drag(pt(.3, .7), pt(.65, .72), 8); });
     await step('flood fill (click)', () => { tool('fill'); const p = pt(.88, .12); down(p); up(p); });
-    await step('eyedropper pick (click)', () => { tool('eyedropper'); const p = pt(.5, .5); down(p); up(p); });
+    await step('brush Alt-click picks color', () => { tool('brush'); const p = pt(.5, .5); down(p, { altKey: true }); up(p); });
     await step('magic wand select (click)', () => { tool('wand'); const p = pt(.5, .5); down(p); up(p); if (!GF.select.has()) throw new Error('wand selected nothing'); });
     await step('marquee select (drag)', async () => { tool('select'); await drag(pt(.15, .2), pt(.55, .7), 8); if (!GF.select.has()) throw new Error('marquee selected nothing'); GF.api.run('deselect'); });
     await step('move layer (drag)', async () => { tool('move'); const x0 = D.active().x; await drag(pt(.5, .5), pt(.42, .56), 8); if (D.active().x === x0) rec('soft', 'move did not change layer x'); });
@@ -133,11 +133,24 @@
     });
     await step('filters (apply 3)', () => { $$('#filter-strip .filter-chip').slice(0, 3).forEach(c => c.click()); });
 
-    /* --- hero actions --- */
-    await step('auto-enhance', () => $('#hero-enhance').click());
-    await step('remove background', () => $('#hero-removebg').click());
-    await step('magic erase (with selection)', () => { GF.api.run('selectRect', { x: 40, y: 40, w: 90, h: 90 }); $('#hero-erase').click(); GF.api.run('deselect'); });
-    await step('generative fill dialog open/close', () => { $('#hero-genfill').click(); const m = $('.fs-modal'); if (m) Array.prototype.find.call(m.querySelectorAll('.text-btn'), b => /Cancel|Run/.test(b.textContent)).click(); });
+    /* --- headline actions (the ⌘K palette is their primary surface now) --- */
+    const pal = label => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+      const i = $('.cmdk-input'); i.value = label; i.dispatchEvent(new Event('input'));
+      i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    };
+    const settle = () => new Promise(r => setTimeout(r, 90));
+    await step('auto-enhance (palette)', async () => { pal('Auto enhance'); await settle(); });
+    await step('remove background (palette)', async () => { pal('Remove background'); await settle(); });
+    await step('magic erase via wand bar (with selection)', () => {
+      GF.api.run('selectRect', { x: 40, y: 40, w: 90, h: 90 });
+      Array.prototype.find.call($('#sel-bar').querySelectorAll('.sel-out'), b => /Erase/.test(b.textContent)).click();
+      GF.api.run('deselect');
+    });
+    await step('generative fill dialog open/close (palette)', async () => {
+      pal('Generative fill'); await settle();
+      const m = $('.fs-modal'); if (m) Array.prototype.find.call(m.querySelectorAll('.text-btn'), b => /Cancel|Run/.test(b.textContent)).click();
+    });
 
     /* --- adjustment layers --- */
     await step('add + edit adjustment layer', () => {
@@ -161,7 +174,7 @@
     });
 
     /* --- history, undo/redo, palette --- */
-    await step('history panel jump', () => { $('.ptab[data-tab=pro]').click(); const items = $$('#history-list .hist-item'); if (items.length > 2) items[1].click(); });
+    await step('history panel jump', () => { $('.ptab[data-tab=layers]').click(); const items = $$('#history-list .hist-item'); if (items.length > 2) items[1].click(); });
     await step('undo/redo (keyboard)', () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true })); });
     await step('command palette run', () => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })); const i = $('.cmdk-input'); if (!i) throw new Error('palette not open'); i.value = 'fit to screen'; i.dispatchEvent(new Event('input')); i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); });
 

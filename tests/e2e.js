@@ -37,7 +37,12 @@
   }
   const layerCount = () => D.doc.layers.length;
   const clickTool = name => $(`#toolrail .tool[data-tool=${name}]`).click();
-  const proBtn = label => Array.prototype.find.call(document.querySelectorAll('#pro-grid .pro-btn'), b => b.textContent === label);
+  /* run a palette entry by (partial) label — the palette is the power surface now */
+  function palRun(label) {
+    $('#btn-palette').click();
+    const inp = $('.cmdk-input'); inp.value = label; inp.dispatchEvent(new Event('input'));
+    inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  }
 
   async function runAll() {
     /* ---------- DOCUMENT ---------- */
@@ -47,20 +52,25 @@
     });
     await t('empty-state hidden when doc open', () => { if (!$('#empty-state').hidden) throw new Error('empty-state visible'); });
     await t('#doc-dims label updated', () => { if ($('#doc-dims').textContent !== '200×200') throw new Error('"' + $('#doc-dims').textContent + '"'); });
-    await t('intent launcher routes on open (erase → magic erase)', () => {
-      $('.intent[data-intent=erase]').click();   // remembers intent + opens picker (noop headless)
-      freshDoc(150, 150);                          // newDoc → onDocumentOpened consumes the intent
-      if (GF.view.view.tool !== 'magiceraser') throw new Error('intent did not route, tool=' + GF.view.view.tool);
+    await t('intent: "Create a 3D scene" activates the 3D tool immediately', () => {
+      $('.intent[data-intent=scene]').click();
+      const on = $('#toolrail .tool[data-tool=scene3d]').classList.contains('on');
+      GF.ui.setTool('move');   // leave 3D so the rest of the suite runs in 2D
+      document.body.dataset.mode = 'image';
+      if (!on) throw new Error('3D tool not active');
     });
-    await t('intent launcher runs action (enhance → history)', () => {
-      $('.intent[data-intent=enhance]').click();
-      freshDoc(150, 150);
-      if ((GF.history.info().undo.slice(-1)[0] || '') !== 'enhance') throw new Error('enhance did not run');
+    await t('intent: "Turn an image into 3D" routes on open', () => {
+      $('.intent[data-intent=image3d]').click();   // remembers intent + opens picker (noop headless)
+      freshDoc(150, 150);                           // newDoc → onDocumentOpened consumes the intent
+      const on = $('#toolrail .tool[data-tool=scene3d]').classList.contains('on');
+      GF.ui.setTool('move');
+      document.body.dataset.mode = 'image';
+      if (!on) throw new Error('intent did not route to 3D');
     });
 
     /* ---------- TOOLS (click rail, verify engine tool) ---------- */
-    const toolMap = { move:'move', select:'marquee', wand:'wand', crop:'move', brush:'brush', eraser:'eraser', fill:'fill', text:'text', shape:'shape', eyedropper:'picker',
-      magicerase:'magiceraser', clone:'clone', gradient:'gradient' };
+    const toolMap = { move:'move', select:'marquee', wand:'wand', crop:'move', brush:'brush', eraser:'eraser', fill:'fill', text:'text', shape:'shape',
+      magicerase:'magiceraser', gradient:'gradient' };
     for (const [btn, eng] of Object.entries(toolMap)) {
       await t('tool ' + btn + ' -> ' + eng, () => { clickTool(btn); if (GF.view.view.tool !== eng) throw new Error('got ' + GF.view.view.tool); });
     }
@@ -121,17 +131,27 @@
 
     /* ---------- FILTERS (click chips) ---------- */
     const chips = document.querySelectorAll('#filter-strip .filter-chip');
-    await t('filter strip rendered (>=9 chips)', () => { if (chips.length < 9) throw new Error('only ' + chips.length); });
+    await t('filter strip rendered (>=6 chips)', () => { if (chips.length < 6) throw new Error('only ' + chips.length); });
     for (const label of ['B&W', 'Pop', 'Vivid', 'Invert']) {
       await t('filter ' + label, () => { freshDoc(); const chip = Array.prototype.find.call(chips, c => c.textContent.trim() === label); if (!chip) throw new Error('chip missing'); const u = GF.history.canUndo(); chip.click(); if (!GF.history.canUndo()) throw new Error('no history'); void u; });
     }
 
-    /* ---------- HERO ACTIONS ---------- */
-    await t('hero Auto-enhance commits', () => { freshDoc(); $('#hero-enhance').click(); if (!GF.history.canUndo()) throw new Error('no history'); });
-    await t('hero Remove bg (classic) runs', () => { freshDoc(); $('#hero-removebg').click(); });
-    await t('hero Magic erase w/o selection is safe', () => { freshDoc(); GF.api.run('deselect'); $('#hero-erase').click(); /* should toast, not throw */ });
-    await t('hero Magic erase w/ selection runs', () => { freshDoc(); GF.api.run('selectRect', { x: 30, y: 30, w: 40, h: 40 }); $('#hero-erase').click(); GF.api.run('deselect'); });
-    await t('hero Generative fill opens AI modal', () => { freshDoc(); $('#hero-genfill').click(); if (!$('.fs-modal')) throw new Error('no modal'); $('.fs-modal .text-btn').click(); /* cancel */ });
+    /* ---------- HEADLINE ACTIONS (palette-surfaced) ---------- */
+    await t('palette Auto enhance commits', async () => {
+      freshDoc(); palRun('Auto enhance');
+      await new Promise(r => setTimeout(r, 60));   // palette exec + busy defer
+      if ((GF.history.info().undo.slice(-1)[0] || '') !== 'enhance') throw new Error('enhance did not run');
+    });
+    await t('palette Remove background (classic) runs', async () => {
+      freshDoc(); palRun('Remove background');
+      await new Promise(r => setTimeout(r, 80));
+    });
+    await t('palette Generative fill opens AI modal', async () => {
+      freshDoc(); palRun('Generative fill');
+      await new Promise(r => setTimeout(r, 40));
+      if (!$('.fs-modal')) throw new Error('no modal');
+      $('.fs-modal .text-btn').click(); /* cancel */
+    });
 
     /* ---------- LAYERS ---------- */
     await t('layer add', () => { freshDoc(); const n = layerCount(); $('#lyr-add').click(); if (layerCount() !== n + 1) throw new Error('add failed'); });
@@ -143,19 +163,41 @@
     await t('layer merge down', () => { freshDoc(); $('#lyr-add').click(); const n = layerCount(); $('#lyr-merge').click(); if (layerCount() !== n - 1) throw new Error('merge'); });
     await t('layer delete', () => { $('#lyr-add').click(); const n = layerCount(); $('#lyr-del').click(); if (layerCount() !== n - 1) throw new Error('del'); });
 
-    /* ---------- PRO TOOLS ---------- */
-    await t('pro: Smart upscale 2x doubles dims', () => { freshDoc(100, 100); proBtn('Smart upscale 2×').click(); if (D.doc.width !== 200) throw new Error('w ' + D.doc.width); });
-    await t('pro: Trim to content', () => { freshDoc(); proBtn('Trim to content').click(); });
-    await t('pro: Flip H', () => { freshDoc(); proBtn('Flip H').click(); });
-    await t('pro: Rotate 90', () => { freshDoc(); proBtn('Rotate 90°').click(); });
-    await t('pro: Add mask', () => { freshDoc(); const had = !!D.active().mask; proBtn('Add mask').click(); if (!D.active().mask) throw new Error('no mask'); void had; });
-    await t('pro: Color replace opens modal', () => { freshDoc(); proBtn('Color replace').click(); if (!$('.fs-modal')) throw new Error('no modal'); $('.fs-modal .text-btn').click(); });
-    await t('pro: Curves opens modal w/ canvas', () => { freshDoc(); proBtn('Curves').click(); if (!$('.fs-modal #m-curve')) throw new Error('no curve canvas'); $('.fs-modal .text-btn').click(); });
-    await t('pro: Content-aware fill (w/ selection)', () => { freshDoc(); GF.api.run('selectRect', { x: 40, y: 40, w: 30, h: 30 }); proBtn('Content-aware fill').click(); GF.api.run('deselect'); });
+    /* ---------- POWER OPS (api catalog + dialogs — the palette's sources) ---------- */
+    await t('op: Smart upscale 2x doubles dims', () => { freshDoc(100, 100); GF.api.run('smartUpscale', { factor: 2, mode: 'photo' }); if (D.doc.width !== 200) throw new Error('w ' + D.doc.width); });
+    await t('op: Trim to content', () => { freshDoc(); GF.api.run('trim'); });
+    await t('op: Flip H', () => { freshDoc(); GF.api.run('flipLayer', { horizontal: true }); });
+    await t('op: Rotate 90', () => { freshDoc(); GF.api.run('rotateLayer', { cw: true }); });
+    await t('op: Add mask', () => { freshDoc(); GF.api.run('addMask', { init: 'reveal' }); if (!D.active().mask) throw new Error('no mask'); });
+    await t('palette Color replace opens modal', async () => {
+      freshDoc(); palRun('Color replace');
+      await new Promise(r => setTimeout(r, 40));
+      if (!$('.fs-modal')) throw new Error('no modal'); $('.fs-modal .text-btn').click();
+    });
+    await t('palette Curves opens modal w/ canvas', async () => {
+      freshDoc(); palRun('Curves');
+      await new Promise(r => setTimeout(r, 40));
+      if (!$('.fs-modal #m-curve')) throw new Error('no curve canvas'); $('.fs-modal .text-btn').click();
+    });
+    await t('op: Content-aware fill (w/ selection)', () => { freshDoc(); GF.api.run('selectRect', { x: 40, y: 40, w: 30, h: 30 }); GF.api.run('contentAwareFill'); GF.api.run('deselect'); });
     if (GF.texture) {
-      await t('pro: Normal map adds layer', () => { freshDoc(); const n = layerCount(); proBtn('Normal map').click(); if (layerCount() !== n + 1) throw new Error('no layer'); });
-      await t('pro: Seamless tile', () => { freshDoc(); proBtn('Seamless tile').click(); });
-    } else log('pro: texture tools present', false, 'GF.texture not loaded');
+      await t('texture: Normal map adds layer', () => { freshDoc(); const n = layerCount(); $('#tex-normal').click(); if (layerCount() !== n + 1) throw new Error('no layer'); });
+      await t('texture: Seamless tile', () => { freshDoc(); $('#tex-seamless').click(); });
+    } else log('texture tools present', false, 'GF.texture not loaded');
+    await t('brush Alt-click picks color', () => {
+      freshDoc(); clickTool('brush');
+      GF.view.view.brush.color = '#00ff00';
+      const v = GF.view.view, vp = $('#viewport').getBoundingClientRect();
+      // doc pixel (30,30) is inside the red rect painted by freshDoc
+      const cx = vp.left + v.panX + 30 * v.zoom, cy = vp.top + v.panY + 30 * v.zoom;
+      const origCap = Element.prototype.setPointerCapture;
+      Element.prototype.setPointerCapture = function () {};   // synthetic pointerIds throw in headless
+      try {
+        $('#viewport').dispatchEvent(new PointerEvent('pointerdown', { clientX: cx, clientY: cy, altKey: true, bubbles: true, pointerId: 991 }));
+        $('#viewport').dispatchEvent(new PointerEvent('pointerup', { clientX: cx, clientY: cy, bubbles: true, pointerId: 991 }));
+      } finally { Element.prototype.setPointerCapture = origCap; }
+      if (GF.view.view.brush.color === '#00ff00') throw new Error('color not picked: ' + GF.view.view.brush.color);
+    });
 
     /* ---------- UNDO / REDO ---------- */
     await t('undo/redo via top buttons + disabled state', () => {
@@ -312,10 +354,10 @@
       if (L.adjust.params.brightness !== 60) throw new Error('param not updated');
       ed.querySelector('.text-btn.primary').click();
     });
-    await t('invert adjustment changes composite + reverts on delete', () => {
+    await t('grayscale adjustment changes composite + reverts on delete', () => {
       freshDoc();
       const before = GF.api.snapshot(1);
-      $('#lyr-fx').click(); $('.fs-modal [data-k=invert]').click();
+      $('#lyr-fx').click(); $('.fs-modal [data-k=grayscale]').click();
       if (GF.api.snapshot(1) === before) throw new Error('composite unchanged');
       GF.api.run('deleteLayer');
       if (GF.api.snapshot(1) !== before) throw new Error('not reverted after delete');
@@ -436,9 +478,9 @@
     });
 
     /* ---------- PRO SELECTIONS + GUIDES ---------- */
-    await t('wand optbar: mode/sample/AA/Select menu/guide', () => {
+    await t('wand optbar: mode/sample/AA/guide', () => {
       freshDoc(); clickTool('wand');
-      ['#sel-mode', '#wand-sample', '#wand-aa', '#sel-menu'].forEach(s => { if (!$(s)) throw new Error('missing ' + s); });
+      ['#sel-mode', '#wand-sample', '#wand-aa'].forEach(s => { if (!$(s)) throw new Error('missing ' + s); });
       if (!$('.guide-btn')) throw new Error('no guide button');
     });
     await t('wand intersect mode (no throw)', () => {
@@ -506,11 +548,16 @@
       const L = GF.doc.active(); if (!L.adjust || !L.mask) throw new Error('adjustment not masked from selection');
       $('.fs-modal .text-btn.primary').click(); GF.api.run('deselect');
     });
-    await t('select menu opens with ops (Color range)', () => {
-      freshDoc(); GF.api.run('selectRect', { x: 10, y: 10, w: 40, h: 40 }); clickTool('wand');
-      $('#sel-menu').click(); const m = $('.fs-modal'); if (!m) throw new Error('no select menu');
-      if (!Array.prototype.some.call(m.querySelectorAll('.pro-btn'), b => /Color range/.test(b.textContent))) throw new Error('missing Color range');
-      $('.fs-modal .text-btn').click(); GF.api.run('deselect');
+    await t('sel-bar More has Contract + Smooth; palette has Color range', async () => {
+      freshDoc(); GF.api.run('selectRect', { x: 10, y: 10, w: 40, h: 40 });
+      const more = $('#sel-bar .sel-more');
+      const labels = Array.prototype.map.call(more.querySelectorAll('button'), b => b.textContent).join('|');
+      if (!/Contract/.test(labels) || !/Smooth/.test(labels)) throw new Error('missing refine ops: ' + labels);
+      GF.api.run('deselect');
+      palRun('Color range');
+      await new Promise(r => setTimeout(r, 40));
+      if (!$('.fs-modal #cr-tol')) throw new Error('Color range dialog missing');
+      $('.fs-modal .text-btn').click();
     });
     await t('tool guide opens (wand) with next-step outcomes', () => {
       freshDoc(); clickTool('wand'); $('.guide-btn').click();

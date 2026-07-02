@@ -226,19 +226,6 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
   color: var(--ink-3); margin: 1.1rem 0 .55rem; font-weight: 700; }
 .panel-h.first { margin-top: .1rem; }
 
-/* hero actions */
-.hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
-.hero {
-  display: flex; align-items: center; gap: .5rem; padding: .7em .7em;
-  background: var(--surface); border-radius: var(--r); font-weight: 600;
-  box-shadow: inset 0 0 0 1px var(--line); text-align: left;
-  transition: .15s transform, .15s background, .15s box-shadow; line-height: 1.15;
-}
-.hero:hover { background: var(--surface-2); transform: translateY(-1px); box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--line); }
-.hero:active { transform: translateY(0); }
-.hero .hi { font-size: 1.2em; }
-.hero.ai { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ai) 45%, var(--line)); color: var(--ai-2); }
-.hero.busy { opacity: .6; pointer-events: none; }
 
 /* adjust sliders */
 .adj-group { margin-top: 1rem; display: flex; flex-direction: column; gap: .15rem; }
@@ -479,9 +466,9 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .ck input { width: auto; }
 
 /* ---------------------- micro-interactions / polish ---------------------- */
-.text-btn, .hero, .tool, .icon-btn, .pro-btn, .filter-chip, .palette-trigger {
+.text-btn, .tool, .icon-btn, .pro-btn, .filter-chip, .palette-trigger {
   transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .08s ease; }
-.text-btn:active, .icon-btn:active, .tool:active, .pro-btn:active, .hero:active, .filter-chip:active { transform: scale(.96); }
+.text-btn:active, .icon-btn:active, .tool:active, .pro-btn:active, .filter-chip:active { transform: scale(.96); }
 .text-btn.primary { box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 50%, #000), var(--shadow-sm); }
 .text-btn.primary:active { box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 50%, #000); }
 #topbar, #panel, #toolrail { transition: background .25s ease; }
@@ -539,11 +526,6 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   #touch-companion { display: flex; }
   #sel-bar { bottom: calc(62px + env(safe-area-inset-bottom) + 10px); left: 50%;
     transform: translateX(-50%); width: min(360px, 94%); }
-  .hero-actions { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 420px) {
-  .hero { flex-direction: column; align-items: flex-start; gap: .25rem; font-size: .9em; }
 }
 
 /* ------------- no-document state: quiet the chrome until work exists -------------

@@ -356,8 +356,10 @@ GF.view = (function () {
       // click with the move tool doesn't create a no-op undo step
       moveStart = { px: e.clientX, py: e.clientY, layerX: L.x, layerY: L.y, pushed: false };
     } else if (tool === 'brush' || tool === 'eraser') {
+      if (e.altKey) { pickColor(p); return; }   // Alt-click samples color (replaces the eyedropper tool)
       if (beginStroke(tool === 'eraser' ? 'eraser' : 'brush')) stampTo(p);
     } else if (tool === 'fill') {
+      if (e.altKey) { pickColor(p); return; }
       doFill(L, p);
     } else if (tool === 'picker') {
       pickColor(p);
