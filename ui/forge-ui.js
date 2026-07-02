@@ -711,7 +711,10 @@ window.GF = window.GF || {};
       ok: 'Download',
       extra: [['Save project', () => { GF.exporter.saveProject(); closeModal(); }],
               ['Export layers', () => { run('exportLayers', {}); closeModal(); }],
-              ...(GF.scene3d && GF.scene3d.count() ? [['GLB (3D scene)', () => { GF.scene3d.exportGLB({}); closeModal(); }]] : [])],
+              ...(GF.scene3d && GF.scene3d.count() ? [
+                ['GLB (3D scene)', () => { GF.scene3d.exportGLB({}); closeModal(); }],
+                ['Web page (3D)', () => { closeModal(); GF.scene3dUI.publishDialog(); }],
+              ] : [])],
       onOk: m => {
         const type = m.querySelector('#m-fmt').value, scale = +m.querySelector('#m-scale').value;
         GF.exporter.exportImage({ type, scale, quality: 0.92 });

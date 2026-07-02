@@ -114,6 +114,7 @@ GF.scene3dUI = (function () {
       <h3 class="panel-h">Actions</h3>
       <div class="s3-row">
         <button class="text-btn primary" id="s3-flatten">⬇ Flatten to layer</button>
+        <button class="text-btn primary" id="s3-publish">🌐 Publish page…</button>
       </div>
       <div class="s3-row">
         <button class="text-btn ghost" id="s3-glb">Export GLB</button>
@@ -148,6 +149,7 @@ GF.scene3dUI = (function () {
     $('#s3-bg').addEventListener('change', e => S().setBackground(e.target.value, $('#s3-bg-color').value));
     $('#s3-bg-color').addEventListener('input', e => S().setBackground('color', e.target.value));
     $('#s3-flatten').addEventListener('click', flattenAndReturn);
+    $('#s3-publish').addEventListener('click', publishDialog);
     $('#s3-glb').addEventListener('click', () => S().exportGLB({}));
     $('#s3-glb-sel').addEventListener('click', () => S().exportGLB({ selection: 'selected' }));
     $('#s3-refresh').addEventListener('click', () => { S().refreshAll(); U.toast('Textures refreshed'); });
@@ -340,6 +342,44 @@ GF.scene3dUI = (function () {
     });
   }
 
+  /* ---- publish: one-file interactive web page ---- */
+  function publishDialog() {
+    if (!S().count()) { U.toast('Add something to the 3D scene first'); return; }
+    const bg = S().background();
+    const wrap = document.createElement('div'); wrap.className = 'fs-modal';
+    wrap.innerHTML = `<div class="card">
+      <h2>🌐 Publish web page</h2>
+      <p class="sub">One self-contained .html — your scene + an interactive viewer. Host it anywhere.</p>
+      <label>Page title<input id="pb-title" value="${(D.doc.name || 'My 3D scene').replace(/"/g, '&quot;')}"></label>
+      <div class="s3-row">
+        <label class="mini">Background<select id="pb-bg">
+          <option value="default"${bg.mode === 'default' ? ' selected' : ''}>Studio (dark)</option>
+          <option value="transparent"${bg.mode === 'transparent' ? ' selected' : ''}>Transparent</option>
+          <option value="color"${bg.mode === 'color' ? ' selected' : ''}>Solid color</option>
+        </select></label>
+        <input type="color" id="pb-color" value="${bg.color || '#0c0e11'}" title="Background color">
+      </div>
+      <label class="ck"><input type="checkbox" id="pb-spin" checked> Slow auto-rotate</label>
+      <menu>
+        <button class="text-btn" data-x>Cancel</button>
+        <button class="text-btn primary" data-go>Download page</button>
+      </menu></div>`;
+    document.body.appendChild(wrap);
+    const close = () => wrap.remove();
+    wrap.addEventListener('mousedown', e => { if (e.target === wrap) close(); });
+    wrap.querySelector('[data-x]').addEventListener('click', close);
+    wrap.querySelector('[data-go]').addEventListener('click', async () => {
+      const btn = wrap.querySelector('[data-go]'); btn.disabled = true; btn.textContent = 'Building…';
+      await GF.publish.downloadPage({
+        title: wrap.querySelector('#pb-title').value.trim(),
+        background: wrap.querySelector('#pb-bg').value,
+        color: wrap.querySelector('#pb-color').value,
+        autoRotate: wrap.querySelector('#pb-spin').checked,
+      });
+      close();
+    });
+  }
+
   /* ---- tiny Poly Haven picker (CC0; online-only, degrades with a message) ---- */
   function phPicker(type, onPick) {
     const wrap = document.createElement('div'); wrap.className = 'fs-modal';
@@ -383,5 +423,5 @@ GF.scene3dUI = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); refresh(); });
   else { ensurePane(); refresh(); }
 
-  return { enter, exit, optbarHtml, wireOptbar, refresh };
+  return { enter, exit, optbarHtml, wireOptbar, refresh, publishDialog };
 })();

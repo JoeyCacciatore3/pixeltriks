@@ -752,19 +752,25 @@ GF.scene3d = (function () {
     return L.id;
   }
 
-  async function exportGLB(opts) {
+  /** Raw binary-GLB ArrayBuffer of the scene (or selected object) — shared by
+      the .glb download and the web-page publisher. */
+  function exportGLBBuffer(opts) {
     opts = opts || {};
+    if (!objects.length || !LIB) return Promise.resolve(null);
     const target = (opts.selection === 'selected' && selected()) ? selected().node : sceneRoot;
+    return new Promise((resolve, reject) => {
+      new LIB.GLTFExporter().parse(target, g => resolve(g), e => reject(e), { binary: true });
+    });
+  }
+  async function exportGLB(opts) {
     if (!objects.length) { U.toast('Add some 3D objects first'); return; }
     try {
-      const GLTFExporter = LIB.GLTFExporter;
-      return new Promise(resolve => {
-        new GLTFExporter().parse(target,
-          g => { U.downloadBlob(new Blob([g], { type: 'model/gltf-binary' }), (D.doc.name || 'scene') + '.glb'); U.toast('GLB exported'); resolve(true); },
-          e => { U.toast('Export failed: ' + e.message); resolve(false); },
-          { binary: true });
-      });
-    } catch (e) { U.toast('GLB exporter could not load'); }
+      const buf = await exportGLBBuffer(opts);
+      if (!buf) return false;
+      U.downloadBlob(new Blob([buf], { type: 'model/gltf-binary' }), (D.doc.name || 'scene') + '.glb');
+      U.toast('GLB exported');
+      return true;
+    } catch (e) { U.toast('Export failed: ' + e.message); return false; }
   }
 
   return {
@@ -780,7 +786,7 @@ GF.scene3d = (function () {
     // environment
     setEnvironment, clearEnvironment, setBackground, background: () => Object.assign({}, bg),
     // output
-    snapshotToLayer, exportGLB,
+    snapshotToLayer, exportGLB, exportGLBBuffer,
     // undo
     hist
   };

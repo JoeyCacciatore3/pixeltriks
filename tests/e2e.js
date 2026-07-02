@@ -685,6 +685,18 @@
           if (id == null) throw new Error(k + ' failed');
         }
       }, 30000);
+      await t('publish: one-file page embeds scene + viewer', async () => {
+        const html = await GF.publish.buildPage({ title: 'Test <scene>', autoRotate: true });
+        if (!html) throw new Error('no html');
+        if (html.indexOf('cdn.jsdelivr.net/npm/three@0.160.0') < 0) throw new Error('no pinned import map');
+        if (html.indexOf('scene-glb') < 0) throw new Error('no embedded GLB block');
+        if (html.indexOf('OrbitControls') < 0) throw new Error('no controls');
+        if (html.indexOf('GLTFLoader') < 0) throw new Error('no loader');
+        if (html.indexOf('Test &lt;scene&gt;') < 0) throw new Error('title not escaped');
+        const m = html.match(/type="application\/octet-stream">([^<]+)</);
+        if (!m || m[1].trim().length < 800) throw new Error('GLB payload too small: ' + (m ? m[1].trim().length : 0));
+        if (!/^[A-Za-z0-9+/=\s]+$/.test(m[1].trim())) throw new Error('payload is not base64');
+      }, 30000);
       await t('make3d: registered in the api catalog', () => {
         const names = GF.api.describe().map(c => c.name);
         ['make3d.run', 'make3d.cutout', 'make3d.relief', 'make3d.lathe', 'make3d.layers'].forEach(n => {
