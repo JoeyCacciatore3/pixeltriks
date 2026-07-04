@@ -167,7 +167,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
   grid-template-rows: 1fr auto;
   grid-template-areas:
     "sidebar viewport panel"
-    "sidebar viewport panel";
+    "sidebar timeline panel";
 }
 #sidebar  { grid-area: sidebar; }
 #viewport { grid-area: viewport; }
