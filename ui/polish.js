@@ -147,12 +147,8 @@ GF.polish = (function () {
      Visual undo — current-state snapshot thumbnail in history panel
      ================================================================= */
   function enhanceHistory() {
-    const orig = GF.ui && GF.ui.renderHistory;
-    if (!orig) return;
-    GF.ui.renderHistory = function () {
-      orig.call(GF.ui);
-      addHistoryThumbnail();
-    };
+    if (!GF.history) return;
+    GF.history.onChange(() => setTimeout(addHistoryThumbnail, 50));
   }
 
   function addHistoryThumbnail() {
@@ -183,14 +179,12 @@ GF.polish = (function () {
     loadDismissed();
     buildQuickActions();
 
-    if (GF.ui && GF.ui.onToolChanged) {
+    if (GF.ui && GF.ui.setTool) {
       const origSetTool = GF.ui.setTool;
-      if (origSetTool) {
-        GF.ui.setTool = function (name) {
-          origSetTool.call(GF.ui, name);
-          showTip(name);
-        };
-      }
+      GF.ui.setTool = function (name) {
+        origSetTool.call(GF.ui, name);
+        showTip(name);
+      };
     }
     enhanceHistory();
   }

@@ -161,15 +161,7 @@ GF.assets = (function () {
     return assets;
   }
 
-  function canvasToBlob(canvas, type) {
-    type = type || 'image/png';
-    const url = canvas.toDataURL(type);
-    const b64 = url.split(',')[1];
-    const bin = atob(b64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return Promise.resolve(new Blob([arr], { type }));
-  }
+  function canvasToBlob(canvas, type) { return U.canvasToBlob(canvas, type); }
 
   async function saveMaterial(name, maps, presetInfo) {
     const colorBlob = await canvasToBlob(maps.color);

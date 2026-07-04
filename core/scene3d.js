@@ -585,14 +585,7 @@ GF.scene3d = (function () {
       handleFiles(e.dataTransfer.files);
     }
   }
-  function _blobToCanvas(blob) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => { const c = U.makeCanvas(img.naturalWidth, img.naturalHeight); U.ctx2d(c).drawImage(img, 0, 0); URL.revokeObjectURL(img.src); resolve(c); };
-      img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('load failed')); };
-      img.src = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
-    });
-  }
+  function _blobToCanvas(blob) { return U.blobToCanvas(blob); }
 
   function removeObject(id) {
     const o = byId(id); if (!o) return;

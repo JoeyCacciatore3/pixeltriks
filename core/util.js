@@ -84,8 +84,20 @@ GF.util = (function () {
   }
 
   function canvasToBlob(canvas, type, quality) {
+    type = type || 'image/png';
+    const url = canvas.toDataURL(type, quality);
+    const b64 = url.split(',')[1];
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return Promise.resolve(new Blob([arr], { type }));
+  }
+  function blobToCanvas(blob) {
     return new Promise((resolve, reject) => {
-      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Export failed — the canvas may be too large for this device.')), type, quality);
+      const img = new Image();
+      img.onload = () => { const c = makeCanvas(img.naturalWidth, img.naturalHeight); ctx2d(c).drawImage(img, 0, 0); URL.revokeObjectURL(img.src); resolve(c); };
+      img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('load failed')); };
+      img.src = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
     });
   }
 
@@ -116,5 +128,5 @@ GF.util = (function () {
   }
 
   return { clamp, $, $$, makeCanvas, ctx2d, luminance, hexToRgb, rgbToHex,
-           rgbToHsl, hslToRgb, downloadBlob, canvasToBlob, toast, busy };
+           rgbToHsl, hslToRgb, downloadBlob, canvasToBlob, blobToCanvas, toast, busy };
 })();
