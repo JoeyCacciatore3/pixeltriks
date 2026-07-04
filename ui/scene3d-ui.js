@@ -155,7 +155,11 @@ GF.scene3dUI = (function () {
     $('#s3-refresh').addEventListener('click', () => { S().refreshAll(); U.toast('Textures refreshed'); });
 
     S().setStatusCallback(msg => { const el = $('#s3-status'); if (el) el.textContent = msg; });
-    S().onChange(refresh);
+    S().onChange(() => {
+      refresh();
+      const es = $('#empty-state');
+      if (es && S().count() > 0) es.hidden = true;
+    });
     wireMake3d();
     wireKeys();
   }
