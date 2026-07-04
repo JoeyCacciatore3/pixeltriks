@@ -544,7 +544,8 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   .color-tool { flex: 0 0 auto; }
   #stage {
     grid-template-columns: 1fr;
-    grid-template-areas: "viewport";
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "viewport" "timeline";
     padding-bottom: 62px;
   }
 
@@ -573,6 +574,13 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   #touch-companion { display: flex; }
   #sel-bar { bottom: calc(62px + env(safe-area-inset-bottom) + 10px); left: 50%;
     transform: translateX(-50%); width: min(360px, 94%); }
+  .quick-actions { bottom: calc(62px + env(safe-area-inset-bottom) + 8px); right: 8px; left: 8px;
+    justify-content: center; }
+  .qa-label { display: none; }
+  .first-tip { bottom: calc(62px + env(safe-area-inset-bottom) + 8px); max-width: calc(100vw - 24px);
+    font-size: .68rem; }
+  #timeline { height: 32px; }
+  .tl-bar { height: 32px; padding: 0 .35rem; }
 }
 
 /* ------------- no-document state: quiet the chrome until work exists -------------
@@ -626,7 +634,7 @@ body[data-mode="3d"] #sel-bar { display: none; }
 
 /* ============================= ANIMATION TIMELINE ======================== */
 #timeline {
-  grid-area: 2 / 2 / 3 / 3; overflow: hidden;
+  grid-area: timeline; overflow: hidden;
   background: var(--bg-2); border-top: 1px solid var(--line);
   transition: height .2s ease; height: 36px;
 }
@@ -667,7 +675,8 @@ body[data-mode="3d"] #sel-bar { display: none; }
 .ph-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- Phase 5 polish ---- */
-.quick-actions { position: fixed; bottom: 52px; right: 16px; display: flex; gap: 6px; z-index: 90; }
+.quick-actions { position: fixed; bottom: 52px; right: 16px; display: flex; gap: 6px; z-index: 90;
+  flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 32px); }
 .qa-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px;
   background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2);
   font: 500 .72rem/1 var(--font); cursor: pointer; white-space: nowrap; }
