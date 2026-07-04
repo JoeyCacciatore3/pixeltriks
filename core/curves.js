@@ -1,4 +1,4 @@
-/* Forge Studio — curves.js
+/* PixelTriks — curves.js
    Interactive tone-curve editor widget: a square canvas with a draggable
    control-point curve per channel (RGB/R/G/B), drawn over a histogram.
    Pure UI — the LUT math lives in GF.filters (buildLut / curveLuts). */

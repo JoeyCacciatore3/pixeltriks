@@ -1,7 +1,7 @@
 {
   "name": "PixelTriks",
   "short_name": "PixelTriks",
-  "description": "Image editor with a 3D workspace — enhance, retouch, cut out, and texture GLB models with your own designs.",
+  "description": "3D scene studio — build, texture, animate, and publish interactive Three.js scenes and GLB models in the browser.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

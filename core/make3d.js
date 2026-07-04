@@ -254,12 +254,95 @@ GF.make3d = (function () {
     }
   });
 
+  /* =================================================================
+     SVG extrusion — import SVG paths → ExtrudeGeometry
+     ================================================================= */
+  register('svg', {
+    label: 'SVG extrude',
+    desc: 'Extrude SVG vector paths into a solid 3D shape',
+    options: [
+      { key: 'depth', label: 'Depth', min: 0.05, max: 1, step: 0.05, def: 0.15 },
+    ],
+    async build({ opts, THREE, LIB }) {
+      if (!LIB.SVGLoader) { U.toast('SVGLoader not available'); return null; }
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.svg';
+      const file = await new Promise(resolve => {
+        input.onchange = () => resolve(input.files[0] || null);
+        input.click();
+      });
+      if (!file) return null;
+      const text = await file.text();
+      const loader = new LIB.SVGLoader();
+      const data = loader.parse(text);
+      if (!data.paths.length) { U.toast('No paths found in SVG'); return null; }
+
+      const group = new THREE.Group();
+      const scale = WORLD / 200;
+      data.paths.forEach(path => {
+        const shapes = path.toShapes(true);
+        shapes.forEach(shape => {
+          const geo = new THREE.ExtrudeGeometry(shape, {
+            depth: opts.depth * 100, bevelEnabled: true, bevelThickness: 1, bevelSize: 1, bevelSegments: 2
+          });
+          geo.scale(scale, -scale, scale);
+          geo.center();
+          const color = path.color || new THREE.Color(0xcccccc);
+          const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
+          group.add(new THREE.Mesh(geo, mat));
+        });
+      });
+      return { node: group, keepOriginal: true };
+    }
+  });
+
+  /* =================================================================
+     Text extrusion — 3D text from a typed string
+     ================================================================= */
+  let _cachedFont = null;
+  function loadFont(LIB) {
+    if (_cachedFont) return Promise.resolve(_cachedFont);
+    return new Promise((resolve, reject) => {
+      new LIB.FontLoader().load('vendor/fonts/helvetiker_regular.typeface.json',
+        f => { _cachedFont = f; resolve(f); },
+        undefined,
+        () => reject(new Error('font load failed')));
+    });
+  }
+
+  register('text3d', {
+    label: '3D Text',
+    desc: 'Extrude typed text into a 3D object',
+    options: [
+      { key: 'depth', label: 'Depth', min: 0.02, max: 0.5, step: 0.02, def: 0.1 },
+      { key: 'size', label: 'Size', min: 0.1, max: 2, step: 0.1, def: 0.5 },
+      { key: 'text', label: 'Text', def: '' },
+    ],
+    async build({ opts, THREE, LIB }) {
+      if (!LIB.TextGeometry || !LIB.FontLoader) {
+        U.toast('TextGeometry not available');
+        return null;
+      }
+      const text = opts.text || prompt('Enter text:');
+      if (!text) return null;
+      let font;
+      try { font = await loadFont(LIB); } catch (e) { U.toast('Could not load font'); return null; }
+      const geo = new LIB.TextGeometry(text, {
+        font, size: opts.size || 0.5, depth: opts.depth || 0.1,
+        curveSegments: 8, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 3
+      });
+      geo.center();
+      return { geometry: geo, doubleSided: true };
+    }
+  });
+
   /* ---- agent/palette surface ---- */
   if (GF.api && GF.api.register) {
     GF.api.register('make3d.list', '', 'List the 2D→3D converters', () => list());
-    GF.api.register('make3d.run', 'key(cutout|relief|lathe|layers), …options', 'Convert the current image/selection into a 3D scene object', a => run(a.key, a));
+    GF.api.register('make3d.run', 'key(cutout|relief|lathe|layers|svg|text3d), …options', 'Convert the current image/selection into a 3D scene object', a => run(a.key, a));
     [['cutout', 'Make 3D: Extrude cutout'], ['relief', 'Make 3D: Relief map'],
-     ['lathe', 'Make 3D: Lathe from shape'], ['layers', 'Make 3D: Layer stack diorama']].forEach(([k, label]) =>
+     ['lathe', 'Make 3D: Lathe from shape'], ['layers', 'Make 3D: Layer stack diorama'],
+     ['svg', 'Make 3D: SVG extrude'], ['text3d', 'Make 3D: 3D Text']].forEach(([k, label]) =>
       GF.api.register('make3d.' + k, '…options', 'Run the ' + k + ' 2D→3D converter', a => run(k, a || {}),
         { group: '3D', label, needsDoc: true }));
   }

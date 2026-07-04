@@ -1,24 +1,17 @@
 /* PixelTriks — scene3d.js
-   The 3D workspace engine (GF.scene3d). Grown out of the old texture-app
-   preview3d.js: instead of a read-only preview it owns a real scene — import
-   GLB/GLTF models, add primitives, move/rotate/scale each object, texture
-   them with the document, any layer, or an imported image, light with an
-   HDRI, then export a .glb or flatten a doc-resolution render onto the 2D
-   canvas as a normal layer.
+   The 3D workspace engine (GF.scene3d). Import GLB/GLTF models, add
+   primitives, move/rotate/scale each object, texture them with the
+   document, any layer, or an imported image, light with an HDRI, then
+   export a .glb or flatten a doc-resolution render onto the 2D canvas.
 
-   Three.js (0.160, vendored in vendor/three/) and its addons arrive via
-   ui/three-bundle.js — a static ES module (resolved through the import map
-   in index.html) that stashes them on window.__THREE_BUNDLE. Static imports
-   are used because dynamic import() hangs on file:// in Chrome. A single
-   THREE instance, so addon objects stay compatible. 2D editing never
-   depends on the bundle loading.
+   Three.js r185 vendored in vendor/three/, loaded via ui/three-bundle.js
+   (static ES module → window.__THREE_BUNDLE). Static imports because
+   dynamic import() hangs on file:// in Chrome.
 
-   Color space is deliberate: base-color maps are tagged sRGB while
-   normal/roughness maps stay linear, matching MeshStandardMaterial.
+   Color space: base-color maps tagged sRGB, normal/roughness stay linear.
 
-   3D edits keep their own small command-stack undo (GF.scene3d.hist) —
-   scene graphs don't fit the bitmap snapshots of GF.history; the api.js
-   undo/redo commands route here while the workspace is active. */
+   3D edits keep their own command-stack undo (GF.scene3d.hist) — scene
+   graphs don't fit bitmap snapshots; api.js routes here while active. */
 'use strict';
 window.GF = window.GF || {};
 
@@ -36,6 +29,7 @@ GF.scene3d = (function () {
   const objects = [];            // [{id, name, kind, prim, node, visible, mat, material, _origMats}]
   let selectedId = null, nextId = 1;
   let interact = 'orbit';        // orbit | move | rotate | scale
+  let gizmo = null, gizmoBefore = null;
   const bg = { mode: 'default', color: '#0c0e11' };   // default = dark; snapshot renders transparent unless 'color'
 
   const texCache = new Map();    // source-string -> { tex, srcCanvas }
@@ -43,6 +37,8 @@ GF.scene3d = (function () {
   let compCanvas = null;         // persistent canvas backing the 'composite' texture
   let texDirty = false, lastTexAt = 0;
   let nextImageId = 1;
+  let clock = null;
+  const mixers = new Map();
 
   function setStatus(msg) { try { statusCb(msg || ''); } catch (e) {} }
   function onChange(fn) { changeCbs.push(fn); }
@@ -55,13 +51,16 @@ GF.scene3d = (function () {
     if (window.__THREE_BUNDLE) { LIB = window.__THREE_BUNDLE; THREE = LIB.THREE; return Promise.resolve(LIB); }
     setStatus('Loading 3D engine…');
     return new Promise((resolve, reject) => {
+      const grab = () => { LIB = window.__THREE_BUNDLE; THREE = LIB.THREE; setStatus(''); };
       const t0 = Date.now();
+      const onReady = () => { clearInterval(iv); grab(); resolve(LIB); };
+      window.addEventListener('three-bundle-ready', onReady, { once: true });
       const iv = setInterval(() => {
         if (window.__THREE_BUNDLE) {
-          clearInterval(iv); setStatus('');
-          LIB = window.__THREE_BUNDLE; THREE = LIB.THREE;
-          resolve(LIB);
+          window.removeEventListener('three-bundle-ready', onReady);
+          clearInterval(iv); grab(); resolve(LIB);
         } else if (Date.now() - t0 > 15000) {
+          window.removeEventListener('three-bundle-ready', onReady);
           clearInterval(iv); reject(new Error('three bundle unavailable'));
         }
       }, 50);
@@ -119,12 +118,36 @@ GF.scene3d = (function () {
 
     controls = new LIB.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
+    clock = new T.Clock();
+
+    if (LIB.TransformControls) {
+      gizmo = new LIB.TransformControls(camera, renderer.domElement);
+      scene.add(gizmo.getHelper());
+      gizmo.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
+      gizmo.addEventListener('mouseDown', () => {
+        const o = selected(); if (o) gizmoBefore = snapTransform(o);
+      });
+      gizmo.addEventListener('mouseUp', () => {
+        const o = selected();
+        if (o && gizmoBefore) {
+          const after = snapTransform(o);
+          const before = gizmoBefore;
+          hist.push('transform', () => writeTransform(o, before), () => writeTransform(o, after));
+          gizmoBefore = null; emit();
+        }
+      });
+    }
 
     new ResizeObserver(resize).observe(U.$('#viewport'));
     resize();
     wirePointer(renderer.domElement, host);
     GF.history.onChange(() => { texDirty = true; });
     U.$('#viewport').addEventListener('pointerup', () => { texDirty = true; }, { passive: true });
+
+    const vp = U.$('#viewport');
+    vp.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    vp.addEventListener('drop', handleViewportDrop);
+
     return true;
   }
 
@@ -140,6 +163,8 @@ GF.scene3d = (function () {
   function animate() {
     raf = requestAnimationFrame(animate);
     if (controls) controls.update();
+    const dt = clock ? clock.getDelta() : 0;
+    for (const [, entry] of mixers) entry.mixer.update(dt);
     if (texDirty && performance.now() - lastTexAt > 250) { lastTexAt = performance.now(); texDirty = false; refreshTextures(); }
     if (boxHelper) { const o = byId(selectedId); if (o) boxHelper.box.setFromObject(o.node); }
     renderer.render(scene, camera);
@@ -149,7 +174,7 @@ GF.scene3d = (function () {
   async function enter() {
     const epoch = ++modeEpoch;
     try { await ensureRenderer(); } catch (e) { return false; }
-    if (epoch !== modeEpoch) return false;   // superseded by an exit() (user switched tools mid-boot)
+    if (epoch !== modeEpoch) return false;
     document.body.dataset.mode = '3d';
     if (!raf) animate();
     refreshAll();
@@ -159,6 +184,16 @@ GF.scene3d = (function () {
     modeEpoch++;
     document.body.dataset.mode = 'image';
     if (raf) { cancelAnimationFrame(raf); raf = null; }
+  }
+
+  /* Auto-boot: start the 3D renderer as soon as the bundle is ready.
+     The 3D viewport is always visible — no mode toggle needed. */
+  function autoBoot() {
+    enter().catch(() => {});
+  }
+  if (typeof window !== 'undefined') {
+    if (window.__THREE_BUNDLE) autoBoot();
+    else window.addEventListener('three-bundle-ready', autoBoot, { once: true });
   }
 
   /* =================================================================
@@ -446,6 +481,12 @@ GF.scene3d = (function () {
         };
         o.material = new T.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
         attach(o); select(o.id);
+        if (g.animations && g.animations.length) {
+          const mixer = new T.AnimationMixer(node);
+          g.animations.forEach(clip => mixer.clipAction(clip).play());
+          mixers.set(o.id, { mixer, clips: g.animations });
+          if (GF.animation) GF.animation.importClips(g.animations);
+        }
         hist.push('import ' + o.name, () => detach(o), () => attach(o));
         setStatus('Model loaded — ' + o.name);
         U.toast('Model loaded: ' + o.name);
@@ -505,8 +546,57 @@ GF.scene3d = (function () {
     }
   }
 
+  async function handleViewportDrop(e) {
+    e.preventDefault();
+    const assetId = e.dataTransfer.getData('application/x-pixeltriks-asset');
+    if (assetId && GF.assets) {
+      const asset = await GF.assets.get(assetId);
+      if (!asset) return;
+      if (asset.type === 'model') {
+        const url = GF.assets.blobUrl(asset);
+        if (url) await importModel(url, asset.name);
+      } else if (asset.type === 'material') {
+        const o = selected();
+        if (!o) { U.toast('Select an object to apply material'); return; }
+        const colorCanvas = await _blobToCanvas(asset.data);
+        const colorKey = addImageSource(colorCanvas, asset.name + '-color');
+        const patch = { mapSource: colorKey };
+        if (asset.materialData) {
+          if (asset.materialData.normal) {
+            const nc = await _blobToCanvas(asset.materialData.normal);
+            patch.normalSource = addImageSource(nc, asset.name + '-normal');
+          }
+          if (asset.materialData.metalness !== undefined) patch.metalness = asset.materialData.metalness;
+          if (asset.materialData.roughnessVal !== undefined) patch.roughness = asset.materialData.roughnessVal;
+        }
+        setMaterial(o.id, patch);
+        U.toast('Material applied: ' + asset.name);
+      } else if (asset.type === 'texture') {
+        const o = selected();
+        if (!o) { U.toast('Select an object to apply texture'); return; }
+        const canvas = await _blobToCanvas(asset.data);
+        setMaterial(o.id, { mapSource: addImageSource(canvas, asset.name) });
+        U.toast('Texture applied: ' + asset.name);
+      } else if (asset.type === 'hdri') {
+        const url = GF.assets.blobUrl(asset);
+        if (url) await setEnvironment(url);
+      }
+    } else if (e.dataTransfer.files.length) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }
+  function _blobToCanvas(blob) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => { const c = U.makeCanvas(img.naturalWidth, img.naturalHeight); U.ctx2d(c).drawImage(img, 0, 0); URL.revokeObjectURL(img.src); resolve(c); };
+      img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('load failed')); };
+      img.src = URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
+    });
+  }
+
   function removeObject(id) {
     const o = byId(id); if (!o) return;
+    if (mixers.has(id)) { mixers.get(id).mixer.stopAllAction(); mixers.delete(id); }
     detach(o);
     hist.push('remove ' + o.name, () => { attach(o); applyMaterial(o); }, () => detach(o));
   }
@@ -571,6 +661,9 @@ GF.scene3d = (function () {
     if (o) {
       boxHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(o.node), new THREE.Color(0xe8a33d));
       helpers.add(boxHelper);
+      if (gizmo) gizmo.attach(o.node);
+    } else {
+      if (gizmo) gizmo.detach();
     }
     emit();
   }
@@ -590,6 +683,19 @@ GF.scene3d = (function () {
     const o = objects.find(x => x.node === n);
     return o ? o.id : null;
   }
+  function raycastUV(clientX, clientY) {
+    if (!THREE || !renderer) return null;
+    const r = renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(sceneRoot.children, true);
+    if (!hits.length || !hits[0].uv) return null;
+    let n = hits[0].object;
+    while (n && n.parent !== sceneRoot) n = n.parent;
+    const o = objects.find(x => x.node === n);
+    if (!o) return null;
+    return { objectId: o.id, uv: { x: hits[0].uv.x, y: hits[0].uv.y }, point: hits[0].point };
+  }
 
   function wirePointer(el, host) {
     // shield the 2D engine: nothing here reaches #viewport's handlers
@@ -599,6 +705,7 @@ GF.scene3d = (function () {
 
     let drag = null;   // {id, startX, startY, start, plane, grab, moved}
     el.addEventListener('pointerdown', e => {
+      if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.onPointerDown(e)) return;
       const o = selected();
       drag = { x0: e.clientX, y0: e.clientY, moved: false, id: null };
       if (interact !== 'orbit' && o) {
@@ -615,6 +722,7 @@ GF.scene3d = (function () {
       }
     });
     el.addEventListener('pointermove', e => {
+      if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.onPointerMove(e)) return;
       if (!drag) return;
       const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
       if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
@@ -632,6 +740,7 @@ GF.scene3d = (function () {
       }
     });
     const up = e => {
+      if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.onPointerUp(e)) return;
       if (!drag) return;
       const d = drag; drag = null;
       const o = d.id != null && byId(d.id);
@@ -685,7 +794,7 @@ GF.scene3d = (function () {
       const T = THREE;
       setStatus('Loading HDRI…');
       return await new Promise(resolve => {
-        new LIB.RGBELoader().load(url, tex => {
+        new LIB.HDRLoader().load(url, tex => {
           tex.mapping = T.EquirectangularReflectionMapping;
           const pmrem = new T.PMREMGenerator(renderer);
           pmrem.compileEquirectangularShader();
@@ -758,8 +867,13 @@ GF.scene3d = (function () {
     opts = opts || {};
     if (!objects.length || !LIB) return Promise.resolve(null);
     const target = (opts.selection === 'selected' && selected()) ? selected().node : sceneRoot;
+    const exportOpts = { binary: true };
+    if (GF.animation && GF.animation.hasAnimation()) {
+      exportOpts.animations = GF.animation.getClips();
+      exportOpts.trs = true;
+    }
     return new Promise((resolve, reject) => {
-      new LIB.GLTFExporter().parse(target, g => resolve(g), e => reject(e), { binary: true });
+      new LIB.GLTFExporter().parse(target, g => resolve(g), e => reject(e), exportOpts);
     });
   }
   async function exportGLB(opts) {
@@ -780,7 +894,13 @@ GF.scene3d = (function () {
     addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, setVisible,
     listObjects, getObject, setObject, byId, count,
     // selection / interaction
-    select, selectedId: () => selectedId, setInteract, getInteract, pick, frame,
+    select, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame,
+    rendererEl: () => renderer ? renderer.domElement : null,
+    // gizmo (TransformControls)
+    setGizmoMode: mode => { if (gizmo) gizmo.setMode(mode); },
+    setGizmoSpace: space => { if (gizmo) gizmo.setSpace(space); },
+    gizmoMode: () => gizmo ? gizmo.mode : null,
+    gizmoSpace: () => gizmo ? gizmo.space : null,
     // materials / textures
     setMaterial, addImageSource, listImageSources, refreshAll,
     // environment
@@ -810,4 +930,9 @@ if (GF.api && GF.api.register) {
   });
   R('scene3d.snapshotToLayer', '', 'Render the 3D scene at document resolution onto a new 2D layer', () => GF.scene3d.snapshotToLayer());
   R('scene3d.exportGLB', 'selection?("scene"|"selected")', 'Export the 3D scene as a .glb file', a => GF.scene3d.exportGLB(a || {}));
+  R('scene3d.gizmo', 'mode?("translate"|"rotate"|"scale"), space?("world"|"local")', 'Set the transform gizmo mode and/or coordinate space', a => {
+    if (a.mode) GF.scene3d.setGizmoMode(a.mode);
+    if (a.space) GF.scene3d.setGizmoSpace(a.space);
+    return { mode: GF.scene3d.gizmoMode(), space: GF.scene3d.gizmoSpace() };
+  });
 }

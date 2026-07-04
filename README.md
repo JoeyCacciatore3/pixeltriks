@@ -1,56 +1,48 @@
 # PixelTriks
 
-A **2D + 3D scene studio** (pixeltriks.com) that runs in any browser and publishes
-to the web. Make textures and art in 2D, turn them into 3D, build scenes — then
-export a GLB or **a one-file interactive web page** anyone can host anywhere.
+A **3D scene studio** (pixeltriks.com) that runs in any browser and publishes
+to the web. Build 3D scenes, texture them with built-in 2D tools, convert images
+into geometry — then export a GLB or **a one-file interactive web page** anyone
+can host anywhere.
 
 Open **`index.html`** (double-click — everything runs from `file://`, no build step).
 
 ## The workflow
 
-1. **2D — make the art.** Open/paste/draw an image. Brush, eraser, fill, gradient,
-   text, shapes; wand + marquee selections with a one-tap outcome bar (erase & heal,
-   cut out, recolor, AI replace, fill); crop/straighten; live Adjust sliders +
-   histogram; 6 filter presets; layers with 16 blend modes, masks, layer styles, and
-   re-editable adjustment layers (Brightness/Contrast, Levels, Curves, Hue/Sat, B&W).
-   AI (bring-your-own-key): remove.bg cutouts, fal.ai generative fill.
-   Texture helpers: **Normal map** and **Seamless tile** right in the Image tab.
-   Alt-click with brush/fill picks a colour.
+1. **Build a 3D scene.** The viewport starts in 3D — 28 primitives, GLB/GLTF import
+   (drag-drop anywhere), Poly Haven CC0 models & HDRIs. TransformControls gizmos
+   for move/rotate/scale (W/E/R keys), HDRI lighting, per-object PBR materials.
+   Scene tree in the left sidebar, properties panel on the right.
 
-2. **Make 3D — convert it.** The 3D panel's **Make 3D** section turns your image
-   into geometry (uses your selection when one exists, else the active layer):
-   - **Extrude cutout** — traces the visible silhouette (holes included) and
-     extrudes a beveled, textured 3D piece. Wand-select a subject → 3D sticker.
-   - **Relief map** — brightness becomes height: embossed art, terrain, logos.
-   - **Lathe** — spins your shape's silhouette into vases, bottles, pillars.
+2. **Texture with 2D tools.** Built-in brush, eraser, fill, gradient, text, shapes;
+   wand + marquee selections with a one-tap outcome bar (erase & heal, cut out,
+   recolor, AI replace, fill); live Adjust sliders + histogram; 6 filter presets;
+   layers with 16 blend modes, masks, layer styles, and re-editable adjustment
+   layers. Normal map and Seamless tile generators. AI (BYOK): remove.bg cutouts,
+   fal.ai generative fill.
+
+3. **Convert 2D → 3D.** The Make 3D converters turn your images into geometry:
+   - **Extrude cutout** — traces the visible silhouette and extrudes it.
+   - **Relief map** — brightness becomes height: terrain, logos, embossing.
+   - **Lathe** — spins a silhouette into vases, bottles, pillars.
    - **Layer stack** — every visible layer becomes a floating plane: instant diorama.
-   Converters live in an extensible registry (`GF.make3d.register`) — AI depth maps
-   and image-to-3D APIs plug in later without UI changes.
+   Extensible via `GF.make3d.register()`.
 
-3. **3D — build the scene.** 28 primitives (basics, faceted crystals, flat shapes,
-   extras), GLB/GLTF import (drag-drop anywhere), Poly Haven CC0 models & HDRIs,
-   full transforms (orbit/move/rotate/scale + numeric), per-object materials using
-   the document / any layer / an imported image (live-updating as you paint),
-   HDRI lighting, its own undo stack (Ctrl+Z routes to whichever world you're in).
-
-4. **Output — ship it.**
-   - **Publish web page** — ONE self-contained `.html`: your scene embedded as GLB
-     + an interactive three.js viewer (orbit + auto-rotate, your lighting and
-     background, responsive). Upload it to GitHub Pages / Netlify / any static host.
-     (Pages load the pinned three.js engine from a CDN — same version the app uses.)
-   - **Export GLB** — whole scene or one object, for game engines/other tools.
-   - **Flatten to layer** — render the scene into the 2D document and keep editing.
-   - PNG / JPEG / WebP / split layers / `.forge.json` projects, as always.
+4. **Ship it.**
+   - **Publish web page** — ONE self-contained `.html` with interactive three.js viewer.
+   - **Export GLB** — whole scene or selected object, for game engines/other tools.
+   - **Flatten to layer** — render 3D onto 2D and keep editing.
+   - PNG / JPEG / WebP / split layers / `.forge.json` projects.
 
 ## Power features
 
-- **Command palette (⌘/Ctrl K)** — a fuzzy launcher over every action, generated
-  from the same command catalog agents use (`GF.api`), so it can't drift. The
-  panel is three tabs (Image | Layers | 3D); everything else is palette-first.
-- **Scene-first front door** — Create a 3D scene / Turn an image into 3D /
-  Texture a model / Edit a photo / Blank canvas.
-- Procedural textures (`generate` command), installable PWA + IndexedDB autosave
-  with crash-restore, scrubbable history, re-editable text layers, cheat sheet (`?`).
+- **Command palette (⌘/Ctrl K)** — fuzzy launcher over 59 commands, same catalog
+  agents use (`GF.api`). See `API.md` for the full reference.
+- **3D-first front door** — 3D viewport loads immediately, scene tree in sidebar.
+- **TransformControls** — visual gizmo handles (W=translate, E=rotate, R=scale).
+- **Toolbar dropdowns** — + Add (primitives, import) and Tools (all 2D tools).
+- Procedural textures, installable PWA + IndexedDB autosave with crash-restore,
+  scrubbable history, re-editable text layers, cheat sheet (`?`).
 
 ## AI (bring your own key)
 
@@ -76,7 +68,7 @@ pixeltriks/
                     three-bundle.js (the one ES module — hands three.js to
                     the classic-script world) · forge.css
   ai/               forge-ai.js (provider-agnostic AI adapter)
-  vendor/three/     vendored Three.js 0.160 + addons (offline-first)
+  vendor/three/     vendored Three.js r185 + addons (offline-first)
   vendor/imagetracer/  raster→vector tracer (public domain) for Make 3D
   assets/models/    sample GLBs
   tools/            cors-proxy.js (optional AI helper)

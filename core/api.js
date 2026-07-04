@@ -1,4 +1,4 @@
-/* Forge Studio — api.js
+/* PixelTriks — api.js
    AI-operator surface. Everything the UI can do is exposed as a flat,
    discoverable command catalog so an automated agent (LLM with JS eval,
    browser automation, an MCP wrapper) can drive the app:
@@ -18,7 +18,7 @@ GF.api = (function () {
   const U = GF.util, D = GF.doc;
   const C = {};
   // ui (optional): {group, label, hint?, needsDoc?} — commands carrying it are
-  // surfaced in the command palette (see commandList in forge-ui.js), so every
+  // surfaced in the command palette (see commandList in forge-ui.js (GF.api.commands())), so every
   // user-facing action has exactly one implementation and one catalog entry.
   const cmd = (name, params, doc, fn, ui) => { C[name] = { params, doc, fn, ui }; };
   const L = () => { const l = D.active(); if (!l) throw new Error('no document open'); return l; };
@@ -145,6 +145,10 @@ GF.api = (function () {
     'Export every visible layer as a separate file (Pixelorama-style split export)',
     a => GF.exporter.exportImage({ splitLayers: true, type: a.type || 'image/png', scale: a.scale || 1, quality: a.quality ?? 0.92 }),
     { group: 'File', label: 'Export layers separately', needsDoc: true });
+
+  cmd('copyToClipboard', '', 'Copy the composite image to the clipboard as PNG',
+    () => GF.exporter.copyToClipboard(),
+    { group: 'File', label: 'Copy to clipboard', hint: 'Ctrl+Shift+C', needsDoc: true });
 
   /* --- introspection --- */
   function state() {

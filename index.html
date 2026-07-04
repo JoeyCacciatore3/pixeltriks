@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0e0f13">
 <meta name="color-scheme" content="dark light">
-<title>PixelTriks — Image Editor</title>
+<title>PixelTriks — 3D Scene Studio</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -24,7 +24,7 @@
 </script>
 <script type="module" src="ui/three-bundle.js"></script>
 </head>
-<body data-mode="image">
+<body data-mode="3d">
 
 <!-- ============================= TOP BAR ============================= -->
 <header id="topbar">
@@ -34,6 +34,37 @@
     </button>
     <span class="brand"><span class="brand-mark">◆</span><span class="brand-name">PixelTriks</span></span>
     <button class="text-btn" id="btn-open">Open</button>
+    <div class="tb-dropdown" id="dd-add">
+      <button class="text-btn ghost">+ Add</button>
+      <div class="tb-dropdown-menu">
+        <div class="tb-dropdown-item" data-action="add-box">Box</div>
+        <div class="tb-dropdown-item" data-action="add-sphere">Sphere</div>
+        <div class="tb-dropdown-item" data-action="add-cylinder">Cylinder</div>
+        <div class="tb-dropdown-item" data-action="add-plane">Plane</div>
+        <div class="tb-dropdown-item" data-action="add-more">More shapes…</div>
+        <div class="tb-dropdown-sep"></div>
+        <div class="tb-dropdown-item" data-action="import-model">Import model…</div>
+        <div class="tb-dropdown-item" data-action="import-image">Open image…</div>
+      </div>
+    </div>
+    <div class="tb-dropdown" id="dd-tools">
+      <button class="text-btn ghost">Tools</button>
+      <div class="tb-dropdown-menu">
+        <div class="tb-dropdown-item" data-tool="brush">Brush <span class="shortcut">B</span></div>
+        <div class="tb-dropdown-item" data-tool="eraser">Eraser <span class="shortcut">E</span></div>
+        <div class="tb-dropdown-item" data-tool="fill">Fill <span class="shortcut">G</span></div>
+        <div class="tb-dropdown-item" data-tool="gradient">Gradient <span class="shortcut">D</span></div>
+        <div class="tb-dropdown-item" data-tool="text">Text <span class="shortcut">T</span></div>
+        <div class="tb-dropdown-item" data-tool="shape">Shape <span class="shortcut">U</span></div>
+        <div class="tb-dropdown-sep"></div>
+        <div class="tb-dropdown-item" data-tool="select">Select area <span class="shortcut">M</span></div>
+        <div class="tb-dropdown-item" data-tool="wand">Magic Wand <span class="shortcut">W</span></div>
+        <div class="tb-dropdown-item" data-tool="magicerase">Magic Erase <span class="shortcut">J</span></div>
+        <div class="tb-dropdown-item" data-tool="crop">Crop <span class="shortcut">C</span></div>
+        <div class="tb-dropdown-sep"></div>
+        <div class="tb-dropdown-item" data-tool="move">Move <span class="shortcut">V</span></div>
+      </div>
+    </div>
   </div>
 
   <div class="tb-group tb-center">
@@ -70,7 +101,7 @@
 <!-- ============================= STAGE ============================= -->
 <main id="stage">
 
-  <!-- LEFT TOOL RAIL (desktop) / BOTTOM BAR (mobile) -->
+  <!-- LEFT TOOL RAIL (desktop) / BOTTOM BAR (mobile) — kept for backward compat during Phase 1 migration -->
   <nav id="toolrail" role="toolbar" aria-label="Tools">
     <button class="tool" data-tool="move" title="Move (V)" aria-label="Move">
       <svg viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg><span class="tlabel">Move</span></button>
@@ -102,6 +133,22 @@
     <label class="tool color-tool" title="Brush colour">
       <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></label>
   </nav>
+
+  <!-- LEFT SIDEBAR (scene tree + asset library placeholder) -->
+  <aside id="sidebar">
+    <div class="sidebar-section" id="scene-tree">
+      <h3 class="panel-h first">Scene</h3>
+      <ul id="sidebar-objects" class="layer-list"></ul>
+      <div class="s3-row">
+        <button class="text-btn ghost" id="sidebar-add" title="Add a 3D object">+ Add</button>
+        <button class="text-btn ghost" id="sidebar-import" title="Import GLB/GLTF model">Import</button>
+      </div>
+    </div>
+    <div class="sidebar-section" id="asset-section">
+      <h3 class="panel-h">Assets</h3>
+      <p class="s3-status">Asset library — Phase 2</p>
+    </div>
+  </aside>
 
   <!-- VIEWPORT -->
   <section id="viewport" aria-label="Canvas">
@@ -138,17 +185,17 @@
   </section>
 
   <!-- RIGHT PANEL (desktop) / BOTTOM SHEET (mobile) -->
-  <aside id="panel" data-tab="adjust">
+  <aside id="panel" data-tab="scene">
     <div class="panel-grip"></div>
     <div class="panel-tabs" role="tablist">
-      <button class="ptab" data-tab="adjust" role="tab">Image</button>
+      <button class="ptab" data-tab="scene" role="tab">Properties</button>
       <button class="ptab" data-tab="layers" role="tab">Layers</button>
-      <button class="ptab" data-tab="scene" role="tab">3D</button>
+      <button class="ptab" data-tab="adjust" role="tab">Adjust</button>
     </div>
 
     <div class="panel-body">
-      <!-- IMAGE TAB -->
-      <div class="ptab-pane" data-pane="adjust">
+      <!-- ADJUST TAB (was Image) -->
+      <div class="ptab-pane" data-pane="adjust" hidden>
         <h3 class="panel-h first">Light &amp; colour</h3>
         <canvas id="histogram" class="histogram" width="288" height="56" aria-hidden="true" title="Luminance histogram"></canvas>
 
@@ -193,10 +240,13 @@
         <ul id="history-list" class="history-list"></ul>
       </div>
 
-      <!-- 3D TAB (content built by ui/scene3d-ui.js) -->
-      <div class="ptab-pane" data-pane="scene" hidden></div>
+      <!-- PROPERTIES TAB (3D scene — content built by ui/scene3d-ui.js) -->
+      <div class="ptab-pane" data-pane="scene"></div>
     </div>
   </aside>
+
+  <!-- ANIMATION TIMELINE (stub — Phase 3) -->
+  <div id="timeline"></div>
 
 </main>
 
@@ -206,7 +256,7 @@
 </button>
 
 <!-- hidden file input -->
-<input type="file" id="file-input" accept="image/*,.json,.forge.json,.glb,.gltf,.hdr,.bin" multiple hidden>
+<input type="file" id="file-input" accept="image/*,.json,.forge.json,.glb,.gltf,.hdr,.svg,.bin" multiple hidden>
 
 <!-- toast (engine's GF.util.toast targets #toast) -->
 <div id="toast" role="status" aria-live="polite"></div>
@@ -230,12 +280,21 @@
 <!-- 2D→3D converters (imagetracer = public-domain raster tracer) -->
 <script src="vendor/imagetracer/imagetracer.js"></script>
 <script src="core/make3d.js"></script>
+<!-- animation engine -->
+<script src="core/animation.js"></script>
 <!-- one-file interactive web-page export -->
 <script src="core/publish.js"></script>
+<!-- 3D texture painting -->
+<script src="core/paint3d.js"></script>
+<!-- ===================== asset library ===================== -->
+<script src="core/assets.js"></script>
 <!-- ============================= AI ============================= -->
 <script src="ai/forge-ai.js"></script>
 <!-- ============================= UI ============================= -->
 <script src="ui/forge-ui.js"></script>
 <script src="ui/scene3d-ui.js"></script>
+<script src="ui/assets-ui.js"></script>
+<script src="ui/timeline-ui.js"></script>
+<script src="ui/polish.js"></script>
 </body>
 </html>

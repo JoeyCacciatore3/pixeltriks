@@ -1,4 +1,4 @@
-/* Forge Studio — select.js
+/* PixelTriks — select.js
    Pixel selection mask (0..255 coverage) shared by the magic wand, magic
    eraser, content-aware fill and color-replace tools. The mask is
    document-sized; operations read it as per-pixel coverage (255 = fully

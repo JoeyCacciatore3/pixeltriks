@@ -1,4 +1,4 @@
-/* Forge Studio — retouch.js
+/* PixelTriks — retouch.js
    High-end editing tools for working on existing images, all pure-JS and
    offline (no models, no network):
      • Magic eraser / background removal (+ defringe)

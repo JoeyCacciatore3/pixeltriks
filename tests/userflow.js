@@ -1,4 +1,4 @@
-/* Forge Studio — USER-FLOW audit.
+/* PixelTriks — USER-FLOW audit.
    Drives the real app the way a person would: genuine PointerEvent drags through
    the engine's input pipeline (brush strokes, marquee, move, shape, crop handles),
    real dialogs, real keyboard. Captures every console.error/warn, uncaught error,

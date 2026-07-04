@@ -1,4 +1,4 @@
-/* Forge Studio — filters.js
+/* PixelTriks — filters.js
    Pixel-level adjustments. Each operates on an ImageData in place or
    returns a new one. Applied to layers via GF.filters.applyToLayer. */
 'use strict';

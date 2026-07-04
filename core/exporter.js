@@ -1,4 +1,4 @@
-/* Forge Studio — exporter.js
+/* PixelTriks — exporter.js
    Image export (PNG / WebP / JPEG at any scale) and project files. */
 'use strict';
 window.GF = window.GF || {};
@@ -148,5 +148,21 @@ GF.exporter = (function () {
     }
   }
 
-  return { exportImage, exportLayersSeparate, saveProject, loadProject, importImage, handleFiles };
+  async function copyToClipboard() {
+    if (!D.doc.open) { U.toast('Open an image first'); return false; }
+    const flat = D.composite();
+    const c = U.makeCanvas(flat.width, flat.height);
+    U.ctx2d(c).drawImage(flat, 0, 0);
+    try {
+      const blob = await new Promise(resolve => c.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      U.toast('Copied to clipboard');
+      return true;
+    } catch (e) {
+      U.toast('Clipboard copy failed: ' + e.message);
+      return false;
+    }
+  }
+
+  return { exportImage, exportLayersSeparate, saveProject, loadProject, importImage, handleFiles, copyToClipboard };
 })();

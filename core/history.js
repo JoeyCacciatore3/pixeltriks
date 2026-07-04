@@ -1,4 +1,4 @@
-/* Forge Studio — history.js
+/* PixelTriks — history.js
    Bounded undo/redo. Each entry stores a full snapshot of document
    structure, but pixel data is SHARED between consecutive snapshots for
    any layer whose pixels didn't change between edits. A 25-deep stack on

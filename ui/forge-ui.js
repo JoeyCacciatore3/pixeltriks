@@ -105,8 +105,9 @@ window.GF = window.GF || {};
     wireMobile();
     wireGestures();
     wireProFeatures();
+    wireDropdowns();
     GF.history.onChange(updateUndoRedo);
-    setTool('brush');
+    setTool('move');
     updateUndoRedo();
     document.body.classList.toggle('no-doc', !D.doc.open);   // quiets panel/optbar chrome pre-document
   }
@@ -415,6 +416,7 @@ window.GF = window.GF || {};
     if (name === 'brush' || name === 'eraser') {
       html = optSlider('Size', 'brush-size', 1, 200, V().brush.size)
            + optSlider('Opacity', 'brush-op', 0, 100, Math.round((V().brush.opacity ?? 1) * 100))
+           + optSlider('Stabilize', 'brush-stab', 0, 20, V().brush.stabilizer || 0)
            + (name === 'eraser' ? '' : seg('brush-shape', [['round','Round'],['square','Square']], V().brush.shape || 'round'))
            + `<label class="opt"><input type="checkbox" id="brush-pixel" ${V().brush.pixel ? 'checked' : ''}> Pixel</label>`;
     } else if (name === 'magicerase') {
@@ -472,6 +474,7 @@ window.GF = window.GF || {};
     const bind = (id, fn) => { const el = $('#'+id); if (el) el.addEventListener('input', () => { fn(el); const v = $('#'+id+'-v'); if (v) v.textContent = el.value; }); };
     bind('brush-size', el => V().brush.size = +el.value);
     bind('brush-op',   el => V().brush.opacity = +el.value / 100);
+    bind('brush-stab', el => V().brush.stabilizer = +el.value);
     bind('fill-tol',   el => V().fillTolerance = +el.value);
     bind('wand-tol',   el => { V().wand.tolerance = +el.value; reWand(); });   // live re-select
     const chk = (id, fn) => { const el = $('#'+id); if (el) el.addEventListener('change', () => fn(el.checked)); };
@@ -514,7 +517,8 @@ window.GF = window.GF || {};
       $$('.ptab-pane').forEach(p => p.hidden = p.dataset.pane !== tab);
       const tg = $('#panel-toggle span'); if (tg) tg.textContent = t.textContent;
     }));
-    $('.ptab').classList.add('on'); // default Adjust
+    const defTab = $('.ptab[data-tab="scene"]') || $('.ptab');
+    defTab.classList.add('on'); // default Properties (3D)
     $('#adj-reset').addEventListener('click', resetAdjust);
     $('#adj-apply').addEventListener('click', applyAdjust);
   }
@@ -602,6 +606,7 @@ window.GF = window.GF || {};
       if ((e.ctrlKey || e.metaKey)) {
         if (k === 'z') { e.preventDefault(); run(e.shiftKey ? 'redo' : 'undo'); return; }
         if (k === 'y') { e.preventDefault(); run('redo'); return; }
+        if (k === 'c' && e.shiftKey) { e.preventDefault(); run('copyToClipboard'); return; }
         if (k === 's') { e.preventDefault(); GF.exporter.saveProject(); return; }
         if (k === 'e') { e.preventDefault(); openExportDialog(); return; }
         if (k === 'm') { e.preventDefault(); if (D.doc.open) openCurves(); return; }
@@ -1330,6 +1335,36 @@ window.GF = window.GF || {};
       if (!typing && !modalEl && e.key === '?') { e.preventDefault(); openCheatSheet(); }
     });
     checkRestore();
+  }
+
+  /* ---- toolbar dropdown menus (+ Add, Tools) ---- */
+  function wireDropdowns() {
+    $$('.tb-dropdown').forEach(dd => {
+      const btn = dd.querySelector('.text-btn');
+      if (!btn) return;
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const wasOpen = dd.classList.contains('open');
+        $$('.tb-dropdown.open').forEach(d => d.classList.remove('open'));
+        if (!wasOpen) dd.classList.add('open');
+      });
+    });
+    document.addEventListener('click', () => $$('.tb-dropdown.open').forEach(d => d.classList.remove('open')));
+
+    $$('.tb-dropdown-item[data-tool]').forEach(item => {
+      item.addEventListener('click', () => { setTool(item.dataset.tool); });
+    });
+    $$('.tb-dropdown-item[data-action]').forEach(item => {
+      item.addEventListener('click', () => {
+        const a = item.dataset.action;
+        if (a === 'add-box') GF.api.run('scene3d.addPrimitive', { kind: 'box' });
+        else if (a === 'add-sphere') GF.api.run('scene3d.addPrimitive', { kind: 'sphere' });
+        else if (a === 'add-cylinder') GF.api.run('scene3d.addPrimitive', { kind: 'cylinder' });
+        else if (a === 'add-plane') GF.api.run('scene3d.addPrimitive', { kind: 'plane' });
+        else if (a === 'add-more') { const tab = $('.ptab[data-tab="scene"]'); if (tab) tab.click(); }
+        else if (a === 'import-model' || a === 'import-image') $('#file-input').click();
+      });
+    });
   }
 
   /* =================================================================

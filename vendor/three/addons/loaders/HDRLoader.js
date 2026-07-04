@@ -7,22 +7,50 @@ import {
 	LinearSRGBColorSpace
 } from 'three';
 
-// https://github.com/mrdoob/three.js/issues/5552
-// http://en.wikipedia.org/wiki/RGBE_image_format
+/**
+ * A loader for the RGBE HDR texture format.
+ *
+ * ```js
+ * const loader = new HDRLoader();
+ * const envMap = await loader.loadAsync( 'textures/equirectangular/blouberg_sunrise_2_1k.hdr' );
+ * envMap.mapping = THREE.EquirectangularReflectionMapping;
+ *
+ * scene.environment = envMap;
+ * ```
+ *
+ * @augments DataTextureLoader
+ * @three_import import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+ */
+class HDRLoader extends DataTextureLoader {
 
-class RGBELoader extends DataTextureLoader {
-
+	/**
+     * Constructs a new RGBE/HDR loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
 	constructor( manager ) {
 
 		super( manager );
 
+		/**
+         * The texture type.
+         *
+         * @type {(HalfFloatType|FloatType)}
+         * @default HalfFloatType
+         */
 		this.type = HalfFloatType;
 
 	}
 
-	// adapted from http://www.graphics.cornell.edu/~bjw/rgbe.html
-
+	/**
+     * Parses the given RGBE texture data.
+     *
+     * @param {ArrayBuffer} buffer - The raw texture data.
+     * @return {DataTextureLoader~TexData} An object representing the parsed texture data.
+     */
 	parse( buffer ) {
+
+		// adapted from http://www.graphics.cornell.edu/~bjw/rgbe.html
 
 		const
 			/* default error routine.  change this to change error handling */
@@ -34,11 +62,11 @@ class RGBELoader extends DataTextureLoader {
 
 				switch ( rgbe_error_code ) {
 
-					case rgbe_read_error: throw new Error( 'THREE.RGBELoader: Read Error: ' + ( msg || '' ) );
-					case rgbe_write_error: throw new Error( 'THREE.RGBELoader: Write Error: ' + ( msg || '' ) );
-					case rgbe_format_error: throw new Error( 'THREE.RGBELoader: Bad File Format: ' + ( msg || '' ) );
+					case rgbe_read_error: throw new Error( 'THREE.HDRLoader: Read Error: ' + ( msg || '' ) );
+					case rgbe_write_error: throw new Error( 'THREE.HDRLoader: Write Error: ' + ( msg || '' ) );
+					case rgbe_format_error: throw new Error( 'THREE.HDRLoader: Bad File Format: ' + ( msg || '' ) );
 					default:
-					case rgbe_memory_error: throw new Error( 'THREE.RGBELoader: Memory Error: ' + ( msg || '' ) );
+					case rgbe_memory_error: throw new Error( 'THREE.HDRLoader: Memory Error: ' + ( msg || '' ) );
 
 				}
 
@@ -72,18 +100,18 @@ class RGBELoader extends DataTextureLoader {
 
 					s += chunk; len += chunk.length;
 					p += chunkSize;
-					chunk += String.fromCharCode.apply( null, new Uint16Array( buffer.subarray( p, p + chunkSize ) ) );
+					chunk = String.fromCharCode.apply( null, new Uint16Array( buffer.subarray( p, p + chunkSize ) ) );
 
 				}
 
 				if ( - 1 < i ) {
 
 					/*for (i=l-1; i>=0; i--) {
-						byteCode = m.charCodeAt(i);
-						if (byteCode > 0x7f && byteCode <= 0x7ff) byteLen++;
-						else if (byteCode > 0x7ff && byteCode <= 0xffff) byteLen += 2;
-						if (byteCode >= 0xDC00 && byteCode <= 0xDFFF) i--; //trail surrogate
-					}*/
+                        byteCode = m.charCodeAt(i);
+                        if (byteCode > 0x7f && byteCode <= 0x7ff) byteLen++;
+                        else if (byteCode > 0x7ff && byteCode <= 0xffff) byteLen += 2;
+                        if (byteCode >= 0xDC00 && byteCode <= 0xDFFF) i--; //trail surrogate
+                    }*/
 					if ( false !== consume ) buffer.pos += len + i + 1;
 					return s + chunk.slice( 0, i );
 
@@ -209,10 +237,10 @@ class RGBELoader extends DataTextureLoader {
 				const scanline_width = w;
 
 				if (
-					// run length encoding is not allowed so read flat
+				// run length encoding is not allowed so read flat
 					( ( scanline_width < 8 ) || ( scanline_width > 0x7fff ) ) ||
-					// this file is not run length encoded
-					( ( 2 !== buffer[ 0 ] ) || ( 2 !== buffer[ 1 ] ) || ( buffer[ 2 ] & 0x80 ) )
+                    // this file is not run length encoded
+                    ( ( 2 !== buffer[ 0 ] ) || ( 2 !== buffer[ 1 ] ) || ( buffer[ 2 ] & 0x80 ) )
 				) {
 
 					// return the flat buffer
@@ -395,8 +423,7 @@ class RGBELoader extends DataTextureLoader {
 
 			default:
 
-				throw new Error( 'THREE.RGBELoader: Unsupported type: ' + this.type );
-				break;
+				throw new Error( 'THREE.HDRLoader: Unsupported type: ' + this.type );
 
 		}
 
@@ -406,11 +433,22 @@ class RGBELoader extends DataTextureLoader {
 			header: rgbe_header_info.string,
 			gamma: rgbe_header_info.gamma,
 			exposure: rgbe_header_info.exposure,
-			type: type
+			type: type,
+			colorSpace: LinearSRGBColorSpace,
+			minFilter: LinearFilter,
+			magFilter: LinearFilter,
+			generateMipmaps: false,
+			flipY: true
 		};
 
 	}
 
+	/**
+     * Sets the texture type.
+     *
+     * @param {(HalfFloatType|FloatType)} value - The texture type to set.
+     * @return {HDRLoader} A reference to this loader.
+     */
 	setDataType( value ) {
 
 		this.type = value;
@@ -418,33 +456,8 @@ class RGBELoader extends DataTextureLoader {
 
 	}
 
-	load( url, onLoad, onProgress, onError ) {
-
-		function onLoadCallback( texture, texData ) {
-
-			switch ( texture.type ) {
-
-				case FloatType:
-				case HalfFloatType:
-
-					texture.colorSpace = LinearSRGBColorSpace;
-					texture.minFilter = LinearFilter;
-					texture.magFilter = LinearFilter;
-					texture.generateMipmaps = false;
-					texture.flipY = true;
-
-					break;
-
-			}
-
-			if ( onLoad ) onLoad( texture, texData );
-
-		}
-
-		return super.load( url, onLoadCallback, onProgress, onError );
-
-	}
-
 }
 
-export { RGBELoader };
+export { HDRLoader };
+
+

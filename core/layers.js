@@ -1,4 +1,4 @@
-/* Forge Studio — layers.js
+/* PixelTriks — layers.js
    Document model: an ordered stack of layers, each backed by its own
    canvas at document resolution. Compositing uses the browser's native
    GPU-accelerated blend modes via globalCompositeOperation. */
@@ -442,7 +442,7 @@ GF.doc = (function () {
 
   function serialize() {
     return {
-      app: 'GameForge', version: 1,
+      app: 'PixelTriks', version: 1,
       name: doc.name, width: doc.width, height: doc.height,
       activeId: doc.activeId,
       layers: doc.layers.map(L => {
@@ -465,8 +465,8 @@ GF.doc = (function () {
       im.onerror = () => rej(new Error('A layer image in the project failed to load.')); im.src = src;
     });
     return new Promise((resolve, reject) => {
-      if (!data || data.app !== 'GameForge' || !Array.isArray(data.layers)) {
-        reject(new Error('Not a Forge Studio project file.'));
+      if (!data || data.app !== 'PixelTriks' && data.app !== 'GameForge' || !Array.isArray(data.layers)) {
+        reject(new Error('Not a PixelTriks project file.'));
         return;
       }
       Promise.all(data.layers.map(async (s) => ({

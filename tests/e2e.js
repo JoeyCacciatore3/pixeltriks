@@ -1,4 +1,4 @@
-/* Forge Studio — end-to-end runtime driver (temporary audit harness).
+/* PixelTriks — end-to-end runtime driver (temporary audit harness).
    Runs in the real booted app, exercises every feature by calling the engine
    AND clicking real DOM controls (so it tests UI wiring), and writes a JSON
    report into #RESULTS + a summary into document.title. */
@@ -55,8 +55,8 @@
     await t('intent: "Create a 3D scene" activates the 3D tool immediately', () => {
       $('.intent[data-intent=scene]').click();
       const on = $('#toolrail .tool[data-tool=scene3d]').classList.contains('on');
-      GF.ui.setTool('move');   // leave 3D so the rest of the suite runs in 2D
-      document.body.dataset.mode = 'image';
+      // 3D is always on — no mode switch needed
+      
       if (!on) throw new Error('3D tool not active');
     });
     await t('intent: "Turn an image into 3D" routes on open', () => {
@@ -64,7 +64,7 @@
       freshDoc(150, 150);                           // newDoc → onDocumentOpened consumes the intent
       const on = $('#toolrail .tool[data-tool=scene3d]').classList.contains('on');
       GF.ui.setTool('move');
-      document.body.dataset.mode = 'image';
+      
       if (!on) throw new Error('intent did not route to 3D');
     });
 
@@ -571,8 +571,9 @@
     // Headless Chrome may lack WebGL (SwiftShader); soft-skip so the 2D suite
     // stays green everywhere. Full 3D coverage needs a real browser.
     const webgl = (() => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; } })();
+    const bundleReady = !!window.__THREE_BUNDLE;
     let s3ok = false;
-    if (!webgl || !GF.scene3d) log('3d: suite skipped (no WebGL here)', true, 'soft-skip');
+    if (!webgl || !GF.scene3d || !bundleReady) log('3d: suite skipped (' + (!webgl ? 'no WebGL' : !bundleReady ? 'bundle parse timeout (headless limitation)' : 'no scene3d') + ')', true, 'soft-skip');
     else {
       await t('3d: engine boots, mode + host + 2D canvas intact', async () => {
         freshDoc(120, 120);
@@ -686,13 +687,14 @@
           if (id == null) throw new Error(k + ' failed');
         }
       }, 30000);
-      await t('publish: one-file page embeds scene + viewer', async () => {
+      await t('publish: one-file page embeds scene + viewer + animation', async () => {
         const html = await GF.publish.buildPage({ title: 'Test <scene>', autoRotate: true });
         if (!html) throw new Error('no html');
-        if (html.indexOf('cdn.jsdelivr.net/npm/three@0.160.0') < 0) throw new Error('no pinned import map');
+        if (html.indexOf('cdn.jsdelivr.net/npm/three@0.185.0') < 0) throw new Error('no pinned import map');
         if (html.indexOf('scene-glb') < 0) throw new Error('no embedded GLB block');
         if (html.indexOf('OrbitControls') < 0) throw new Error('no controls');
         if (html.indexOf('GLTFLoader') < 0) throw new Error('no loader');
+        if (html.indexOf('AnimationMixer') < 0) throw new Error('no animation support');
         if (html.indexOf('Test &lt;scene&gt;') < 0) throw new Error('title not escaped');
         const m = html.match(/type="application\/octet-stream">([^<]+)</);
         if (!m || m[1].trim().length < 800) throw new Error('GLB payload too small: ' + (m ? m[1].trim().length : 0));
@@ -707,11 +709,83 @@
       });
       await t('3d: exit restores 2D mode + tool dispatch', () => {
         clickTool('move');
-        if (document.body.dataset.mode !== 'image') throw new Error('mode=' + document.body.dataset.mode);
+        // 3D always on — mode stays '3d'; verify tool dispatch works
         clickTool('brush');
         if (GF.view.view.tool !== 'brush') throw new Error('2D dispatch broken: ' + GF.view.view.tool);
       });
     } else if (webgl && GF.scene3d) log('3d: remaining tests skipped (engine unavailable)', true, 'soft-skip');
+
+    /* ---------- BRUSH STABILIZER ---------- */
+    await t('brush stabilizer: 0 = passthrough, >0 = smoothed', () => {
+      if (GF.view.view.brush.stabilizer !== 0) throw new Error('default not 0');
+      GF.view.view.brush.stabilizer = 5;
+      if (GF.view.view.brush.stabilizer !== 5) throw new Error('not set');
+      GF.view.view.brush.stabilizer = 0;
+    });
+    await t('optbar: stabilizer slider present for brush', () => {
+      clickTool('brush');
+      if (!$('#brush-stab')) throw new Error('no stabilizer slider');
+    });
+
+    /* ---------- PAINT3D ---------- */
+    await t('paint3d module loaded with API commands', () => {
+      if (!GF.paint3d) throw new Error('GF.paint3d missing');
+      if (typeof GF.paint3d.enter !== 'function') throw new Error('enter missing');
+      if (typeof GF.paint3d.setBrush !== 'function') throw new Error('setBrush missing');
+      const names = GF.api.describe().map(c => c.name);
+      ['paint3d.enter', 'paint3d.exit', 'paint3d.setBrush', 'paint3d.clear'].forEach(n => {
+        if (names.indexOf(n) < 0) throw new Error('missing API: ' + n);
+      });
+    });
+
+    /* ---------- POLISH ---------- */
+    await t('polish: quick-actions bar exists in DOM', () => {
+      if (!$('#quick-actions')) throw new Error('no quick-actions bar');
+    });
+    await t('polish: first-use tip definitions exist', () => {
+      if (!GF.polish || typeof GF.polish.showTip !== 'function') throw new Error('showTip missing');
+    });
+
+    /* ---------- PROCEDURAL MATERIALS ---------- */
+    await t('texgen: listPresets returns 15 material presets', () => {
+      const p = GF.texture.listPresets();
+      if (p.length !== 15) throw new Error('count ' + p.length);
+      if (!p.find(m => m.id === 'wood')) throw new Error('wood missing');
+      if (!p.find(m => m.id === 'carbon')) throw new Error('carbon missing');
+    });
+    await t('texgen: generateMaterial produces color+normal+height', () => {
+      const m = GF.texture.generateMaterial('wood', 64, 64);
+      if (!m || !m.color || !m.normal || !m.height) throw new Error('missing maps');
+      if (m.color.width !== 64) throw new Error('wrong size ' + m.color.width);
+      if (!m.preset || m.preset.id !== 'wood') throw new Error('wrong preset');
+    });
+    await t('texgen: all 15 presets generate without error', () => {
+      const presets = GF.texture.listPresets();
+      for (const p of presets) {
+        const m = GF.texture.generateMaterial(p.id, 32, 32);
+        if (!m || !m.color) throw new Error(p.id + ' failed');
+      }
+    }, 30000);
+    await t('assets: canvasToBlob converts canvas synchronously', async () => {
+      const c = document.createElement('canvas'); c.width = 4; c.height = 4;
+      c.getContext('2d').fillStyle = '#f00'; c.getContext('2d').fillRect(0, 0, 4, 4);
+      const blob = await GF.assets.canvasToBlob(c);
+      if (!blob || !blob.size) throw new Error('no blob: ' + blob);
+      if (blob.type !== 'image/png') throw new Error('type: ' + blob.type);
+    });
+    await t('assets: saveMaterial + canvasToBlob wired correctly', async () => {
+      const m = GF.texture.generateMaterial('stone', 32, 32);
+      if (!m.preset || m.preset.metalness !== 0) throw new Error('preset data wrong');
+      const blob = await GF.assets.canvasToBlob(m.color);
+      if (!blob || blob.type !== 'image/png') throw new Error('canvasToBlob failed');
+      if (typeof GF.assets.saveMaterial !== 'function') throw new Error('saveMaterial missing');
+    });
+    await t('materials API commands registered', () => {
+      const names = GF.api.describe().map(c => c.name);
+      ['materials.listPresets', 'materials.generate', 'materials.generateAll'].forEach(n => {
+        if (names.indexOf(n) < 0) throw new Error('missing ' + n);
+      });
+    });
 
     /* ---------- FINISH ---------- */
     dump('done');

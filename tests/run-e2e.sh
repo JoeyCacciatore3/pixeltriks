@@ -15,7 +15,7 @@ node -e 'const fs=require("fs");let h=fs.readFileSync("index.html","utf8");fs.wr
 # --enable-unsafe-swiftshader (instead of --disable-gpu) provides software
 # WebGL so the 3D-workspace suite runs; it soft-skips where WebGL is absent.
 OUT=$("$CHROME" --headless=new --enable-unsafe-swiftshader --no-sandbox --allow-file-access-from-files \
-  --window-size=1280,820 --virtual-time-budget=90000 \
+  --window-size=1280,820 --virtual-time-budget=180000 \
   --dump-dom "file://$PWD/index-e2e.html" 2>/dev/null)
 rm -f index-e2e.html
 

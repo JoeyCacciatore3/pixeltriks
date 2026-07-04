@@ -1,7 +1,7 @@
 /* PixelTriks — scene3d-ui.js
    UI for the 3D workspace (GF.scene3dUI). Owns the "3D" panel tab (objects,
    transform, material, environment, actions), the 3D options bar, and the
-   mode enter/exit handshake with forge-ui's setTool. All scene mutations go
+   mode enter/exit handshake with GF.ui.setTool. All scene mutations go
    through GF.scene3d — this file is DOM only. */
 'use strict';
 window.GF = window.GF || {};
@@ -194,9 +194,9 @@ GF.scene3dUI = (function () {
     if (el && GF.make3d) el.textContent = 'Converts ' + GF.make3d.sourceLabel() + '.';
   }
 
-  /* ---- object list ---- */
-  function renderObjects() {
-    const list = $('#s3-objects'); if (!list) return;
+  /* ---- object list (renders to both panel #s3-objects AND sidebar #sidebar-objects) ---- */
+  function renderObjectsInto(list) {
+    if (!list) return;
     list.innerHTML = '';
     S().listObjects().forEach(o => {
       const li = document.createElement('li');
@@ -217,6 +217,10 @@ GF.scene3dUI = (function () {
       li.appendChild(name); li.appendChild(vis); li.appendChild(del);
       list.appendChild(li);
     });
+  }
+  function renderObjects() {
+    renderObjectsInto($('#s3-objects'));
+    renderObjectsInto($('#sidebar-objects'));
   }
 
   /* ---- transform + material inspector for the selected object ---- */
@@ -341,6 +345,10 @@ GF.scene3dUI = (function () {
       const k = e.key.toLowerCase();
       if (k === 'delete' || k === 'backspace') { const id = S().selectedId(); if (id != null) { e.preventDefault(); S().removeObject(id); } }
       else if (k === 'f') { e.preventDefault(); S().frame(); }
+      else if (k === 'w') { e.preventDefault(); S().setGizmoMode('translate'); }
+      else if (k === 'e') { e.preventDefault(); S().setGizmoMode('rotate'); }
+      else if (k === 'r') { e.preventDefault(); S().setGizmoMode('scale'); }
+      else if (k === 'q') { e.preventDefault(); S().setGizmoSpace(S().gizmoSpace() === 'world' ? 'local' : 'world'); }
     });
   }
 
@@ -422,8 +430,17 @@ GF.scene3dUI = (function () {
 
   // Build the pane eagerly — the panel's "3D" tab is clickable before the 3D
   // tool is ever activated and must never show an empty pane.
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); refresh(); });
-  else { ensurePane(); refresh(); }
+  function wireSidebar() {
+    const addBtn = $('#sidebar-add');
+    const impBtn = $('#sidebar-import');
+    if (addBtn) addBtn.addEventListener('click', () => {
+      if (!S().isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');
+      S().addPrimitive('box');
+    });
+    if (impBtn) impBtn.addEventListener('click', () => $('#file-input').click());
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); wireSidebar(); refresh(); });
+  else { ensurePane(); wireSidebar(); refresh(); }
 
   return { enter, exit, optbarHtml, wireOptbar, refresh, publishDialog };
 })();

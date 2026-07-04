@@ -1,4 +1,4 @@
-/* Forge Studio — util.js
+/* PixelTriks — util.js
    Shared helpers. All modules attach to the GF namespace so the app
    runs from file:// (classic scripts, no bundler required). */
 'use strict';

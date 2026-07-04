@@ -12,7 +12,7 @@ window.GF = window.GF || {};
 
 GF.publish = (function () {
   const U = GF.util, D = GF.doc;
-  const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0';   // keep in lockstep with vendor/three
+  const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.185.0';   // keep in lockstep with vendor/three
 
   function b64(buf) {
     const bytes = new Uint8Array(buf);
@@ -89,6 +89,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.autoRotate = ${autoRotate}; controls.autoRotateSpeed = 1.1;
 
+let mixer = null, clock = null;
 new GLTFLoader().parse(bin.buffer, '', g => {
   scene.add(g.scene);
   const box = new THREE.Box3().setFromObject(g.scene);
@@ -96,6 +97,11 @@ new GLTFLoader().parse(bin.buffer, '', g => {
   const center = box.getCenter(new THREE.Vector3());
   controls.target.copy(center);
   camera.position.copy(center).add(new THREE.Vector3(size * 0.55, size * 0.4, size * 0.85));
+  if (g.animations && g.animations.length) {
+    mixer = new THREE.AnimationMixer(g.scene);
+    clock = new THREE.Clock();
+    g.animations.forEach(clip => mixer.clipAction(clip).play());
+  }
   const load = document.getElementById('load'); if (load) load.remove();
 }, () => { document.getElementById('load').textContent = 'Could not load the scene.'; });
 
@@ -105,7 +111,7 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize); resize();
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+renderer.setAnimationLoop(() => { if (mixer && clock) mixer.update(clock.getDelta()); controls.update(); renderer.render(scene, camera); });
 </script>
 </body>
 </html>`;

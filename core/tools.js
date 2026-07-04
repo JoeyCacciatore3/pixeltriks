@@ -1,4 +1,4 @@
-/* Forge Studio — tools.js
+/* PixelTriks — tools.js
    Viewport rendering (zoom/pan, checkerboard, DPR-aware) and pointer
    tools. One Pointer Events code path covers mouse, pen and touch;
    two simultaneous touches always pinch-zoom regardless of tool. */
@@ -14,7 +14,7 @@ GF.view = (function () {
     tool: 'brush',
     // shape: round | square | line. `pixel` snaps stamps to integer coords for
     // crisp pixel-art output; orthogonal to shape (a round brush can still be pixel).
-    brush: { size: 16, opacity: 1, color: '#e8a33d', pixel: false, shape: 'round', hardness: 100, flow: 100, spacing: 25 },
+    brush: { size: 16, opacity: 1, color: '#e8a33d', pixel: false, shape: 'round', hardness: 100, flow: 100, spacing: 25, stabilizer: 0 },
     fillTolerance: 24,
     wand: { tolerance: 32, contiguous: true, defringe: true, heal: false, antialias: true },
     marquee: { shape: 'rect' },                       // rect | ellipse | lasso
@@ -30,6 +30,17 @@ GF.view = (function () {
   // stroke buffer for brush/eraser/clone (composited on pointer-up)
   let stroke = null;        // {canvas, ctx, mode, masked?, src?, offset?}
   let lastDocPt = null;
+  const stabBuf = [];
+  function stabilize(p) {
+    const n = view.brush.stabilizer || 0;
+    if (n <= 0) return p;
+    stabBuf.push({ x: p.x, y: p.y });
+    if (stabBuf.length > n) stabBuf.splice(0, stabBuf.length - n);
+    let sx = 0, sy = 0;
+    for (const pt of stabBuf) { sx += pt.x; sy += pt.y; }
+    return { x: sx / stabBuf.length, y: sy / stabBuf.length };
+  }
+  function resetStabilizer() { stabBuf.length = 0; }
   let moveStart = null;     // for move tool {x,y,layerX,layerY}
   let selDrag = null;       // marquee/lasso in progress {x0,y0,x1,y1,pts,mode}
   let gradDrag = null;      // gradient drag {x0,y0,x1,y1}
@@ -343,8 +354,9 @@ GF.view = (function () {
       // click with the move tool doesn't create a no-op undo step
       moveStart = { px: e.clientX, py: e.clientY, layerX: L.x, layerY: L.y, pushed: false };
     } else if (tool === 'brush' || tool === 'eraser') {
-      if (e.altKey) { pickColor(p); return; }   // Alt-click samples color (replaces the eyedropper tool)
-      if (beginStroke(tool === 'eraser' ? 'eraser' : 'brush')) stampTo(p);
+      if (e.altKey) { pickColor(p); return; }
+      resetStabilizer();
+      if (beginStroke(tool === 'eraser' ? 'eraser' : 'brush')) stampTo(stabilize(p));
     } else if (tool === 'fill') {
       if (e.altKey) { pickColor(p); return; }
       doFill(L, p);
@@ -442,7 +454,7 @@ GF.view = (function () {
       }
     }
     if (stroke) {
-      stampTo(screenToDoc(e.clientX, e.clientY));
+      stampTo(stabilize(screenToDoc(e.clientX, e.clientY)));
       return;
     }
     const p = screenToDoc(e.clientX, e.clientY);
