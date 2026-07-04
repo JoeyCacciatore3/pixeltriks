@@ -85,7 +85,9 @@ GF.assetsUI = (function () {
     }
 
     if (!assets.length) {
-      grid.innerHTML = '<p class="s3-status">No assets yet. Import files or drag-drop.</p>';
+      grid.innerHTML = currentTab === 'material'
+        ? '<p class="s3-status">No materials yet.<br>Hit <b>Generate</b> below to create PBR presets.</p>'
+        : '<p class="s3-status">No assets yet.<br>Import files or drag-drop.</p>';
       return;
     }
 

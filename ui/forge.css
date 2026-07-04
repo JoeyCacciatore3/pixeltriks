@@ -575,8 +575,10 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   #sel-bar { bottom: calc(62px + env(safe-area-inset-bottom) + 10px); left: 50%;
     transform: translateX(-50%); width: min(360px, 94%); }
   .quick-actions { bottom: calc(62px + env(safe-area-inset-bottom) + 8px); right: 8px; left: 8px;
-    justify-content: center; }
+    justify-content: center; gap: 10px; }
+  .qa-chip { padding: 10px 14px; border-radius: 14px; font-size: .85rem; }
   .qa-label { display: none; }
+  .qa-icon { font-size: 1.2em; }
   .first-tip { bottom: calc(62px + env(safe-area-inset-bottom) + 8px); max-width: calc(100vw - 24px);
     font-size: .68rem; }
   #timeline { height: 32px; }
@@ -647,8 +649,9 @@ body[data-mode="3d"] #sel-bar { display: none; }
 #tl-canvas { width: 100%; display: none; cursor: pointer; }
 
 /* ============================= ASSET LIBRARY ============================= */
-.asset-tabs { display: flex; gap: .15rem; margin: .4rem 0; }
-.asset-tab { padding: .3em .6em; border-radius: 999px; font-size: .72em; font-weight: 600;
+.asset-tabs { display: flex; gap: .3rem; margin: .5rem 0; flex-wrap: wrap; }
+.asset-tab { padding: .45em .8em; border-radius: 999px; font-size: .78em; font-weight: 600;
+  min-height: 28px;
   color: var(--ink-3); background: transparent; }
 .asset-tab:hover { color: var(--ink-2); }
 .asset-tab.on { color: var(--accent-2); background: color-mix(in srgb, var(--accent) 16%, transparent); }
@@ -674,15 +677,27 @@ body[data-mode="3d"] #sel-bar { display: none; }
 .ph-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; }
 .ph-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- Phase 5 polish ---- */
-.quick-actions { position: fixed; bottom: 52px; right: 16px; display: flex; gap: 6px; z-index: 90;
+/* ---- Phase 5 polish — Gameboy-bold action chips ---- */
+.quick-actions { position: fixed; bottom: 52px; right: 16px; display: flex; gap: 8px; z-index: 90;
   flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 32px); }
-.qa-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px;
-  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2);
-  font: 500 .72rem/1 var(--font); cursor: pointer; white-space: nowrap; }
-.qa-chip:hover { border-color: var(--accent); color: var(--ink); }
-.qa-icon { font-size: .85em; }
-.qa-mat-menu { min-width: 140px; }
+.qa-chip { display: flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 12px;
+  background: var(--surface-2); border: 2px solid var(--line); color: var(--ink);
+  font: 600 .82rem/1 var(--font); cursor: pointer; white-space: nowrap;
+  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
+.qa-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.qa-chip:active { transform: scale(.95); }
+.qa-icon { font-size: 1em; }
+.qa-mat-menu { min-width: 160px; }
+
+/* 3D-mode context: dim 2D-only UI when no document is open */
+body.no-doc .zoom-pill { opacity: .3; pointer-events: none; }
+body.no-doc .ptab[data-tab="layers"],
+body.no-doc .ptab[data-tab="adjust"] { opacity: .35; }
+
+/* Asset library: make Generate CTA stand out */
+#asset-gen-btn { background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+  font-weight: 700; }
 
 .first-tip { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
   padding: 6px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line);
