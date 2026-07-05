@@ -1,41 +1,34 @@
-# Cloudflare Pages custom headers
-# https://developers.cloudflare.com/pages/configuration/headers/
+# Cloudflare Pages custom headers — PREVIEW DEPLOYMENTS ONLY.
 #
-# CF Pages MERGES all matching rules (not most-specific-wins).
-# Keep rules non-overlapping to avoid contradictory Cache-Control.
+# Production (pixeltriks.com) is governed by zone-level HTTP Response Header
+# Modification rules in the Cloudflare dashboard — those override everything.
+# This file exists for branch preview URLs (*.pixeltriks.pages.dev) where
+# zone rules don't apply, and as human-readable documentation of intent.
+#
+# CF Pages MERGES all matching rules — keep paths non-overlapping.
 
-# Service worker — ALWAYS revalidate (stale sw.js = stale app for hours)
+# Service worker — NEVER cache
 /sw.js
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-store, must-revalidate
 
-# HTML — always fresh
+# HTML app shell — always revalidate
 /index.html
-  Cache-Control: no-cache
+  Cache-Control: no-cache, must-revalidate
 /
-  Cache-Control: no-cache
+  Cache-Control: no-cache, must-revalidate
 
-# Manifest — short cache
+# PWA manifest — 1h
 /manifest.webmanifest
   Cache-Control: public, max-age=3600, must-revalidate
 
-# App code — 1 hour (SW owns offline caching; these TTLs are for first-visit CDN)
-/ui/*
-  Cache-Control: public, max-age=3600, must-revalidate
-/core/*
-  Cache-Control: public, max-age=3600, must-revalidate
-/ai/*
-  Cache-Control: public, max-age=3600, must-revalidate
-/tools/*
-  Cache-Control: public, max-age=3600, must-revalidate
-
-# CSS
-/ui/forge.css
-  Cache-Control: public, max-age=3600, must-revalidate
-
-# Static assets — long cache (images, fonts, 3D models, vendor libs)
-/assets/*
-  Cache-Control: public, max-age=86400
-/vendor/*
-  Cache-Control: public, max-age=86400
+# Images — 24h
 /icon.svg
   Cache-Control: public, max-age=86400
+
+# Vendor libs (three.js, fonts, models) — 7 days, immutable
+/vendor/*
+  Cache-Control: public, max-age=604800, immutable
+
+# 3D model assets — 7 days, immutable
+/assets/*
+  Cache-Control: public, max-age=604800, immutable
