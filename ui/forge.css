@@ -85,13 +85,16 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
 
 .icon-btn {
   display: inline-grid; place-items: center;
-  width: 38px; height: 38px; border-radius: var(--r-sm);
-  color: var(--ink-2); transition: .15s background, .15s color;
+  width: 36px; height: 36px; border-radius: var(--game-r);
+  color: var(--ink-2);
+  border: var(--game-border-w) solid transparent;
+  transition: .12s background, .12s color, .12s border-color, .12s box-shadow;
 }
 .icon-btn.sm { width: 30px; height: 30px; }
-.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); border-color: var(--line); }
+.icon-btn:active { transform: scale(.95); }
 .icon-btn:disabled { opacity: .32; pointer-events: none; }
-.icon-btn.danger:hover { color: var(--danger); }
+.icon-btn.danger:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
 
 .text-btn {
   padding: .5em 1em; border-radius: var(--game-r); font-weight: 700;
@@ -132,7 +135,7 @@ body:not(.no-doc) .topbar-action { display: none; }
 .menu-btn { display: none; }
 
 .zoom-pill { display: flex; align-items: center; background: var(--surface);
-  border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+  border-radius: var(--game-r); border: var(--game-border-w) solid var(--game-border); }
 .zoom-label { min-width: 4ch; padding: .35em .2em; font-variant-numeric: tabular-nums;
   font-weight: 600; color: var(--ink-2); font-size: .92em; }
 .zoom-label:hover { color: var(--ink); }
@@ -244,20 +247,29 @@ body:not(.no-doc) .topbar-action { display: none; }
 #empty-state { position: absolute; inset: 0; display: grid; place-items: center;
   padding: 2rem; z-index: 5; }
 .empty-card { text-align: center; max-width: 560px; animation: pop .4s ease; }
-.empty-mark { font-size: 3rem; color: var(--accent); filter: drop-shadow(0 4px 16px color-mix(in srgb,var(--accent) 40%, transparent)); }
-.empty-card h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: .3rem 0 .2rem; }
-.empty-card p { color: var(--ink-2); margin: .2rem 0 1.2rem; line-height: 1.5; }
-.empty-actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
-.empty-hint { font-size: .85em; color: var(--ink-3); margin-top: 1rem; }
+.empty-mark { font-size: 2.8rem; color: var(--accent);
+  filter: drop-shadow(0 4px 16px color-mix(in srgb, var(--accent) 40%, transparent)); }
+.empty-card h1 { font-size: clamp(1.5rem, 3.5vw, 2rem); margin: .3rem 0 .15rem; font-weight: 800; }
+.empty-card p { color: var(--ink-2); margin: .2rem 0 1rem; line-height: 1.5; font-size: .9em; }
+.empty-actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+.empty-hint { font-size: .78em; color: var(--ink-3); margin-top: .8rem; }
 
-/* intent-first launcher — lead with outcomes, not "open a file" */
-.intent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin: 1.3rem 0 1rem; }
-.intent { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; padding: .85rem .8rem;
-  background: var(--surface); border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line); text-align: left; }
-.intent:hover { background: var(--surface-2); transform: translateY(-2px); box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--accent); }
-.intent .in-ic { font-size: 1.5rem; margin-bottom: .25rem; line-height: 1; }
-.intent b { font-size: .92em; font-weight: 600; }
-.intent small { color: var(--ink-3); font-size: .76em; }
+/* intent-first launcher — controller deck cards */
+.intent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: 1rem 0 .8rem; }
+.intent { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+  padding: .75rem .7rem; text-align: left;
+  background: var(--surface); border-radius: var(--game-r);
+  border: var(--game-border-w) solid var(--game-border);
+  transition: .12s background, .12s border-color, .12s box-shadow, .12s transform; }
+.intent:hover { background: var(--surface-2); transform: translateY(-2px);
+  border-color: var(--accent); box-shadow: var(--game-glow); }
+.intent .in-ic { font-size: 1.3rem; margin-bottom: .15rem; line-height: 1;
+  display: inline-grid; place-items: center; width: 32px; height: 32px;
+  border-radius: var(--game-r); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-2); }
+.intent .in-ic svg { width: 18px; height: 18px; }
+.intent b { font-size: .85em; font-weight: 700; }
+.intent small { color: var(--ink-3); font-size: .72em; }
 @media (max-width: 560px) { .intent-grid { grid-template-columns: repeat(2, 1fr); } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 
@@ -418,10 +430,12 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 /* mobile panel toggle (hidden on desktop) */
 #panel-toggle { display: none; }
 
-/* toast (engine's GF.util.toast toggles #toast.show) */
+/* toast — game-deck styled */
 #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(10px);
-  background: var(--surface); color: var(--ink); padding: .6em 1.1em; border-radius: 999px;
-  box-shadow: var(--shadow), inset 0 0 0 1px var(--line); font-size: .9em; z-index: 60;
+  background: var(--surface); color: var(--ink); padding: .55em 1em; border-radius: var(--game-r);
+  border: var(--game-border-w) solid var(--game-border);
+  box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  font-size: .85em; font-weight: 600; z-index: 60;
   opacity: 0; pointer-events: none; max-width: 80vw; text-align: center;
   transition: opacity .2s ease, transform .2s ease; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -429,26 +443,37 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 /* document dimensions readout */
 .dims { font-size: .82em; color: var(--ink-3); font-variant-numeric: tabular-nums; padding: 0 .3rem; }
 
-/* generic modal */
-.fs-modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: grid; place-items: center;
-  z-index: 80; padding: 1rem; animation: fade .2s ease; backdrop-filter: blur(3px); }
-.fs-modal .card { background: var(--surface); border-radius: var(--r); padding: 1.3rem;
-  width: min(420px, 100%); box-shadow: var(--shadow), inset 0 0 0 1px var(--line); animation: pop .25s ease; }
-.fs-modal h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
-.fs-modal .sub { color: var(--ink-2); font-size: .9em; margin: 0 0 1rem; }
-.fs-modal label { display: flex; flex-direction: column; gap: .3rem; font-size: .85em; color: var(--ink-2); margin-bottom: .8rem; }
+/* generic modal — game-deck framed */
+.fs-modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center;
+  z-index: 80; padding: 1rem; animation: fade .2s ease; backdrop-filter: blur(4px); }
+.fs-modal .card { background: var(--surface); border-radius: var(--game-r); padding: 1.2rem;
+  width: min(420px, 100%);
+  border: var(--game-border-w) solid var(--game-border);
+  box-shadow: 0 12px 40px rgba(0,0,0,.4); animation: pop .25s ease; }
+.fs-modal h2 { margin: 0 0 .3rem; font-size: 1.15rem; font-weight: 800; }
+.fs-modal .sub { color: var(--ink-2); font-size: .85em; margin: 0 0 .8rem; }
+.fs-modal label { display: flex; flex-direction: column; gap: .25rem; font-size: .82em;
+  color: var(--ink-2); margin-bottom: .7rem; font-weight: 600; }
 .fs-modal input, .fs-modal select, .fs-modal textarea {
-  background: var(--bg-2); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm);
-  padding: .55em; font-size: 1.05em; font-family: inherit; }
+  background: var(--bg); color: var(--ink);
+  border: var(--game-border-w) solid var(--game-border); border-radius: var(--game-r);
+  padding: .5em .6em; font-size: 1em; font-family: inherit;
+  transition: .12s border-color; }
+.fs-modal input:focus, .fs-modal select:focus, .fs-modal textarea:focus {
+  border-color: var(--accent); outline: none; }
 .fs-modal textarea { resize: vertical; min-height: 64px; }
-.fs-modal .row { display: flex; gap: .6rem; }
+.fs-modal .row { display: flex; gap: .5rem; }
 .fs-modal .row > * { flex: 1; }
-.fs-modal menu { display: flex; gap: .5rem; justify-content: flex-end; margin: 1.1rem 0 0; padding: 0; }
-.size-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: .5rem; margin-bottom: .8rem; }
-.size-card { padding: .7em .4em; text-align: center; background: var(--bg-2); border-radius: var(--r-sm);
-  box-shadow: inset 0 0 0 1px var(--line); font-size: .82em; font-weight: 600; }
-.size-card.on { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent-2); }
-.size-card small { display: block; color: var(--ink-3); font-weight: 400; }
+.fs-modal menu { display: flex; gap: .5rem; justify-content: flex-end; margin: 1rem 0 0; padding: 0; }
+.size-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: .4rem; margin-bottom: .7rem; }
+.size-card { padding: .65em .4em; text-align: center; background: var(--bg);
+  border-radius: var(--game-r); border: var(--game-border-w) solid var(--game-border);
+  font-size: .8em; font-weight: 700; cursor: pointer;
+  transition: .12s border-color, .12s box-shadow, .12s color; }
+.size-card:hover { border-color: var(--line); }
+.size-card.on { border-color: var(--accent); color: var(--accent-2);
+  box-shadow: var(--game-glow); }
+.size-card small { display: block; color: var(--ink-3); font-weight: 400; font-size: .9em; }
 
 
 /* ---------------------- accessibility ---------------------- */
@@ -463,9 +488,10 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 
 /* ---------------------- command palette (⌘K) ---------------------- */
 .palette-trigger { display: flex; align-items: center; gap: .5rem; padding: .4em .7em;
-  background: var(--surface); border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--ink-3); transition: .15s background, .15s color; }
-.palette-trigger:hover { background: var(--surface-2); color: var(--ink-2); }
+  background: var(--surface); border-radius: var(--game-r);
+  border: var(--game-border-w) solid var(--game-border);
+  color: var(--ink-3); transition: .12s background, .12s color, .12s border-color; }
+.palette-trigger:hover { background: var(--surface-2); color: var(--ink-2); border-color: var(--line); }
 .palette-trigger svg { width: 16px; height: 16px; }
 .kbd { font: 600 .72em/1 ui-monospace, monospace; color: var(--ink-2); background: var(--bg);
   padding: .25em .45em; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap; }
@@ -534,15 +560,16 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .hist-item.base { color: var(--ink-3); font-style: italic; }
 .hist-item.future { color: var(--ink-3); opacity: .55; }
 
-/* ------------- first-run coach mark (wand) ------------- */
+/* ------------- first-run coach mark (wand) — game-deck ------------- */
 #coach { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 11;
-  width: min(300px, 90%); animation: pop .25s ease; pointer-events: none; }   /* click-through */
+  width: min(300px, 90%); animation: pop .25s ease; pointer-events: none; }
 .coach-card { background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(12px);
-  border: 1px solid var(--accent); border-radius: 14px; padding: .85rem .9rem; box-shadow: var(--shadow);
+  border: var(--game-border-w) solid var(--accent); border-radius: var(--game-r);
+  padding: .8rem .9rem; box-shadow: var(--game-glow), 0 8px 24px rgba(0,0,0,.3);
   text-align: left; pointer-events: none; }
-#coach .text-btn { pointer-events: auto; }   /* only the dismiss button is interactive */
-.coach-card b { display: block; margin-bottom: .3rem; font-size: .95em; }
-.coach-card p { margin: 0 0 .7rem; font-size: .84em; color: var(--ink-2); line-height: 1.45; }
+#coach .text-btn { pointer-events: auto; }
+.coach-card b { display: block; margin-bottom: .25rem; font-size: .9em; color: var(--accent-2); }
+.coach-card p { margin: 0 0 .6rem; font-size: .8em; color: var(--ink-2); line-height: 1.45; }
 .text-btn.sm { padding: .35em .9em; font-size: .85em; }
 
 /* ------------- contextual selection OUTCOME bar (intent-first) ------------- */
@@ -897,25 +924,31 @@ body[data-mode="3d"] #sel-bar { display: none; }
   white-space: nowrap; width: 100%; }
 
 /* Poly Haven picker */
-.ph-search { width: 100%; margin: .5rem 0; padding: .5em .7em; border-radius: 8px;
-  border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; }
-.ph-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem;
+.ph-search { width: 100%; margin: .4rem 0; padding: .45em .6em; border-radius: var(--game-r);
+  border: var(--game-border-w) solid var(--game-border); background: var(--bg); color: var(--ink);
+  font: inherit; transition: .12s border-color; }
+.ph-search:focus { border-color: var(--accent); outline: none; }
+.ph-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem;
   max-height: 46vh; overflow: auto; padding: .2rem; }
-.ph-card { display: grid; gap: .25rem; padding: .3rem; border-radius: 10px; background: transparent;
-  border: 1px solid var(--line); cursor: pointer; color: var(--ink-2); font-size: .72em; }
-.ph-card:hover { border-color: var(--accent); color: var(--ink); }
-.ph-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; }
+.ph-card { display: grid; gap: .2rem; padding: .25rem; border-radius: var(--game-r);
+  background: transparent; border: var(--game-border-w) solid var(--game-border);
+  cursor: pointer; color: var(--ink-2); font-size: .72em;
+  transition: .12s border-color, .12s box-shadow; }
+.ph-card:hover { border-color: var(--accent); color: var(--ink);
+  box-shadow: var(--game-glow); }
+.ph-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: calc(var(--game-r) - 2px); }
 .ph-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- Phase 5 polish — Gameboy-bold action chips ---- */
-.quick-actions { position: fixed; bottom: 52px; right: 16px; display: flex; gap: 8px; z-index: 90;
+/* ---- Phase 5 — game-deck action chips ---- */
+.quick-actions { position: fixed; bottom: 52px; right: 16px; display: flex; gap: 6px; z-index: 90;
   flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 32px); }
-.qa-chip { display: flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 12px;
-  background: var(--surface-2); border: 2px solid var(--line); color: var(--ink);
-  font: 600 .82rem/1 var(--font); cursor: pointer; white-space: nowrap;
-  transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
-.qa-chip:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.qa-chip { display: flex; align-items: center; gap: 5px; padding: 7px 12px;
+  border-radius: var(--game-r);
+  background: var(--surface); border: var(--game-border-w) solid var(--game-border);
+  color: var(--ink); font: 700 .8rem/1 var(--font); cursor: pointer; white-space: nowrap;
+  transition: .12s transform, .12s border-color, .12s box-shadow; }
+.qa-chip:hover { border-color: var(--accent); color: var(--accent-2);
+  box-shadow: var(--game-glow); transform: translateY(-2px); }
 .qa-chip:active { transform: scale(.95); }
 .qa-icon { font-size: 1em; }
 .qa-mat-menu { min-width: 160px; }
@@ -930,8 +963,10 @@ body.no-doc .ptab[data-tab="adjust"] { opacity: .35; }
   font-weight: 700; }
 
 .first-tip { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-  padding: 6px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line);
-  color: var(--ink-2); font: .72rem/1.4 var(--font); z-index: 80; display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: var(--game-r);
+  background: var(--surface); border: var(--game-border-w) solid var(--game-border);
+  color: var(--ink-2); font: .72rem/1.4 var(--font); font-weight: 600; z-index: 80;
+  display: flex; align-items: center; gap: 8px;
   animation: tip-in .3s ease; pointer-events: auto; max-width: 400px; }
 .tip-dismiss { background: none; border: none; color: var(--ink-3); cursor: pointer; font-size: .8em; padding: 2px; }
 @keyframes tip-in { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
