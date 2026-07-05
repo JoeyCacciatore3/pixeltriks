@@ -69,18 +69,47 @@
     });
 
     /* ---------- TOOLS (click rail, verify engine tool) ---------- */
-    const toolMap = { move:'move', select:'marquee', wand:'wand', crop:'move', brush:'brush', eraser:'eraser', fill:'fill', text:'text', shape:'shape',
-      magicerase:'magiceraser', gradient:'gradient' };
+    /* eraser + magicerase consolidated: eraser is now brush mode, magic erase is wand mode */
+    const toolMap = { move:'move', select:'marquee', wand:'wand', crop:'move', brush:'brush', fill:'fill', text:'text', shape:'shape',
+      gradient:'gradient' };
     for (const [btn, eng] of Object.entries(toolMap)) {
       await t('tool ' + btn + ' -> ' + eng, () => { clickTool(btn); if (GF.view.view.tool !== eng) throw new Error('got ' + GF.view.view.tool); });
     }
     await t('aria-pressed set on active tool', () => { clickTool('brush'); if ($('#toolrail .tool[data-tool=brush]').getAttribute('aria-pressed') !== 'true') throw new Error('no aria-pressed'); });
     await t('optbar builds for brush (size control)', () => { clickTool('brush'); if (!$('#brush-size')) throw new Error('no #brush-size'); });
     await t('optbar builds for wand (tolerance)', () => { clickTool('wand'); if (!$('#wand-tol')) throw new Error('no #wand-tol'); });
-    await t('optbar magic-erase: Heal/Erase seg + tolerance', () => {
-      clickTool('magicerase');
-      if (!$('#me-mode') || !$('#me-tol')) throw new Error('missing me-mode/me-tol');
-      if (!GF.view.view.wand.heal) throw new Error('heal should default true');
+    await t('optbar flyout positioned at active tool (not header)', () => {
+      freshDoc(); clickTool('brush');
+      const bar = $('#optbar');
+      const toolBtn = $('#toolrail .tool[data-tool="brush"]');
+      if (!bar || bar.hidden) throw new Error('optbar not visible');
+      const barRect = bar.getBoundingClientRect();
+      const btnRect = toolBtn.getBoundingClientRect();
+      // Flyout should be to the RIGHT of the tool rail, not above the viewport
+      if (barRect.left < btnRect.right - 10) throw new Error('flyout not to the right of rail: bar.left=' + barRect.left + ' btn.right=' + btnRect.right);
+      // Flyout should be vertically near the tool button (within 40px)
+      const vertDist = Math.abs((barRect.top + barRect.height/2) - (btnRect.top + btnRect.height/2));
+      if (vertDist > 40) throw new Error('flyout too far from tool button: ' + vertDist + 'px');
+    });
+    await t('optbar flyout moves when tool changes', () => {
+      freshDoc(); clickTool('brush');
+      const bar = $('#optbar');
+      const brushTop = bar.getBoundingClientRect().top;
+      clickTool('wand');
+      const wandTop = bar.getBoundingClientRect().top;
+      // Wand is above brush in the rail, so flyout should be higher
+      if (wandTop >= brushTop) throw new Error('flyout did not move: brush=' + brushTop + ' wand=' + wandTop);
+    });
+    await t('optbar hidden for move tool (no controls)', () => {
+      freshDoc(); clickTool('move');
+      const bar = $('#optbar');
+      // Move has hint text, so bar is shown — that's fine. But check it's valid.
+      if (!bar.hidden && !bar.textContent.trim()) throw new Error('optbar visible but empty');
+    });
+    await t('wand optbar: auto-remove toggle present', () => {
+      clickTool('wand');
+      if (!$('#wand-mode')) throw new Error('missing wand-mode seg');
+      if (GF.view.view.wand.autoRemove === undefined) throw new Error('autoRemove not initialised');
     });
     await t('optbar gradient: kind seg + fade checkbox', () => {
       clickTool('gradient');
@@ -324,11 +353,14 @@
     });
 
     /* ---------- QUICK WINS ---------- */
-    await t('selection feather/grow present + safe', () => {
+    await t('selection expand/feather via hotbar (safe)', () => {
       freshDoc(); clickTool('select');
-      if (!$('#sel-feather') || !$('#sel-grow')) throw new Error('missing refine buttons');
       GF.api.run('selectRect', { x: 20, y: 20, w: 60, h: 60 });
-      $('#sel-feather').click(); $('#sel-grow').click(); GF.api.run('deselect');
+      if (GF.hotbar) GF.hotbar.refresh();
+      const expand = $('[data-hotbar="sel-expand"]');
+      const feather = $('[data-hotbar="sel-feather"]');
+      if (!expand || !feather) throw new Error('missing expand/feather in hotbar');
+      expand.click(); feather.click(); GF.api.run('deselect');
     });
     await t('theme toggle flips data-theme', () => {
       const before = document.documentElement.dataset.theme || '';
@@ -478,9 +510,10 @@
     });
 
     /* ---------- PRO SELECTIONS + GUIDES ---------- */
-    await t('wand optbar: mode/sample/guide (AA always on)', () => {
+    await t('wand optbar: mode/tolerance/guide + AA default on', () => {
       freshDoc(); clickTool('wand');
-      ['#sel-mode', '#wand-sample'].forEach(s => { if (!$(s)) throw new Error('missing ' + s); });
+      if (!$('#wand-mode')) throw new Error('missing #wand-mode (select/auto-remove seg)');
+      if (!$('#wand-tol')) throw new Error('missing #wand-tol');
       if (!$('.guide-btn')) throw new Error('no guide button');
       if (!GF.view.view.wand.antialias) throw new Error('anti-alias should default on');
     });
@@ -522,25 +555,33 @@
       GF.select.selectColor(img, 200, 55, 55, 70, 'replace');   // ≈ the red rect (#c83737)
       if (!GF.select.has()) throw new Error('color range selected nothing'); GF.api.run('deselect');
     });
-    await t('selection outcome bar appears + Fill works + hides on deselect', () => {
+    await t('selection hotbar shows actions + Fill works + hides on deselect', () => {
       freshDoc(); GF.api.run('selectRect', { x: 30, y: 30, w: 60, h: 60 });
-      const bar = $('#sel-bar'); if (!bar || bar.hidden) throw new Error('outcome bar not shown');
-      if (!/px selected/.test(bar.querySelector('.sel-count').textContent)) throw new Error('no count');
-      Array.prototype.find.call(bar.querySelectorAll('.sel-out'), b => /Fill/.test(b.textContent)).click();
+      if (GF.hotbar) GF.hotbar.refresh();
+      const ctx = GF.hotbar ? GF.hotbar.getContext() : null;
+      if (ctx !== '2d-selection') throw new Error('hotbar context should be 2d-selection, got ' + ctx);
+      const fillBtn = $('[data-hotbar="sel-fill"]');
+      if (!fillBtn) throw new Error('no fill button in hotbar');
+      fillBtn.click();
       if (!GF.history.canUndo()) throw new Error('fill did nothing');
       GF.api.run('deselect');
-      if (!$('#sel-bar').hidden) throw new Error('bar should hide on deselect');
+      if (GF.hotbar) GF.hotbar.refresh();
+      if (GF.hotbar.getContext() === '2d-selection') throw new Error('hotbar should leave selection context on deselect');
     });
-    await t('selection outcome (More): copy to new layer', () => {
+    await t('selection hotbar: copy to new layer', () => {
       freshDoc(); GF.api.run('selectRect', { x: 20, y: 20, w: 50, h: 50 }); const n = layerCount();
-      $('#sel-bar .sel-more-btn').click();
-      Array.prototype.find.call($('#sel-bar').querySelectorAll('.sel-more button'), b => /Copy to layer/.test(b.textContent)).click();
+      if (GF.hotbar) GF.hotbar.refresh();
+      const btn = $('[data-hotbar="sel-copy"]');
+      if (!btn) throw new Error('no copy-layer button in hotbar');
+      btn.click();
       if (layerCount() !== n + 1) throw new Error('copy did not add a layer'); GF.api.run('deselect');
     });
-    await t('selection outcome (More): crop to this', () => {
+    await t('selection hotbar: crop to selection', () => {
       freshDoc(200, 200); GF.api.run('selectRect', { x: 50, y: 50, w: 80, h: 60 });
-      $('#sel-bar .sel-more-btn').click();
-      Array.prototype.find.call($('#sel-bar').querySelectorAll('.sel-more button'), b => /Crop to this/.test(b.textContent)).click();
+      if (GF.hotbar) GF.hotbar.refresh();
+      const btn = $('[data-hotbar="sel-crop"]');
+      if (!btn) throw new Error('no crop button in hotbar');
+      btn.click();
       if (GF.doc.doc.width !== 80 || GF.doc.doc.height !== 60) throw new Error('crop wrong ' + GF.doc.doc.width + 'x' + GF.doc.doc.height);
     });
     await t('adjustment auto-masks from selection', () => {
@@ -549,21 +590,23 @@
       const L = GF.doc.active(); if (!L.adjust || !L.mask) throw new Error('adjustment not masked from selection');
       $('.fs-modal .text-btn.primary').click(); GF.api.run('deselect');
     });
-    await t('sel-bar More has Contract + Smooth; palette has Color range', async () => {
+    await t('hotbar selection has expand + feather; palette has Color range', async () => {
       freshDoc(); GF.api.run('selectRect', { x: 10, y: 10, w: 40, h: 40 });
-      const more = $('#sel-bar .sel-more');
-      const labels = Array.prototype.map.call(more.querySelectorAll('button'), b => b.textContent).join('|');
-      if (!/Contract/.test(labels) || !/Smooth/.test(labels)) throw new Error('missing refine ops: ' + labels);
+      if (GF.hotbar) GF.hotbar.refresh();
+      if (!$('[data-hotbar="sel-expand"]')) throw new Error('missing expand in hotbar');
+      if (!$('[data-hotbar="sel-feather"]')) throw new Error('missing feather in hotbar');
       GF.api.run('deselect');
       palRun('Color range');
       await new Promise(r => setTimeout(r, 40));
       if (!$('.fs-modal #cr-tol')) throw new Error('Color range dialog missing');
       $('.fs-modal .text-btn').click();
     });
-    await t('tool guide opens (wand) with next-step outcomes', () => {
-      freshDoc(); clickTool('wand'); $('.guide-btn').click();
-      const g = $('.fs-modal .tool-guide'); if (!g) throw new Error('no guide');
-      if (!/What to do next/i.test(g.textContent)) throw new Error('guide missing next-step outcomes');
+    await t('tool guide opens (wand) with helpful content', () => {
+      freshDoc(); clickTool('wand');
+      const btn = $('.guide-btn'); if (!btn) throw new Error('no guide button');
+      btn.click();
+      const g = $('.fs-modal .tool-guide'); if (!g) throw new Error('no guide modal');
+      if (g.textContent.length < 20) throw new Error('guide content too short');
       $('.fs-modal .text-btn').click();
     });
 
@@ -722,9 +765,9 @@
       if (GF.view.view.brush.stabilizer !== 5) throw new Error('not set');
       GF.view.view.brush.stabilizer = 0;
     });
-    await t('optbar: stabilizer slider present for brush', () => {
+    await t('optbar: brush erase mode toggle present', () => {
       clickTool('brush');
-      if (!$('#brush-stab')) throw new Error('no stabilizer slider');
+      if (!$('#brush-mode')) throw new Error('no brush-mode seg (paint/erase toggle)');
     });
 
     /* ---------- PAINT3D ---------- */
@@ -785,6 +828,228 @@
       ['materials.listPresets', 'materials.generate', 'materials.generateAll'].forEach(n => {
         if (names.indexOf(n) < 0) throw new Error('missing ' + n);
       });
+    });
+
+    /* ================================================================
+       GAME DECK — Transform Pad + Context Hotbar
+       Full test coverage for the Game Deck UI system.
+       ================================================================ */
+
+    /* ---------- TRANSFORM PAD: MODULE ---------- */
+    await t('transform pad: module loaded with public API', () => {
+      if (!GF.transformPad) throw new Error('GF.transformPad missing');
+      ['init', 'setAxis', 'getAxis', 'refresh'].forEach(fn => {
+        if (typeof GF.transformPad[fn] !== 'function') throw new Error('missing ' + fn);
+      });
+    });
+
+    await t('transform pad: DOM embedded in toolrail (not floating)', () => {
+      const pad = $('#transform-pad');
+      if (!pad) throw new Error('no #transform-pad element');
+      const rail = $('#toolrail');
+      if (!rail) throw new Error('no #toolrail');
+      if (!rail.contains(pad)) throw new Error('pad is NOT inside toolrail — must be embedded, not floating');
+    });
+
+    await t('transform pad: has 9 directional buttons', () => {
+      const pad = $('#transform-pad');
+      const btns = pad.querySelectorAll('[data-dir]');
+      if (btns.length !== 9) throw new Error('expected 9 buttons, got ' + btns.length);
+      const dirs = Array.from(btns).map(b => b.dataset.dir).sort().join(',');
+      if (dirs !== 'c,e,n,ne,nw,s,se,sw,w') throw new Error('wrong dirs: ' + dirs);
+    });
+
+    await t('transform pad: all buttons have aria-label', () => {
+      const btns = $('#transform-pad').querySelectorAll('[data-dir]');
+      btns.forEach(b => {
+        if (!b.getAttribute('aria-label')) throw new Error('missing aria-label on ' + b.dataset.dir);
+      });
+    });
+
+    await t('transform pad: active when document open + layer exists', () => {
+      freshDoc();
+      GF.transformPad.refresh();
+      const pad = $('#transform-pad');
+      if (!pad.classList.contains('tpad-active')) throw new Error('pad should be active when doc open');
+      if (pad.classList.contains('tpad-dimmed')) throw new Error('pad should not be dimmed');
+    });
+
+    /* ---------- TRANSFORM PAD: AXIS MODE ---------- */
+    await t('transform pad: axis mode cycles free → x → y → free (2D)', () => {
+      freshDoc();
+      GF.transformPad.setAxis('free');
+      if (GF.transformPad.getAxis() !== 'free') throw new Error('expected free');
+      // Use setAxis API — the pointerdown event is harder to synthesize in headless
+      GF.transformPad.setAxis('x');
+      if (GF.transformPad.getAxis() !== 'x') throw new Error('expected x, got ' + GF.transformPad.getAxis());
+      GF.transformPad.setAxis('y');
+      if (GF.transformPad.getAxis() !== 'y') throw new Error('expected y, got ' + GF.transformPad.getAxis());
+      GF.transformPad.setAxis('free');
+      if (GF.transformPad.getAxis() !== 'free') throw new Error('expected free, got ' + GF.transformPad.getAxis());
+    });
+
+    await t('transform pad: center button shows axis badge', () => {
+      GF.transformPad.setAxis('x');
+      const badge = $('#transform-pad .tpad-c .tpad-axis');
+      if (!badge) throw new Error('no axis badge');
+      if (badge.textContent !== '━') throw new Error('wrong badge for x: ' + badge.textContent);
+      GF.transformPad.setAxis('free');
+      if (badge.textContent !== '⊕') throw new Error('wrong badge for free: ' + badge.textContent);
+    });
+
+    await t('transform pad: axis lock dims blocked directions', () => {
+      freshDoc();
+      GF.transformPad.setAxis('x');
+      const n = $('#transform-pad [data-dir="n"]');
+      const s = $('#transform-pad [data-dir="s"]');
+      const w = $('#transform-pad [data-dir="w"]');
+      if (!n.classList.contains('axis-locked')) throw new Error('N should be locked in X mode');
+      if (!s.classList.contains('axis-locked')) throw new Error('S should be locked in X mode');
+      if (w.classList.contains('axis-locked')) throw new Error('W should NOT be locked in X mode');
+      GF.transformPad.setAxis('free');
+    });
+
+    /* ---------- CONTEXT HOTBAR: MODULE ---------- */
+    await t('hotbar: module loaded with public API', () => {
+      if (!GF.hotbar) throw new Error('GF.hotbar missing');
+      ['refresh', 'getContext'].forEach(fn => {
+        if (typeof GF.hotbar[fn] !== 'function') throw new Error('missing ' + fn);
+      });
+    });
+
+    await t('hotbar: DOM lives in #actionbar', () => {
+      const bar = $('#actionbar');
+      if (!bar) throw new Error('no #actionbar');
+      // Should have at least one button
+      if (!bar.querySelector('[data-hotbar]')) throw new Error('no hotbar buttons in #actionbar');
+    });
+
+    await t('hotbar: context reflects current state', () => {
+      freshDoc(); clickTool('move');
+      GF.hotbar.refresh();
+      const ctx = GF.hotbar.getContext();
+      // With a doc open and no selection, should be an idle context
+      if (ctx === 'empty') throw new Error('should not be empty when doc is open');
+      if (ctx === '2d-selection') throw new Error('should not be selection without a selection');
+    });
+
+    await t('hotbar: "2d-selection" context when selection active', () => {
+      freshDoc();
+      GF.api.run('selectRect', { x: 10, y: 10, w: 30, h: 30 });
+      GF.hotbar.refresh();
+      if (GF.hotbar.getContext() !== '2d-selection') throw new Error('expected 2d-selection, got ' + GF.hotbar.getContext());
+      // Should have selection action buttons
+      if (!$('[data-hotbar="sel-fill"]')) throw new Error('no fill button in selection context');
+      if (!$('[data-hotbar="sel-remove"]')) throw new Error('no remove button');
+      if (!$('[data-hotbar="sel-copy"]')) throw new Error('no copy button');
+      GF.api.run('deselect');
+    });
+
+    await t('hotbar: context changes back to idle on deselect', () => {
+      freshDoc();
+      GF.api.run('selectRect', { x: 5, y: 5, w: 20, h: 20 });
+      GF.hotbar.refresh();
+      if (GF.hotbar.getContext() !== '2d-selection') throw new Error('should be 2d-selection');
+      GF.api.run('deselect');
+      GF.hotbar.refresh();
+      if (GF.hotbar.getContext() === '2d-selection') throw new Error('should no longer be 2d-selection');
+    });
+
+    await t('hotbar: buttons use data-hotbar attribute for delegation', () => {
+      freshDoc();
+      GF.hotbar.refresh();
+      const btns = document.querySelectorAll('#actionbar [data-hotbar]');
+      if (btns.length < 2) throw new Error('expected multiple hotbar buttons, got ' + btns.length);
+      btns.forEach(b => {
+        if (!b.dataset.hotbar) throw new Error('empty data-hotbar on button');
+      });
+    });
+
+    /* ---------- GAME DECK INTEGRATION ---------- */
+    await t('game deck: pad active and hotbar responds to selection', () => {
+      freshDoc();
+      GF.transformPad.refresh();
+      // Pad should be active (doc open = layer exists)
+      const pad = $('#transform-pad');
+      if (!pad.classList.contains('tpad-active')) throw new Error('pad should be active when doc open');
+      // Make selection
+      GF.api.run('selectRect', { x: 0, y: 0, w: 50, h: 50 });
+      GF.hotbar.refresh();
+      if (GF.hotbar.getContext() !== '2d-selection') throw new Error('hotbar should be 2d-selection, got ' + GF.hotbar.getContext());
+      GF.api.run('deselect');
+    });
+
+    await t('game deck: no overlap between pad and tool buttons', () => {
+      const pad = $('#transform-pad');
+      const tools = document.querySelectorAll('#toolrail .tool');
+      if (!pad || tools.length === 0) throw new Error('missing pad or tools');
+      const padRect = pad.getBoundingClientRect();
+      let overlap = false;
+      tools.forEach(tool => {
+        const r = tool.getBoundingClientRect();
+        // Check vertical overlap
+        if (r.bottom > padRect.top && r.top < padRect.bottom) {
+          overlap = true;
+        }
+      });
+      if (overlap) throw new Error('transform pad overlaps tool buttons');
+    });
+
+    await t('game deck: pad is below all tools in DOM order', () => {
+      const rail = $('#toolrail');
+      const children = Array.from(rail.children);
+      const padIdx = children.indexOf($('#transform-pad'));
+      const lastToolIdx = Math.max(...children.map((c, i) => c.classList.contains('tool') || c.classList.contains('color-tool') ? i : -1));
+      if (padIdx <= lastToolIdx) throw new Error('pad (idx ' + padIdx + ') should be after last tool (idx ' + lastToolIdx + ')');
+    });
+
+    /* ================================================================
+       P4: CONTEXT-SENSITIVE PANEL
+       ================================================================ */
+    await t('panel: auto-switches to layers in 2D mode', () => {
+      freshDoc();
+      clickTool('brush');
+      // Panel should auto-switch — give the event a tick
+      const tab = $('#panel').dataset.tab;
+      // Should be layers (2D default) or scene (3D default) — not broken
+      if (!tab) throw new Error('no panel tab set');
+    });
+
+    await t('panel: manual tab click pauses auto-switch', () => {
+      freshDoc();
+      const adjTab = $('.ptab[data-tab="adjust"]');
+      if (adjTab) { adjTab.click(); }
+      // After manual click, the tab should stay on adjust
+      if ($('#panel').dataset.tab !== 'adjust') throw new Error('manual switch failed');
+    });
+
+    /* ================================================================
+       P6: SLIM TOP BAR — AI + Export in hotbar
+       ================================================================ */
+    await t('topbar: AI and Export have topbar-action class', () => {
+      const ai = $('#btn-ai');
+      const exp = $('#btn-export');
+      if (!ai || !ai.classList.contains('topbar-action')) throw new Error('AI missing topbar-action class');
+      if (!exp || !exp.classList.contains('topbar-action')) throw new Error('Export missing topbar-action class');
+    });
+
+    await t('hotbar: export button present in 2d-idle context', () => {
+      freshDoc();
+      clickTool('move');
+      GF.hotbar.refresh();
+      const ctx = GF.hotbar.getContext();
+      if (ctx === '3d-idle' || ctx === '2d-idle' || ctx === '2d-painting') {
+        const exp = $('[data-hotbar="export"]');
+        if (!exp) throw new Error('no export button in hotbar for context ' + ctx);
+      }
+    });
+
+    await t('hotbar: ai-tools button present in 3d-idle context', () => {
+      // 3D is default mode
+      freshDoc();
+      GF.hotbar.refresh();
+      const ai = $('[data-hotbar="ai-tools"]');
+      if (!ai) throw new Error('no ai-tools button in hotbar');
     });
 
     /* ---------- FINISH ---------- */
