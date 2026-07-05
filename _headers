@@ -1,27 +1,38 @@
 # Cloudflare Pages custom headers
 # https://developers.cloudflare.com/pages/configuration/headers/
+#
+# CF Pages MERGES all matching rules (not most-specific-wins).
+# Keep rules non-overlapping to avoid contradictory Cache-Control.
 
-# Service worker MUST revalidate every time — stale sw.js = stale app
+# Service worker — ALWAYS revalidate (stale sw.js = stale app for hours)
 /sw.js
-  Cache-Control: no-cache, must-revalidate
-
-# Manifest can be cached briefly but should revalidate
-/manifest.webmanifest
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: no-cache
 
 # HTML — always fresh
 /index.html
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: no-cache
 /
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: no-cache
 
-# JS/CSS assets — 1 hour cache (SW handles offline; edge cache handles CDN)
-/*.js
-  Cache-Control: public, max-age=3600, must-revalidate
-/*.css
+# Manifest — short cache
+/manifest.webmanifest
   Cache-Control: public, max-age=3600, must-revalidate
 
-# Static assets — cache longer (images, fonts, models)
+# App code — 1 hour (SW owns offline caching; these TTLs are for first-visit CDN)
+/ui/*
+  Cache-Control: public, max-age=3600, must-revalidate
+/core/*
+  Cache-Control: public, max-age=3600, must-revalidate
+/ai/*
+  Cache-Control: public, max-age=3600, must-revalidate
+/tools/*
+  Cache-Control: public, max-age=3600, must-revalidate
+
+# CSS
+/ui/forge.css
+  Cache-Control: public, max-age=3600, must-revalidate
+
+# Static assets — long cache (images, fonts, 3D models, vendor libs)
 /assets/*
   Cache-Control: public, max-age=86400
 /vendor/*
