@@ -78,33 +78,32 @@
     await t('aria-pressed set on active tool', () => { clickTool('brush'); if ($('#toolrail .tool[data-tool=brush]').getAttribute('aria-pressed') !== 'true') throw new Error('no aria-pressed'); });
     await t('optbar builds for brush (size control)', () => { clickTool('brush'); if (!$('#brush-size')) throw new Error('no #brush-size'); });
     await t('optbar builds for wand (tolerance)', () => { clickTool('wand'); if (!$('#wand-tol')) throw new Error('no #wand-tol'); });
-    await t('optbar flyout positioned at active tool (not header)', () => {
+    await t('optbar inline panel opens next to tool rail', () => {
       freshDoc(); clickTool('brush');
       const bar = $('#optbar');
-      const toolBtn = $('#toolrail .tool[data-tool="brush"]');
-      if (!bar || bar.hidden) throw new Error('optbar not visible');
+      if (!bar || !bar.classList.contains('open')) throw new Error('optbar not open');
       const barRect = bar.getBoundingClientRect();
-      const btnRect = toolBtn.getBoundingClientRect();
-      // Flyout should be to the RIGHT of the tool rail, not above the viewport
-      if (barRect.left < btnRect.right - 10) throw new Error('flyout not to the right of rail: bar.left=' + barRect.left + ' btn.right=' + btnRect.right);
-      // Flyout should be vertically near the tool button (within 40px)
-      const vertDist = Math.abs((barRect.top + barRect.height/2) - (btnRect.top + btnRect.height/2));
-      if (vertDist > 40) throw new Error('flyout too far from tool button: ' + vertDist + 'px');
+      const railRect = $('#toolrail').getBoundingClientRect();
+      // Panel should be immediately right of the tool rail (within 4px tolerance for border)
+      if (Math.abs(barRect.left - railRect.right) > 4) throw new Error('panel not adjacent to rail: bar.left=' + barRect.left + ' rail.right=' + railRect.right);
+      // Panel should have real width
+      if (barRect.width < 100) throw new Error('panel too narrow: ' + barRect.width + 'px');
     });
-    await t('optbar flyout moves when tool changes', () => {
+    await t('optbar panel shows tool name title', () => {
       freshDoc(); clickTool('brush');
-      const bar = $('#optbar');
-      const brushTop = bar.getBoundingClientRect().top;
+      const title = $('#optbar .opt-title');
+      if (!title) throw new Error('no .opt-title in panel');
+      if (!title.textContent.includes('Brush')) throw new Error('title missing tool name: ' + title.textContent);
       clickTool('wand');
-      const wandTop = bar.getBoundingClientRect().top;
-      // Wand is above brush in the rail, so flyout should be higher
-      if (wandTop >= brushTop) throw new Error('flyout did not move: brush=' + brushTop + ' wand=' + wandTop);
+      const title2 = $('#optbar .opt-title');
+      if (!title2 || !title2.textContent.includes('Smart Select')) throw new Error('title not updated for wand');
     });
-    await t('optbar hidden for move tool (no controls)', () => {
+    await t('optbar shows hint for move tool', () => {
       freshDoc(); clickTool('move');
       const bar = $('#optbar');
-      // Move has hint text, so bar is shown — that's fine. But check it's valid.
-      if (!bar.hidden && !bar.textContent.trim()) throw new Error('optbar visible but empty');
+      // Move has hint text in the panel
+      if (!bar.classList.contains('open')) throw new Error('optbar not open for move');
+      if (!bar.querySelector('.opt-hint')) throw new Error('no hint text for move tool');
     });
     await t('wand optbar: auto-remove toggle present', () => {
       clickTool('wand');

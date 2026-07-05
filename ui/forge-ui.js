@@ -421,56 +421,66 @@ window.GF = window.GF || {};
   function buildOptbar(name) {
     const bar = $('#optbar');
     let html = '';
-    /* Position the flyout: left edge at the rail's right edge, vertically centered on the tool button */
-    const toolBtn = $(`#toolrail .tool[data-tool="${name}"]`);
-    const stage = $('#stage');
-    if (toolBtn && stage) {
-      const btnRect = toolBtn.getBoundingClientRect();
-      const stageRect = stage.getBoundingClientRect();
-      const railW = $('#toolrail').getBoundingClientRect().width;
-      bar.style.left = railW + 'px';
-      bar.style.top = (btnRect.top - stageRect.top + btnRect.height / 2 - 21) + 'px';  // 21 = half of min-height 42
-    }
+    /* Inline panel — no JS positioning needed. CSS grid column handles layout. */
+    const toolLabel = { brush:'Brush', gradient:'Gradient', fill:'Fill', wand:'Smart Select',
+      select:'Marquee', shape:'Shape', crop:'Crop', text:'Text', move:'Move', pan:'Pan',
+      scene3d:'3D Scene' }[name] || name;
     if (name === 'brush') {
-      html = seg('brush-mode', [['paint','Paint'],['erase','Erase']], V().brush.erasing ? 'erase' : 'paint')
+      html = title(toolLabel)
+           + seg('brush-mode', [['paint','Paint'],['erase','Erase']], V().brush.erasing ? 'erase' : 'paint')
            + optSlider('Size', 'brush-size', 1, 200, V().brush.size)
            + optSlider('Opacity', 'brush-op', 0, 100, Math.round((V().brush.opacity ?? 1) * 100))
-           + `<label class="opt"><input type="checkbox" id="brush-pixel" ${V().brush.pixel ? 'checked' : ''}> Pixel</label>`;
+           + optCheck('Pixel', 'brush-pixel', V().brush.pixel);
     } else if (name === 'gradient') {
-      html = seg('grad-kind', [['linear','Linear'],['radial','Radial']], V().gradient.kind || 'linear')
-           + `<label class="opt"><input type="checkbox" id="grad-alpha" ${V().gradient.toAlpha ? 'checked' : ''}> Fade to transparent</label>`
-           + `<span class="opt">Drag on the canvas to draw</span>`;
+      html = title(toolLabel)
+           + seg('grad-kind', [['linear','Linear'],['radial','Radial']], V().gradient.kind || 'linear')
+           + optCheck('Fade to transparent', 'grad-alpha', V().gradient.toAlpha)
+           + hint('Drag on canvas to draw');
     } else if (name === 'fill') {
-      html = optSlider('Tolerance', 'fill-tol', 0, 128, V().fillTolerance);
+      html = title(toolLabel)
+           + optSlider('Tolerance', 'fill-tol', 0, 128, V().fillTolerance);
     } else if (name === 'wand') {
-      html = seg('wand-mode', [['select','Select'],['remove','Auto-remove']], V().wand.autoRemove ? 'remove' : 'select')
+      html = title(toolLabel)
+           + seg('wand-mode', [['select','Select'],['remove','Remove']], V().wand.autoRemove ? 'remove' : 'select')
            + optSlider('Tolerance', 'wand-tol', 0, 128, V().wand.tolerance)
-           + `<span class="opt">Click to select · Shift adds · Alt subtracts</span>`;
+           + hint('Click to select\nShift → add\nAlt → subtract');
     } else if (name === 'select') {
-      html = seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
-           + `<span class="opt">Shift adds · Alt subtracts</span>`;
+      html = title(toolLabel)
+           + seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
+           + hint('Shift → add\nAlt → subtract');
     } else if (name === 'shape') {
-      html = seg('shp-kind', [['rect','Rect'],['ellipse','Ellipse'],['line','Line']], V().shape.kind)
-           + `<label class="opt"><input type="checkbox" id="shp-fill" ${V().shape.fill ? 'checked':''}> Fill</label>`;
+      html = title(toolLabel)
+           + seg('shp-kind', [['rect','Rect'],['ellipse','Ellipse'],['line','Line']], V().shape.kind)
+           + optCheck('Fill', 'shp-fill', V().shape.fill);
     } else if (name === 'crop') {
-      html = seg('crop-aspect', [['0','Free'],['1','1:1'],['0.8','4:5'],['1.7778','16:9'],['0.5625','9:16'],['1.5','3:2'],['orig','Orig']], '0')
-           + `<label class="opt">Straighten<input type="range" id="crop-straighten" min="-15" max="15" value="0" step="0.5"><span class="opt-v" id="crop-straighten-v">0°</span></label>`
-           + `<button class="text-btn primary" id="crop-apply">Crop</button>`
+      html = title(toolLabel)
+           + seg('crop-aspect', [['0','Free'],['1','1:1'],['0.8','4:5'],['1.7778','16:9'],['0.5625','9:16'],['1.5','3:2'],['orig','Orig']], '0')
+           + optSlider('Straighten', 'crop-straighten', -15, 15, 0)
+           + `<button class="text-btn primary" id="crop-apply">Apply Crop</button>`
            + `<button class="text-btn ghost" id="crop-cancel">Cancel</button>`;
     } else if (name === 'text') {
-      html = `<span class="opt">Click on the canvas to place text</span>`;
-    } else if (name === 'move' || name === 'pan') {
-      html = `<span class="opt">${name === 'move' ? 'Drag to move the active layer' : 'Drag to pan · pinch to zoom'}</span>`;
+      html = title(toolLabel) + hint('Click on canvas to place text');
+    } else if (name === 'move') {
+      html = title(toolLabel) + hint('Drag to move the active layer');
+    } else if (name === 'pan') {
+      html = title(toolLabel) + hint('Drag to pan\nPinch to zoom');
     } else if (name === 'scene3d') {
       html = GF.scene3dUI ? GF.scene3dUI.optbarHtml() : '';
+      if (html) html = title('3D Scene') + html;
     }
     if (html && GF.toolGuides && GF.toolGuides.has(name)) html += guideBtn(name);
-    if (!html) { bar.hidden = true; return; }
-    bar.hidden = false; bar.innerHTML = html;
+    if (!html) { bar.classList.remove('open'); bar.innerHTML = ''; return; }
+    bar.innerHTML = html;
+    bar.classList.add('open');
     wireOptbar(name);
   }
+  function title(t) { return `<span class="opt-title">${t}</span>`; }
+  function hint(t) { return `<span class="opt-hint">${t.replace(/\n/g, '<br>')}</span>`; }
+  function optCheck(label, id, checked) {
+    return `<label class="opt-check"><input type="checkbox" id="${id}" ${checked ? 'checked' : ''}> ${label}</label>`;
+  }
   function optSlider(label, id, min, max, val) {
-    return `<label class="opt">${label}<input type="range" id="${id}" min="${min}" max="${max}" value="${val}"><span class="opt-v" id="${id}-v">${val}</span></label>`;
+    return `<label class="opt">${label}<div class="opt-row"><input type="range" id="${id}" min="${min}" max="${max}" value="${val}"><span class="opt-v" id="${id}-v">${val}</span></div></label>`;
   }
   function seg(id, items, cur) {
     return `<span class="seg" id="${id}">` + items.map(([v,l]) => `<button data-v="${v}" class="${v===cur?'on':''}">${l}</button>`).join('') + `</span>`;
