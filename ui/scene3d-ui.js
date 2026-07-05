@@ -198,7 +198,7 @@ GF.scene3dUI = (function () {
     if (el && GF.make3d) el.textContent = 'Converts ' + GF.make3d.sourceLabel() + '.';
   }
 
-  /* ---- object list (renders to both panel #s3-objects AND sidebar #sidebar-objects) ---- */
+  /* ---- object list (renders into panel #s3-objects) ---- */
   function renderObjectsInto(list) {
     if (!list) return;
     list.innerHTML = '';
@@ -224,7 +224,6 @@ GF.scene3dUI = (function () {
   }
   function renderObjects() {
     renderObjectsInto($('#s3-objects'));
-    renderObjectsInto($('#sidebar-objects'));
   }
 
   /* ---- transform + material inspector for the selected object ---- */
@@ -434,17 +433,8 @@ GF.scene3dUI = (function () {
 
   // Build the pane eagerly — the panel's "3D" tab is clickable before the 3D
   // tool is ever activated and must never show an empty pane.
-  function wireSidebar() {
-    const addBtn = $('#sidebar-add');
-    const impBtn = $('#sidebar-import');
-    if (addBtn) addBtn.addEventListener('click', () => {
-      if (!S().isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');
-      S().addPrimitive('box');
-    });
-    if (impBtn) impBtn.addEventListener('click', () => $('#file-input').click());
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); wireSidebar(); refresh(); });
-  else { ensurePane(); wireSidebar(); refresh(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); refresh(); });
+  else { ensurePane(); refresh(); }
 
   return { enter, exit, optbarHtml, wireOptbar, refresh, publishDialog };
 })();

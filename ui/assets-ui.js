@@ -1,6 +1,7 @@
 /* PixelTriks — assets-ui.js
-   Asset library panel in the left sidebar. Browsable grid with tabs
-   (All | Models | Textures | HDRIs), search, drag-to-scene. */
+   Asset library grid with tabs (All | Models | Textures | HDRIs).
+   Builds into #asset-section if present; bottom bar Assets button
+   routes to the Properties tab where this can be surfaced. */
 'use strict';
 window.GF = window.GF || {};
 

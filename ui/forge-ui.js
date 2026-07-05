@@ -16,16 +16,15 @@ window.GF = window.GF || {};
   const V  = () => GF.view.view;
   const run = (n, a) => { try { return GF.api.run(n, a); } catch (e) { U.toast(e.message); } };
 
-  /* engine tool name per rail button */
+  /* engine tool name per rail button — consolidated: eraser is a brush mode,
+     magic erase is a wand mode, gradient folds into fill */
   const TOOLMAP = {
     move:'move', select:'marquee', wand:'wand', crop:'marquee',
-    brush:'brush', eraser:'eraser', fill:'fill', text:'text',
-    shape:'shape', pan:'pan',
-    magicerase:'magiceraser', gradient:'gradient'
+    brush:'brush', fill:'fill', text:'text',
+    shape:'shape', pan:'pan', gradient:'gradient'
   };
   const SHORTCUTS = { v:'move', m:'select', w:'wand', c:'crop', b:'brush',
-    e:'eraser', g:'fill', t:'text', u:'shape', h:'pan',
-    j:'magicerase', d:'gradient' };
+    g:'fill', t:'text', u:'shape', h:'pan', d:'gradient' };
 
   const BLENDS = [
     ['source-over','Normal'],['multiply','Multiply'],['screen','Screen'],['overlay','Overlay'],
@@ -105,7 +104,7 @@ window.GF = window.GF || {};
     wireMobile();
     wireGestures();
     wireProFeatures();
-    wireDropdowns();
+    wireActionBar();
     GF.history.onChange(updateUndoRedo);
     setTool('move');
     updateUndoRedo();
@@ -253,7 +252,7 @@ window.GF = window.GF || {};
     });
   }
 
-  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool, openAIDialog };
+  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool, openAIDialog, modal };
 
   /* =================================================================
      Build dynamic UI
@@ -413,34 +412,24 @@ window.GF = window.GF || {};
   function buildOptbar(name) {
     const bar = $('#optbar');
     let html = '';
-    if (name === 'brush' || name === 'eraser') {
-      html = optSlider('Size', 'brush-size', 1, 200, V().brush.size)
+    if (name === 'brush') {
+      html = seg('brush-mode', [['paint','Paint'],['erase','Erase']], V().brush.erasing ? 'erase' : 'paint')
+           + optSlider('Size', 'brush-size', 1, 200, V().brush.size)
            + optSlider('Opacity', 'brush-op', 0, 100, Math.round((V().brush.opacity ?? 1) * 100))
-           + optSlider('Stabilize', 'brush-stab', 0, 20, V().brush.stabilizer || 0)
-           + (name === 'eraser' ? '' : seg('brush-shape', [['round','Round'],['square','Square']], V().brush.shape || 'round'))
            + `<label class="opt"><input type="checkbox" id="brush-pixel" ${V().brush.pixel ? 'checked' : ''}> Pixel</label>`;
-    } else if (name === 'magicerase') {
-      html = `<span class="opt">Click an object to remove it</span>`
-           + seg('me-mode', [['heal','Heal (rebuild)'],['erase','Erase (transparent)']], V().wand.heal ? 'heal' : 'erase')
-           + optSlider('Tolerance', 'me-tol', 0, 128, V().wand.tolerance)
-           + `<label class="opt"><input type="checkbox" id="me-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`;
     } else if (name === 'gradient') {
       html = seg('grad-kind', [['linear','Linear'],['radial','Radial']], V().gradient.kind || 'linear')
            + `<label class="opt"><input type="checkbox" id="grad-alpha" ${V().gradient.toAlpha ? 'checked' : ''}> Fade to transparent</label>`
-           + `<label class="opt">End color<input type="color" id="grad-c2" value="${V().gradient.color2 || '#1a1d24'}"></label>`
            + `<span class="opt">Drag on the canvas to draw</span>`;
     } else if (name === 'fill') {
       html = optSlider('Tolerance', 'fill-tol', 0, 128, V().fillTolerance);
     } else if (name === 'wand') {
-      html = selModeSeg()
+      html = seg('wand-mode', [['select','Select'],['remove','Auto-remove']], V().wand.autoRemove ? 'remove' : 'select')
            + optSlider('Tolerance', 'wand-tol', 0, 128, V().wand.tolerance)
-           + `<label class="opt"><input type="checkbox" id="wand-cont" ${V().wand.contiguous ? 'checked' : ''}> Contiguous</label>`
-           + seg('wand-sample', [['all','All layers'],['layer','Layer']], V().wand.sample || 'all');
+           + `<span class="opt">Click to select · Shift adds · Alt subtracts</span>`;
     } else if (name === 'select') {
-      html = selModeSeg()
-           + seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
-           + `<button class="text-btn ghost" id="sel-feather">Feather</button>`
-           + `<button class="text-btn ghost" id="sel-grow">Grow</button>`;
+      html = seg('sel-shape', [['rect','Rect'],['ellipse','Ellipse'],['lasso','Lasso']], V().marquee.shape)
+           + `<span class="opt">Shift adds · Alt subtracts</span>`;
     } else if (name === 'shape') {
       html = seg('shp-kind', [['rect','Rect'],['ellipse','Ellipse'],['line','Line']], V().shape.kind)
            + `<label class="opt"><input type="checkbox" id="shp-fill" ${V().shape.fill ? 'checked':''}> Fill</label>`;
@@ -456,7 +445,7 @@ window.GF = window.GF || {};
     } else if (name === 'scene3d') {
       html = GF.scene3dUI ? GF.scene3dUI.optbarHtml() : '';
     }
-    if (html && GUIDES[name]) html += guideBtn(name);   // every tool gets a "?" guide
+    if (html && GF.toolGuides && GF.toolGuides.has(name)) html += guideBtn(name);
     if (!html) { bar.hidden = true; return; }
     bar.hidden = false; bar.innerHTML = html;
     wireOptbar(name);
@@ -467,35 +456,24 @@ window.GF = window.GF || {};
   function seg(id, items, cur) {
     return `<span class="seg" id="${id}">` + items.map(([v,l]) => `<button data-v="${v}" class="${v===cur?'on':''}">${l}</button>`).join('') + `</span>`;
   }
-  function selModeSeg() { return `<span class="opt">Mode</span>` + seg('sel-mode', [['replace','New'],['add','Add'],['subtract','Sub'],['intersect','Int']], V().selMode || 'replace'); }
   function guideBtn(name) { return `<button class="icon-btn sm guide-btn" data-guide="${name}" title="How to use this tool" aria-label="Tool guide">?</button>`; }
   function wireOptbar(name) {
     if (name === 'scene3d' && GF.scene3dUI) { GF.scene3dUI.wireOptbar(); }
     const bind = (id, fn) => { const el = $('#'+id); if (el) el.addEventListener('input', () => { fn(el); const v = $('#'+id+'-v'); if (v) v.textContent = el.value; }); };
     bind('brush-size', el => V().brush.size = +el.value);
     bind('brush-op',   el => V().brush.opacity = +el.value / 100);
-    bind('brush-stab', el => V().brush.stabilizer = +el.value);
     bind('fill-tol',   el => V().fillTolerance = +el.value);
-    bind('wand-tol',   el => { V().wand.tolerance = +el.value; reWand(); });   // live re-select
+    bind('wand-tol',   el => { V().wand.tolerance = +el.value; reWand(); });
     const chk = (id, fn) => { const el = $('#'+id); if (el) el.addEventListener('change', () => fn(el.checked)); };
-    bind('me-tol',     el => V().wand.tolerance = +el.value);
     chk('brush-pixel', v => V().brush.pixel = v);
-    chk('wand-cont',   v => { V().wand.contiguous = v; reWand(); });
-    chk('me-cont',     v => V().wand.contiguous = v);
     chk('shp-fill',    v => V().shape.fill = v);
     chk('grad-alpha',  v => V().gradient.toAlpha = v);
-    segWire('brush-shape', v => V().brush.shape = v);
-    segWire('me-mode', v => V().wand.heal = (v === 'heal'));
+    segWire('brush-mode', v => { V().brush.erasing = (v === 'erase'); });
+    segWire('wand-mode', v => { V().wand.autoRemove = (v === 'remove'); });
     segWire('grad-kind', v => V().gradient.kind = v);
-    const gc2 = $('#grad-c2'); if (gc2) gc2.addEventListener('input', () => V().gradient.color2 = gc2.value);
     segWire('sel-shape', v => V().marquee.shape = v);
     segWire('shp-kind',  v => V().shape.kind = v);
-    segWire('sel-mode', v => V().selMode = v);
-    segWire('wand-sample', v => { V().wand.sample = v; reWand(); });
-    const gb = $('.guide-btn'); if (gb) gb.addEventListener('click', () => openToolGuide(gb.dataset.guide));
-    const fea = $('#sel-feather'); if (fea) fea.addEventListener('click', () => GF.select.has() ? run('featherSelection', { px: 4 }) : U.toast('Make a selection first'));
-    const grw = $('#sel-grow'); if (grw) grw.addEventListener('click', () => GF.select.has() ? run('growSelection', { px: 4 }) : U.toast('Make a selection first'));
-    // crop
+    const gb = $('.guide-btn'); if (gb) gb.addEventListener('click', () => GF.toolGuides && GF.toolGuides.open(gb.dataset.guide));
     segWire('crop-aspect', v => setCropAspect(v === 'orig' ? (D.doc.width / D.doc.height) : parseFloat(v)));
     const cs = $('#crop-straighten'); if (cs) cs.addEventListener('change', () => { straighten(parseFloat(cs.value)); cs.value = 0; $('#crop-straighten-v').textContent = '0°'; });
     if (cs) cs.addEventListener('input', () => $('#crop-straighten-v').textContent = (cs.value > 0 ? '+' : '') + cs.value + '°');
@@ -538,9 +516,9 @@ window.GF = window.GF || {};
       busyHero('#hero-removebg', () => run('removeBackground'));
     },
     magicErase() {
-      // with a selection: heal it. Without: hand the user the one-click Magic Erase tool.
       if (!GF.select.has || !GF.select.has()) {
-        setTool('magicerase'); U.toast('Click the object you want to remove');
+        V().wand.autoRemove = true;
+        setTool('wand'); U.toast('Click the object you want to remove');
         return;
       }
       busyHero('#hero-erase', () => run('contentAwareFill'));
@@ -885,10 +863,9 @@ window.GF = window.GF || {};
      SHORTCUTS, engine actions from the GF.api catalog (every command carrying
      ui metadata), and only dialogs / composite UI actions are listed here. */
   const TOOL_LABELS = {
-    move: 'Move', select: 'Select', wand: 'Magic wand', crop: 'Crop',
-    magicerase: 'Magic erase (one-click remove)', gradient: 'Gradient',
-    brush: 'Brush', eraser: 'Eraser', fill: 'Fill', text: 'Text',
-    shape: 'Shape', scene3d: '3D workspace',
+    move: 'Move', select: 'Select', wand: 'Smart select', crop: 'Crop',
+    brush: 'Brush (paint/erase)', fill: 'Fill', gradient: 'Gradient',
+    text: 'Text', shape: 'Shape', scene3d: '3D workspace',
   };
   function commandList() {
     const cmds = Object.keys(TOOL_LABELS).map(t => {
@@ -1278,7 +1255,7 @@ window.GF = window.GF || {};
   }
   function installApp() {
     if (deferredInstall) { deferredInstall.prompt(); deferredInstall = null; }
-    else U.toast('Install isn’t available here (already installed, or open over http to enable)');
+    else U.toast('Install isn\'t available here (already installed, or open over http to enable)');
   }
   const IDB_STORE = 'session';
   function idb() {
@@ -1323,7 +1300,8 @@ window.GF = window.GF || {};
     GF.history.onChange(scheduleAutosave);
     if (!V().selMode) V().selMode = 'replace';
     if (!('sample' in V().wand)) V().wand.sample = 'all';
-    V().wand.heal = true;   // Magic Erase defaults to Heal (photo-first); the optbar can switch to Erase
+    if (V().wand.autoRemove === undefined) V().wand.autoRemove = false;
+    if (V().brush.erasing === undefined) V().brush.erasing = false;
     GF.select.onChange(updateSelBar); updateSelBar();
     $('#btn-palette') && $('#btn-palette').addEventListener('click', openPalette);
     $('#btn-theme') && $('#btn-theme').addEventListener('click', toggleTheme);
@@ -1337,33 +1315,23 @@ window.GF = window.GF || {};
     checkRestore();
   }
 
-  /* ---- toolbar dropdown menus (+ Add, Tools) ---- */
-  function wireDropdowns() {
-    $$('.tb-dropdown').forEach(dd => {
-      const btn = dd.querySelector('.text-btn');
-      if (!btn) return;
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const wasOpen = dd.classList.contains('open');
-        $$('.tb-dropdown.open').forEach(d => d.classList.remove('open'));
-        if (!wasOpen) dd.classList.add('open');
-      });
-    });
-    document.addEventListener('click', () => $$('.tb-dropdown.open').forEach(d => d.classList.remove('open')));
-
-    $$('.tb-dropdown-item[data-tool]').forEach(item => {
-      item.addEventListener('click', () => { setTool(item.dataset.tool); });
-    });
-    $$('.tb-dropdown-item[data-action]').forEach(item => {
-      item.addEventListener('click', () => {
-        const a = item.dataset.action;
+  /* ---- action bar buttons (bottom hotbar + any [data-action] element) ---- */
+  function wireActionBar() {
+    $$('[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const a = btn.dataset.action;
         if (a === 'add-box') GF.api.run('scene3d.addPrimitive', { kind: 'box' });
         else if (a === 'add-sphere') GF.api.run('scene3d.addPrimitive', { kind: 'sphere' });
         else if (a === 'add-cylinder') GF.api.run('scene3d.addPrimitive', { kind: 'cylinder' });
         else if (a === 'add-plane') GF.api.run('scene3d.addPrimitive', { kind: 'plane' });
-        else if (a === 'add-more') { const tab = $('.ptab[data-tab="scene"]'); if (tab) tab.click(); }
-        else if (a === 'import-model' || a === 'import-image') $('#file-input').click();
+        else if (a === 'import-model') $('#file-input').click();
       });
+    });
+    const gen = $('#ab-generate');
+    if (gen) gen.addEventListener('click', () => { if (GF.ui.openAIDialog) GF.ui.openAIDialog(); });
+    const assets = $('#ab-assets');
+    if (assets) assets.addEventListener('click', () => {
+      const tab = $('.ptab[data-tab="scene"]'); if (tab) tab.click();
     });
   }
 
@@ -1406,204 +1374,21 @@ window.GF = window.GF || {};
     });
   }
 
-  /* =================================================================
-     Selection outcome bar — intent-first "what now?" for any selection.
-     A selection is a means, not an end: the moment you make one (Magic
-     Wand especially) we float the concrete OUTCOMES right at it, each a
-     one-click, already-implemented action. This is what turns the wand
-     from "marching ants, now what?" into the most obvious tool in the app.
-     ================================================================= */
-  let selBarEl = null, selBounds = null, _vsig = '';
+  /* Selection bar — delegated to ui/selection-bar.js (GF.selectionBar) */
+  function updateSelBar() { if (GF.selectionBar) GF.selectionBar.update(); }
 
-  function fillSelection() {
-    const L = D.active(); if (!L || !L.canvas) return U.toast('Pick a pixel layer');
-    GF.history.push(D.doc, 'fill selection');
-    const t = U.makeCanvas(D.doc.width, D.doc.height), tc = U.ctx2d(t);
-    tc.fillStyle = V().brush.color; tc.fillRect(0, 0, t.width, t.height);
-    tc.globalCompositeOperation = 'destination-in'; tc.drawImage(GF.select.maskCanvas(), 0, 0);
-    U.ctx2d(L.canvas).drawImage(t, -(L.x || 0), -(L.y || 0));
-    GF.view.requestRender(); refreshLayers(); U.toast('Filled selection');
-  }
-  function deleteSelection() {
-    const L = D.active(); if (!L || !L.canvas) return U.toast('Pick a pixel layer');
-    GF.retouch.eraseSelection(L, true); GF.view.requestRender(); refreshLayers(); U.toast('Deleted');
-  }
-  function cutOut() {
-    if (!GF.select.has()) return;
-    run('addMask', { init: 'selection' });   // non-destructive: hide everything outside the selection
-    GF.select.clear(); GF.view.requestRender(); refreshLayers();
-    U.toast('Cut out — the rest is hidden (edit the mask to refine)');
-  }
-
-  /* The 5 headline outcomes — icon, verb-first label, and a plain-language
-     "what this does" line so the tool teaches itself. */
-  const SEL_OUTCOMES = [
-    { ic: '🩹', label: 'Erase & heal',  desc: 'Remove it, rebuild the background', fn: () => run('contentAwareFill') },
-    { ic: '✂️', label: 'Cut out',       desc: 'Keep only this, hide the rest',     fn: cutOut },
-    { ic: '🎨', label: 'Recolor',       desc: 'Shift this area’s colour',          fn: () => addAdjustmentLayer('hsl') },
-    { ic: '✦', label: 'Replace (AI)',  desc: 'Generate something new here',       fn: () => ACTIONS.genFill(), ai: true },
-    { ic: '🪣', label: 'Fill',          desc: 'Flat-fill with your colour',        fn: fillSelection },
-  ];
-  /* Secondary refine/utility actions, tucked under "More". */
-  const SEL_MORE = [
-    ['⧉ Copy to layer', () => run('layerViaCopy')],
-    ['⌗ Crop to this',  () => cropToSelection()],
-    ['⇄ Invert',        () => { GF.select.invert(); GF.view.requestRender(); }],
-    ['◌ Grow 4px',      () => { GF.select.grow(4); GF.view.requestRender(); }],
-    ['◎ Contract 4px',  () => { GF.select.contract(4); GF.view.requestRender(); }],
-    ['◠ Feather 4px',   () => { GF.select.feather(4); GF.view.requestRender(); }],
-    ['∿ Smooth',        () => { GF.select.smooth(2); GF.view.requestRender(); }],
-    ['🗑 Delete',        deleteSelection],
-  ];
-
-  function ensureSelBar() {
-    if (selBarEl) return selBarEl;
-    const bar = document.createElement('div'); bar.id = 'sel-bar'; bar.hidden = true;
-    const outs = SEL_OUTCOMES.map((o, i) =>
-      `<button class="sel-out${o.ai ? ' ai' : ''}" data-i="${i}" title="${o.desc}">
-         <span class="so-ic">${o.ic}</span>
-         <span class="so-tx"><b>${o.label}</b><small>${o.desc}</small></span>
-       </button>`).join('');
-    const more = SEL_MORE.map((a, i) => `<button data-m="${i}">${a[0]}</button>`).join('');
-    bar.innerHTML =
-      `<div class="sel-head">
-         <span class="sel-count"></span>
-         <button class="sel-more-btn" type="button">More ▾</button>
-         <button class="sel-x" type="button" title="Deselect (Esc)">✕</button>
-       </div>
-       <div class="sel-outs">${outs}</div>
-       <div class="sel-more" hidden>${more}</div>`;
-    $('#viewport').appendChild(bar);
-    const act = fn => { if (!D.doc.open) return U.toast('Open an image first'); fn(); updateSelBar(); };
-    bar.querySelectorAll('.sel-out').forEach(b => b.addEventListener('click', () => act(SEL_OUTCOMES[+b.dataset.i].fn)));
-    bar.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => act(SEL_MORE[+b.dataset.m][1])));
-    bar.querySelector('.sel-x').addEventListener('click', () => { GF.select.clear(); GF.view.requestRender(); });
-    bar.querySelector('.sel-more-btn').addEventListener('click', () => {
-      const m = bar.querySelector('.sel-more'); m.hidden = !m.hidden;
-      bar.querySelector('.sel-more-btn').textContent = m.hidden ? 'More ▾' : 'Less ▴';
-      positionSelBar(true);
-    });
-    // keep the bar pinned to the selection as the canvas pans / zooms
-    const vp = $('#viewport');
-    ['wheel', 'pointermove', 'pointerup'].forEach(ev => vp.addEventListener(ev, () => positionSelBar(), { passive: true }));
-    window.addEventListener('resize', () => positionSelBar(true));
-    selBarEl = bar; return bar;
-  }
-
-  /* On desktop, float the bar just above the selection (fall back to below,
-     then clamp into the viewport). On mobile it stays docked at the bottom. */
-  function positionSelBar(force) {
-    const bar = selBarEl; if (!bar || bar.hidden) return;
-    if (!matchMedia('(min-width: 881px)').matches) { bar.classList.remove('floating'); bar.style.left = ''; bar.style.top = ''; _vsig = ''; return; }
-    const v = V(); if (!v || !selBounds) return;
-    const sig = Math.round(v.zoom * 1000) + '|' + Math.round(v.panX) + '|' + Math.round(v.panY);
-    if (sig === _vsig && !force) return;    // nothing moved — skip the layout read
-    _vsig = sig;
-    bar.classList.add('floating');
-    const bw = bar.offsetWidth, bh = bar.offsetHeight;
-    const vpr = $('#viewport').getBoundingClientRect();
-    const cx = v.panX + (selBounds.x + selBounds.w / 2) * v.zoom;
-    let top = v.panY + selBounds.y * v.zoom - bh - 14;                 // above
-    if (top < 8) top = v.panY + (selBounds.y + selBounds.h) * v.zoom + 14;  // else below
-    const left = U.clamp(cx, bw / 2 + 8, vpr.width - bw / 2 - 8);
-    top = U.clamp(top, 8, vpr.height - bh - 8);
-    bar.style.left = left + 'px'; bar.style.top = top + 'px';
-  }
-
-  function updateSelBar() {
-    const bar = ensureSelBar();
-    const n = GF.select && GF.select.has && GF.select.has() ? GF.select.count() : 0;
-    bar.hidden = n === 0;
-    if (!n) { selBounds = null; bar.querySelector('.sel-more').hidden = true; bar.querySelector('.sel-more-btn').textContent = 'More ▾'; return; }
-    selBounds = GF.select.bounds();
-    bar.querySelector('.sel-count').textContent = n.toLocaleString() + ' px selected';
-    requestAnimationFrame(() => positionSelBar(true));
-  }
-
-  /* crop helpers (shared by the crop tool and "crop to selection") */
   function cropDocTo(x, y, w, h) {
-    if (w < 1 || h < 1) return;
-    GF.history.push(D.doc, 'crop');
-    for (const L of D.doc.layers) {
-      if (!L.canvas) continue;
-      const c = U.makeCanvas(w, h); U.ctx2d(c).drawImage(L.canvas, (L.x || 0) - x, (L.y || 0) - y);
-      L.canvas = c; L.x = 0; L.y = 0;
-      if (L.mask) { const m = U.makeCanvas(w, h); U.ctx2d(m).drawImage(L.mask, -x, -y); L.mask = m; }
-    }
-    D.doc.width = w; D.doc.height = h;
-    GF.select.clear(); GF.view.zoomFit(); refreshLayers(); setDims();
+    if (GF.selectionBar) GF.selectionBar.cropTo(x, y, w, h);
+    else { /* fallback inline */ }
+    refreshLayers(); setDims();
   }
   function cropToSelection() {
     const b = GF.select.bounds(); if (!b) return U.toast('Nothing selected');
     cropDocTo(b.x, b.y, b.w, b.h); U.toast('Cropped to selection ' + b.w + '×' + b.h);
   }
 
-  /* =================================================================
-     Tool guides — what each tool does + expansive pro uses
-     ================================================================= */
-  const GUIDES = {
-    wand: { icon: '✨', title: 'Magic Wand — the selection powerhouse',
-      body: `<p class="g-lead">Click to select a region of similar colour. Everything you do next — fill, cut, mask, adjust, erase — can be confined to that selection. This is the heart of high-end editing.</p>
-        <h4>Options</h4><ul>
-          <li><b>Tolerance</b> — how close in colour a pixel must be to get selected. Low = picky, high = grabs more.</li>
-          <li><b>Contiguous</b> — on: only the connected blob you clicked. Off: every matching pixel in the image.</li>
-          <li><b>Sample</b> — <b>All layers</b> reads the blended image; <b>Layer</b> reads only the active layer's own pixels. Edges are always anti-aliased for clean composites.</li>
-          <li><b>Mode</b> — New / Add / Subtract / Intersect. Hold <span class="kbd">⇧</span> to add, <span class="kbd">⌥</span> to subtract, <span class="kbd">⇧⌥</span> to intersect — without changing the button.</li>
-        </ul>
-        <h4>What to do next</h4>
-        <p class="g-lead">After you click, a bar appears at the selection with one-tap outcomes — no need to remember menus:</p>
-        <ul>
-          <li><b>🩹 Erase &amp; heal</b> — remove the object and rebuild the background behind it.</li>
-          <li><b>✂️ Cut out</b> — keep only the selection; everything else is hidden (non-destructive).</li>
-          <li><b>🎨 Recolor</b> — a Hue/Saturation adjustment clipped to the selection, so only it changes.</li>
-          <li><b>✦ Replace (AI)</b> — generative-fill the region with something new.</li>
-          <li><b>🪣 Fill</b> — flat-fill with your current colour.</li>
-          <li><b>More ▾</b> — Copy to layer, Crop to this, Invert, Grow, Feather, Delete.</li>
-        </ul>
-        <p class="g-lead">Tip: to cut out a subject on a plain background, wand the <i>background</i>, hit <b>⇄ Invert</b>, then <b>✂️ Cut out</b>. Any filter or adjustment you apply also respects the selection.</p>` },
-    select: { icon: '⬚', title: 'Marquee Select — rectangles, ellipses & lasso',
-      body: `<p class="g-lead">Drag to select a precise shape. Combine with the Magic Wand using the same Add/Subtract/Intersect modes.</p>
-        <h4>Options</h4><ul><li><b>Shape</b> — Rect, Ellipse, or freehand Lasso.</li>
-          <li><b>Mode</b> — New / Add / Subtract / Intersect (or <span class="kbd">⇧</span>/<span class="kbd">⌥</span>).</li>
-          <li><b>Feather / Grow</b> — soften or expand the edge.</li></ul>
-        <h4>Uses</h4><ul><li>Constrain any tool or filter to the marquee.</li><li><b>⌗ Crop</b> to the selection.</li><li><b>◫ Mask</b> a layer to the shape.</li></ul>` },
-    brush: { icon: '🖌', title: 'Brush', body: `<p class="g-lead">Paint with the current colour. Size, Opacity and a crisp Pixel mode in the options bar. Strokes respect the active selection — paint inside a marquee and nothing spills out. <span class="kbd">Alt</span>-click anywhere to pick that colour.</p>` },
-    eraser: { icon: '🩹', title: 'Eraser', body: `<p class="g-lead">Erase to transparency. Respects the active selection. For removing objects cleanly, prefer <b>Magic erase</b> (content-aware) over manual erasing.</p>` },
-    fill: { icon: '🪣', title: 'Fill', body: `<p class="g-lead">Flood-fill connected pixels within Tolerance with the current colour. Inside a selection, the fill is clipped to it.</p>` },
-    crop: { icon: '⌗', title: 'Crop & Straighten', body: `<p class="g-lead">Drag the handles, pick an aspect preset, and use the rule-of-thirds grid to compose. The Straighten slider rotates and auto-expands the canvas. You can also select a region and use <b>Crop to selection</b>.</p>` },
-    text: { icon: 'T', title: 'Text', body: `<p class="g-lead">Click to place text. Pick a font, size, colour and outline. Text stays <b>re-editable</b> — double-click a text layer to change the words or style any time.</p>` },
-    move: { icon: '✛', title: 'Move', body: `<p class="g-lead">Drag to reposition the active layer. Content moved off-canvas is never lost.</p>` },
-    shape: { icon: '▭', title: 'Shape', body: `<p class="g-lead">Drag to draw a rectangle, ellipse or line. Hold <span class="kbd">⇧</span> for a perfect square/circle.</p>` },
-    magicerase: { icon: '🩹', title: 'Magic Erase — one-click object removal',
-      body: `<p class="g-lead">Click an object or colour region and it's gone — in one step.</p>
-        <h4>Options</h4><ul>
-          <li><b>Heal (rebuild)</b> — fills the hole with matching texture from around it. Best for photos.</li>
-          <li><b>Erase (transparent)</b> — punches through to transparency. Best for cutouts and graphics.</li>
-          <li><b>Tolerance</b> — how much of the surrounding colour gets included per click.</li>
-        </ul>
-        <p class="g-lead">Tip: several small clicks beat one big one. For precise control, use the <b>Wand</b> instead — select first, review, then choose an action.</p>` },
-    scene3d: { icon: '⬡', title: '3D workspace — models, GLB & your images',
-      body: `<p class="g-lead">Import GLB/GLTF models or add primitives, pose them, and texture them with the document, any layer, or an imported image. Export the scene as a <b>.glb</b>, or <b>Flatten to layer</b> to drop a doc-resolution render back onto the canvas and keep editing in 2D.</p>
-        <h4>Basics</h4><ul>
-          <li><b>Orbit / Move / Rotate / Scale</b> — pick a mode in the options bar; click any object to select it.</li>
-          <li><b>Texture</b> — in the 3D panel, set an object's texture to the whole document, one layer, or an imported image. Paint in 2D and the model updates live.</li>
-          <li><b>Environment</b> — load an HDRI (file or Poly Haven) for realistic lighting and reflections.</li>
-          <li><b>Keys</b> — <span class="kbd">Del</span> removes the selected object, <span class="kbd">F</span> frames it.</li>
-        </ul>
-        <p class="g-lead">Tip: drop a .glb anywhere on the app to jump straight into the 3D workspace.</p>` },
-    gradient: { icon: '◧', title: 'Gradient — smooth colour blends',
-      body: `<p class="g-lead">Drag across the canvas: the blend runs from your brush colour at the start of the drag to the end colour (or to transparent). Inside a selection, it fills only the selection.</p>
-        <h4>Uses</h4><ul>
-          <li><b>Sky wash</b> — select the sky, drag a blue→transparent gradient.</li>
-          <li><b>Vignette / fade</b> — radial, dark colour, fade to transparent, low layer opacity.</li>
-          <li><b>Text backdrops</b> — dark→transparent band behind captions.</li>
-        </ul>` },
-  };
+  /* Tool guides — delegated to ui/tool-guides.js (GF.toolGuides) */
   let curTool = 'brush';
-  function openToolGuide(name) {
-    const g = GUIDES[name] || GUIDES[curTool]; if (!g) return;
-    modal({ title: g.icon + '  ' + g.title, body: `<div class="tool-guide">${g.body}</div>`, ok: 'Got it', noCancel: true });
-  }
 
   /* =================================================================
      Boot

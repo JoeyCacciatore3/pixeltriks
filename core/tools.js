@@ -353,42 +353,35 @@ GF.view = (function () {
       // history is pushed lazily on the first actual movement, so a plain
       // click with the move tool doesn't create a no-op undo step
       moveStart = { px: e.clientX, py: e.clientY, layerX: L.x, layerY: L.y, pushed: false };
-    } else if (tool === 'brush' || tool === 'eraser') {
+    } else if (tool === 'brush') {
       if (e.altKey) { pickColor(p); return; }
       resetStabilizer();
-      if (beginStroke(tool === 'eraser' ? 'eraser' : 'brush')) stampTo(stabilize(p));
+      if (beginStroke(view.brush.erasing ? 'eraser' : 'brush')) stampTo(stabilize(p));
     } else if (tool === 'fill') {
       if (e.altKey) { pickColor(p); return; }
       doFill(L, p);
     } else if (tool === 'picker') {
       pickColor(p);
-    } else if (tool === 'wand' || tool === 'magiceraser') {
+    } else if (tool === 'wand') {
       const x = Math.floor(p.x), y = Math.floor(p.y);
       if (x < 0 || y < 0 || x >= D.doc.width || y >= D.doc.height) return;
       const img = U.ctx2d(D.composite()).getImageData(0, 0, D.doc.width, D.doc.height);
-      if (tool === 'wand') {
+      if (view.wand.autoRemove) {
+        GF.select.wand(img, x, y, view.wand.tolerance, view.wand.contiguous, 'replace');
+        GF.select.grow(2);
+        GF.retouch.contentAwareFill(L);
+        GF.select.clear();
+        GF.ui.refreshLayers();
+        U.toast('Removed — region rebuilt from surrounding texture');
+      } else {
         const mode = (e.shiftKey && e.altKey) ? 'intersect' : e.shiftKey ? 'add' : e.altKey ? 'subtract' : (view.selMode || 'replace');
-        // sample the active layer's own pixels, or the flattened composite (default)
         const wimg = (view.wand.sample === 'layer' && L && L.canvas)
           ? U.ctx2d(D.docAligned(L).canvas).getImageData(0, 0, D.doc.width, D.doc.height) : img;
         GF.select.wand(wimg, x, y, view.wand.tolerance, view.wand.contiguous, mode);
         if (view.wand.antialias) GF.select.feather(1);
-        view.wand.seed = { x: x, y: y };   // remembered so tolerance can re-select live
+        view.wand.seed = { x: x, y: y };
         const n = GF.select.count();
         U.toast(n ? n.toLocaleString() + ' px selected' : 'Nothing selected — try raising Tolerance');
-      } else {
-        GF.select.wand(img, x, y, view.wand.tolerance, view.wand.contiguous, 'replace');
-        if (view.wand.heal) {
-          // one-click object removal: pad the selection, then rebuild the
-          // region from surrounding texture instead of leaving a hole
-          GF.select.grow(2);
-          GF.retouch.contentAwareFill(L);
-          U.toast('Healed — region rebuilt from surrounding texture');
-        } else {
-          GF.retouch.eraseSelection(L, view.wand.defringe);
-        }
-        GF.select.clear(); // one-shot: don't leave a stale selection behind
-        GF.ui.refreshLayers();
       }
       requestRender();
     } else if (tool === 'marquee') {

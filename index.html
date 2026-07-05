@@ -34,37 +34,6 @@
     </button>
     <span class="brand"><span class="brand-mark">◆</span><span class="brand-name">PixelTriks</span></span>
     <button class="text-btn" id="btn-open">Open</button>
-    <div class="tb-dropdown" id="dd-add">
-      <button class="text-btn ghost">+ Add</button>
-      <div class="tb-dropdown-menu">
-        <div class="tb-dropdown-item" data-action="add-box">Box</div>
-        <div class="tb-dropdown-item" data-action="add-sphere">Sphere</div>
-        <div class="tb-dropdown-item" data-action="add-cylinder">Cylinder</div>
-        <div class="tb-dropdown-item" data-action="add-plane">Plane</div>
-        <div class="tb-dropdown-item" data-action="add-more">More shapes…</div>
-        <div class="tb-dropdown-sep"></div>
-        <div class="tb-dropdown-item" data-action="import-model">Import model…</div>
-        <div class="tb-dropdown-item" data-action="import-image">Open image…</div>
-      </div>
-    </div>
-    <div class="tb-dropdown" id="dd-tools">
-      <button class="text-btn ghost">Tools</button>
-      <div class="tb-dropdown-menu">
-        <div class="tb-dropdown-item" data-tool="brush">Brush <span class="shortcut">B</span></div>
-        <div class="tb-dropdown-item" data-tool="eraser">Eraser <span class="shortcut">E</span></div>
-        <div class="tb-dropdown-item" data-tool="fill">Fill <span class="shortcut">G</span></div>
-        <div class="tb-dropdown-item" data-tool="gradient">Gradient <span class="shortcut">D</span></div>
-        <div class="tb-dropdown-item" data-tool="text">Text <span class="shortcut">T</span></div>
-        <div class="tb-dropdown-item" data-tool="shape">Shape <span class="shortcut">U</span></div>
-        <div class="tb-dropdown-sep"></div>
-        <div class="tb-dropdown-item" data-tool="select">Select area <span class="shortcut">M</span></div>
-        <div class="tb-dropdown-item" data-tool="wand">Magic Wand <span class="shortcut">W</span></div>
-        <div class="tb-dropdown-item" data-tool="magicerase">Magic Erase <span class="shortcut">J</span></div>
-        <div class="tb-dropdown-item" data-tool="crop">Crop <span class="shortcut">C</span></div>
-        <div class="tb-dropdown-sep"></div>
-        <div class="tb-dropdown-item" data-tool="move">Move <span class="shortcut">V</span></div>
-      </div>
-    </div>
   </div>
 
   <div class="tb-group tb-center">
@@ -101,54 +70,36 @@
 <!-- ============================= STAGE ============================= -->
 <main id="stage">
 
-  <!-- LEFT TOOL RAIL (desktop) / BOTTOM BAR (mobile) — kept for backward compat during Phase 1 migration -->
+  <!-- TOOL RAIL — consolidated: 10 tools (was 12). Eraser merged into Brush, Magic Erase merged into Wand. -->
   <nav id="toolrail" role="toolbar" aria-label="Tools">
     <button class="tool" data-tool="move" title="Move (V)" aria-label="Move">
       <svg viewBox="0 0 24 24"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg><span class="tlabel">Move</span></button>
     <button class="tool" data-tool="select" title="Select area (M)" aria-label="Select">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3.5 3"/></svg><span class="tlabel">Select</span></button>
-    <button class="tool" data-tool="wand" title="Magic Wand (W)" aria-label="Magic wand">
+    <button class="tool" data-tool="wand" title="Smart Select (W) — select by colour, then act" aria-label="Smart select">
       <svg viewBox="0 0 24 24"><path d="M4 20L13 11"/><path d="M16 3l1.2 2.8L20 7l-2.8 1.2L16 11l-1.2-2.8L12 7l2.8-1.2z" fill="currentColor" stroke="none"/></svg><span class="tlabel">Wand</span></button>
-    <button class="tool" data-tool="magicerase" title="Magic Erase — click an object to remove it (J)" aria-label="Magic erase">
-      <svg viewBox="0 0 24 24"><rect x="2.5" y="8.5" width="19" height="7" rx="3.5" transform="rotate(-45 12 12)"/><path d="M10.4 10.4h.01M13.6 13.6h.01M13.6 10.4h.01M10.4 13.6h.01"/></svg><span class="tlabel">Remove</span></button>
     <button class="tool" data-tool="crop" title="Crop &amp; straighten (C)" aria-label="Crop">
       <svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg><span class="tlabel">Crop</span></button>
     <span class="rail-sep"></span>
-    <button class="tool" data-tool="brush" title="Brush (B)" aria-label="Brush">
+    <button class="tool" data-tool="brush" title="Brush (B) — paint or erase" aria-label="Brush">
       <svg viewBox="0 0 24 24"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg><span class="tlabel">Brush</span></button>
-    <button class="tool" data-tool="eraser" title="Eraser (E)" aria-label="Eraser">
-      <svg viewBox="0 0 24 24"><path d="M7 21l-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="M5 11l9 9"/></svg><span class="tlabel">Eraser</span></button>
-    <button class="tool" data-tool="fill" title="Fill (G) — Alt-click picks a colour" aria-label="Fill">
+    <button class="tool" data-tool="fill" title="Fill (G)" aria-label="Fill">
       <svg viewBox="0 0 24 24"><path d="M19 11l-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11z"/><path d="M5 2l5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z" fill="currentColor" stroke="none"/></svg><span class="tlabel">Fill</span></button>
-    <button class="tool" data-tool="gradient" title="Gradient — drag to draw (D)" aria-label="Gradient">
+    <button class="tool" data-tool="gradient" title="Gradient (D)" aria-label="Gradient">
       <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7.5 8.5v7"/><path d="M11 8.5v7"/><path d="M14.5 10.5v3"/><path d="M17.5 11.75v.5"/></svg><span class="tlabel">Gradient</span></button>
     <button class="tool" data-tool="text" title="Text (T)" aria-label="Text">
       <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg><span class="tlabel">Text</span></button>
     <button class="tool" data-tool="shape" title="Shape (U)" aria-label="Shape">
       <svg viewBox="0 0 24 24"><path d="M8.3 10a.7.7 0 0 1-.63-1.08L11.4 3a.7.7 0 0 1 1.2-.04L16.3 8.9a.7.7 0 0 1-.57 1.1z"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/></svg><span class="tlabel">Shape</span></button>
     <span class="rail-sep"></span>
-    <button class="tool" data-tool="scene3d" title="3D workspace — GLB models, primitives, texture with your images" aria-label="3D workspace">
+    <button class="tool" data-tool="scene3d" title="3D workspace" aria-label="3D workspace">
       <svg viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M12 11L4 6.5M12 11l8-4.5M12 11v9"/></svg><span class="tlabel">3D</span></button>
     <span class="rail-sep"></span>
     <label class="tool color-tool" title="Brush colour">
       <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></label>
   </nav>
 
-  <!-- LEFT SIDEBAR (scene tree + asset library placeholder) -->
-  <aside id="sidebar">
-    <div class="sidebar-section" id="scene-tree">
-      <h3 class="panel-h first">Scene</h3>
-      <ul id="sidebar-objects" class="layer-list"></ul>
-      <div class="s3-row">
-        <button class="text-btn ghost" id="sidebar-add" title="Add a 3D object">+ Add</button>
-        <button class="text-btn ghost" id="sidebar-import" title="Import GLB/GLTF model">Import</button>
-      </div>
-    </div>
-    <div class="sidebar-section" id="asset-section">
-      <h3 class="panel-h">Assets</h3>
-      <p class="s3-status">Asset library — Phase 2</p>
-    </div>
-  </aside>
+  <!-- sidebar removed — scene tree in right panel, actions in bottom bar -->
 
   <!-- VIEWPORT -->
   <section id="viewport" aria-label="Canvas">
@@ -245,8 +196,32 @@
     </div>
   </aside>
 
-  <!-- ANIMATION TIMELINE (stub — Phase 3) -->
-  <div id="timeline"></div>
+  <!-- BOTTOM ACTION BAR — the hotbar -->
+  <div id="actionbar">
+    <div class="ab-group ab-left">
+      <button class="ab-btn" data-action="add-box" title="Add box">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg><span>Box</span></button>
+      <button class="ab-btn" data-action="add-sphere" title="Add sphere">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span>Sphere</span></button>
+      <button class="ab-btn" data-action="add-cylinder" title="Add cylinder">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/></svg><span>Cylinder</span></button>
+      <button class="ab-btn" data-action="add-plane" title="Add plane">
+        <svg viewBox="0 0 24 24"><path d="M2 16l10-6 10 6-10 6z"/></svg><span>Plane</span></button>
+      <button class="ab-btn" data-action="import-model" title="Import 3D model or image">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12M12 15l-4-4M12 15l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Import</span></button>
+    </div>
+    <div class="ab-group ab-center">
+      <button class="ab-btn" id="ab-play" title="Play animation">
+        <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg><span>Play</span></button>
+      <span class="ab-time" id="ab-time">0:00 / 0:02</span>
+    </div>
+    <div class="ab-group ab-right">
+      <button class="ab-btn ai-accent" id="ab-generate" title="Generate with AI">
+        <span class="ab-ic">✦</span><span>Generate</span></button>
+      <button class="ab-btn" id="ab-assets" title="Browse assets">
+        <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span>Assets</span></button>
+    </div>
+  </div>
 
 </main>
 
@@ -290,7 +265,9 @@
 <script src="core/assets.js"></script>
 <!-- ============================= AI ============================= -->
 <script src="ai/forge-ai.js"></script>
-<!-- ============================= UI ============================= -->
+<!-- ============================= UI (modular) ============================= -->
+<script src="ui/selection-bar.js"></script>
+<script src="ui/tool-guides.js"></script>
 <script src="ui/forge-ui.js"></script>
 <script src="ui/scene3d-ui.js"></script>
 <script src="ui/assets-ui.js"></script>
