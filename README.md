@@ -121,6 +121,16 @@ Everything routes through one discoverable command catalog
 workspace (`scene3d.*`), the converters (`make3d.*`), and the publisher
 (`publish.page`) — which makes the whole app scriptable by automated agents.
 
+## Documentation
+
+| File | What it covers |
+|------|---------------|
+| `README.md` | This file — overview, workflow, how to run |
+| `API.md` | Agent API reference — every `GF.api.run()` command |
+| `ARCHITECTURE.md` | **Full technical reference** — every module, CSS variable, event, data flow, bug class, modification guide |
+| `AGENTS.md` | Shared contributor rules for all agents/humans |
+| `IMPLEMENTATION.md` | Phase-by-phase implementation tracker |
+
 ## Verifying
 
 ```bash
