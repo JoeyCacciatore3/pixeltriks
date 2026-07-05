@@ -43,6 +43,19 @@
 - [x] Contextual quick-actions — floating chip bar for selected 3D objects: Paint, Material, Frame, Duplicate, Delete (Jul 4)
 - [x] First-use tooltips — one-sentence hints per tool, dismissible, persisted in localStorage (Jul 4)
 
+## Phase 6: Game Deck UI — COMPLETE ✅
+- [x] P0: Smart-quote syntax fix + `$` selector fixes (Jul 5)
+- [x] P1: Transform Pad — 3×3 joystick grid embedded at bottom of tool rail. 4 move, 2 rotate, 2 scale, 1 axis-mode center. Hold-to-repeat with acceleration. Works on 2D layers and 3D objects. `ui/transform-pad.js` (Jul 5)
+- [x] P2: Context-Aware Hotbar — bottom bar auto-detects 7 contexts (empty, 3d-idle, 3d-selected, 2d-idle, 2d-selection, 2d-painting, animation) and renders appropriate action buttons. `ui/hotbar.js` (Jul 5)
+- [x] P3: Tool Flyout — optbar repositioned from header strip to horizontal flyout extending from the active tool button in the rail, with connector triangle. CSS + JS positioning. (Jul 5)
+- [x] P4: Context-Sensitive Panel — right panel auto-switches tab based on mode (3D→Properties, 2D→Layers). Manual tab click pauses auto-switch. (Jul 5)
+- [x] P5: Mobile Controller Layout — two-row bottom (hotbar + tool strip), transform pad floats bottom-left, touch companion eliminated. (Jul 5)
+- [x] P6: Slim Top Bar — AI and Export buttons hidden from topbar when doc is open (moved to hotbar). CSS `body:not(.no-doc)` rule. (Jul 5)
+- [x] Tool consolidation: 12→10 tools (eraser→brush mode, magic erase→wand mode) (Jul 5)
+- [x] Selection bar: flat grid of one-tap outcomes (Remove, Cut Out, Fill, AI Replace, Recolor, Copy, Crop, Expand, Feather, Invert, Delete) — `ui/selection-bar.js` utility, rendered by hotbar (Jul 5)
+- [x] Tool guides: in-app help per tool via ? button in flyout — `ui/tool-guides.js` (Jul 5)
+- [x] 165/165 e2e tests (23 new Game Deck tests) (Jul 5)
+
 ## Step 1: HTML Grid Shell
 
 Replace `#stage` from flex to CSS Grid. Keep all child elements — just change

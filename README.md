@@ -7,19 +7,48 @@ can host anywhere.
 
 Open **`index.html`** (double-click — everything runs from `file://`, no build step).
 
+## The Game Deck UI
+
+PixelTriks uses a **four-edge "Game Deck" layout** inspired by handheld game
+controllers — every screen edge has exactly one job, and the center is 100% canvas:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  TOP = Status: logo, undo/redo, zoom, search        │
+├──────────┬──────────────────────────┬───────────────┤
+│  LEFT    │                          │  RIGHT        │
+│  = PICK  │     CENTER = VIEWPORT    │  = INSPECT    │
+│  (tools) │     (100% canvas/3D)     │  (properties) │
+│          │                          │               │
+│  ↶ ↑ ↷   │                          │               │
+│  ← ⊕ →   │◄── Transform Pad        │               │
+│  − ↓ +   │                          │               │
+├──────────┴──────────────────────────┴───────────────┤
+│  BOTTOM = ACT (context-aware hotbar)                 │
+└─────────────────────────────────────────────────────┘
+```
+
+- **Left edge (PICK):** 10 tools + Transform Pad (3×3 joystick for precise
+  move/rotate/scale). Click a tool → its options fly out horizontally as a panel.
+- **Right edge (INSPECT):** Context-sensitive — auto-shows Properties (3D),
+  Layers (2D), or Adjust based on what you're doing.
+- **Bottom edge (ACT):** Changes based on context — 3D idle shows primitives,
+  2D selection shows one-tap outcomes (Remove, Fill, Cut Out, AI Replace…),
+  painting shows layer shortcuts.
+- **Top edge (STATUS):** Slim — logo, undo/redo, zoom, dimensions, search (⌘K).
+
 ## The workflow
 
 1. **Build a 3D scene.** The viewport starts in 3D — 28 primitives, GLB/GLTF import
    (drag-drop anywhere), Poly Haven CC0 models & HDRIs. TransformControls gizmos
    for move/rotate/scale (W/E/R keys), HDRI lighting, per-object PBR materials.
-   Scene tree in the left sidebar, properties panel on the right.
 
-2. **Texture with 2D tools.** Built-in brush, eraser, fill, gradient, text, shapes;
-   wand + marquee selections with a one-tap outcome bar (erase & heal, cut out,
-   recolor, AI replace, fill); live Adjust sliders + histogram; 6 filter presets;
-   layers with 16 blend modes, masks, layer styles, and re-editable adjustment
-   layers. Normal map and Seamless tile generators. AI (BYOK): remove.bg cutouts,
-   fal.ai generative fill.
+2. **Texture with 2D tools.** 10 tools: brush (paint/erase toggle), fill, gradient,
+   text, shapes, wand (select/auto-remove toggle), marquee, crop, move.
+   Wand selections trigger the hotbar with one-tap outcomes — remove, cut out,
+   fill, AI replace, recolor, copy to layer, crop. No hidden menus.
+   Live Adjust sliders + histogram; 6 filter presets; layers with 16 blend modes,
+   masks, layer styles, and re-editable adjustment layers.
 
 3. **Convert 2D → 3D.** The Make 3D converters turn your images into geometry:
    - **Extrude cutout** — traces the visible silhouette and extrudes it.
@@ -38,17 +67,20 @@ Open **`index.html`** (double-click — everything runs from `file://`, no build
 
 - **Command palette (⌘/Ctrl K)** — fuzzy launcher over 59 commands, same catalog
   agents use (`GF.api`). See `API.md` for the full reference.
-- **3D-first front door** — 3D viewport loads immediately, scene tree in sidebar.
-- **TransformControls** — visual gizmo handles (W=translate, E=rotate, R=scale).
-- **Toolbar dropdowns** — + Add (primitives, import) and Tools (all 2D tools).
+- **Transform Pad** — 9-button joystick: 4 directional (move), 2 diagonal-top
+  (rotate), 2 diagonal-bottom (scale), center (cycle axis lock: Free/X/Y/Z).
+  Tap = 1px nudge, hold = accelerating continuous movement, Shift = 10× precision.
+- **Tool flyout** — tool options extend horizontally from the active tool button
+  with a connector triangle, keeping the viewport clear.
+- **Context hotbar** — 7 auto-detected contexts, no mode switching needed.
 - Procedural textures, installable PWA + IndexedDB autosave with crash-restore,
-  scrubbable history, re-editable text layers, cheat sheet (`?`).
+  scrubbable history, re-editable text layers, keyboard cheat sheet (`?`).
 
 ## AI (bring your own key)
 
-`ai/forge-ai.js` — open **✦ AI** to set a provider + key (kept in memory only):
-**remove.bg** (one-click cutout), **fal.ai** (generative fill on a selection),
-or a **custom endpoint**. If the browser blocks a request, run the bundled proxy:
+`ai/forge-ai.js` — open **✦ AI** (in the hotbar) to set a provider + key
+(kept in memory only): **remove.bg** (one-click cutout), **fal.ai**
+(generative fill on a selection), or a **custom endpoint**.
 
 ```bash
 node tools/cors-proxy.js     # http://localhost:8787/?url=
@@ -63,16 +95,25 @@ pixeltriks/
   index.html        single-page shell (+ import map for three.js)
   core/             engine (global GF): util · history · layers · filters ·
                     select · retouch · tools · exporter · curves · api ·
-                    texgen · library · scene3d · make3d · publish
-  ui/               forge-ui.js (2D UI) · scene3d-ui.js (3D panel/optbar) ·
-                    three-bundle.js (the one ES module — hands three.js to
-                    the classic-script world) · forge.css
+                    texgen · library · scene3d · make3d · animation ·
+                    publish · paint3d · assets
+  ui/               forge-ui.js (main UI + tool flyout wiring)
+                    hotbar.js (context-aware bottom bar — 7 contexts)
+                    transform-pad.js (3×3 joystick for transforms)
+                    selection-bar.js (selection outcome actions)
+                    tool-guides.js (in-app help per tool)
+                    scene3d-ui.js (3D panel/optbar)
+                    assets-ui.js (asset library grid)
+                    timeline-ui.js (animation playback)
+                    polish.js (keyboard shortcuts, compare, paste)
+                    three-bundle.js (ES module → classic-script bridge)
+                    forge.css (all styles)
   ai/               forge-ai.js (provider-agnostic AI adapter)
   vendor/three/     vendored Three.js r185 + addons (offline-first)
   vendor/imagetracer/  raster→vector tracer (public domain) for Make 3D
   assets/models/    sample GLBs
   tools/            cors-proxy.js (optional AI helper)
-  tests/            browser e2e + userflow harnesses
+  tests/            browser e2e (165 tests) + userflow harnesses
 ```
 
 Everything routes through one discoverable command catalog
@@ -83,7 +124,7 @@ workspace (`scene3d.*`), the converters (`make3d.*`), and the publisher
 ## Verifying
 
 ```bash
-bash tests/run-e2e.sh              # full feature audit incl. 3D + Make-3D + publish
+bash tests/run-e2e.sh              # full feature audit (165 tests) incl. Game Deck
 bash tests/run-userflow.sh         # pointer/keyboard user flows, desktop
 bash tests/run-userflow-mobile.sh  # same, mobile viewport
 ```
