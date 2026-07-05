@@ -593,13 +593,15 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   /* Hotbar: fixed above tool strip */
   #actionbar {
     position: fixed; left: 0; right: 0; bottom: 62px; z-index: 16;
-    display: flex; height: 44px; padding: 2px 6px; gap: 4px;
+    display: flex; height: 44px; padding: 2px 6px; gap: 3px;
     background: var(--bg-2);
     border-top: var(--game-border-w) solid var(--game-border);
     overflow-x: auto; overflow-y: hidden;
   }
+  #actionbar .ab-ctx-label { padding: 2px 6px; font-size: .5em; margin-right: 2px; }
   #actionbar .ab-btn { min-width: 44px; min-height: 38px; padding: 3px 8px; flex: 0 0 auto; }
   #actionbar .ab-btn .ab-label { font-size: .58em; }
+  #actionbar .ab-btn svg { width: 16px; height: 16px; }
 
   /* panel -> bottom sheet (keep existing) */
   #panel {
@@ -688,33 +690,44 @@ body[data-mode="3d"] #sel-bar { display: none; }
 
 /* ============================= BOTTOM ACTION BAR (hotbar) ================ */
 #actionbar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-start;
   background: var(--bg-2); border-top: var(--game-border-w) solid var(--game-border);
-  padding: 4px 8px; gap: 6px; height: 52px; overflow: hidden;
+  padding: 4px 8px; gap: 4px; height: 52px;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  transition: opacity .15s ease;
 }
-.ab-group { display: flex; align-items: center; gap: 4px; }
-.ab-left { flex: 1; justify-content: flex-start; }
-.ab-center { flex: 0 0 auto; }
-.ab-right { flex: 1; justify-content: flex-end; }
+#actionbar::-webkit-scrollbar { height: 3px; }
+#actionbar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+#actionbar.ab-switching { opacity: 0; }
+
+/* Context label pill — shows what mode the hotbar is in */
+.ab-ctx-label {
+  flex: 0 0 auto; padding: 3px 8px; margin-right: 4px;
+  font-size: .56em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent-2); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 999px; white-space: nowrap; line-height: 1.6;
+}
+
 .ab-btn {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  padding: 4px 10px; min-height: 42px; min-width: 52px;
+  padding: 4px 10px; min-height: 42px; min-width: 52px; flex: 0 0 auto;
   border-radius: var(--game-r); color: var(--ink-2);
   border: var(--game-border-w) solid var(--game-border);
   font-weight: 700; font-size: .68em; text-transform: uppercase; letter-spacing: .04em;
   cursor: pointer; background: transparent;
   transition: .12s background, .12s color, .12s border-color, .12s box-shadow, .12s transform;
 }
-.ab-btn svg { width: 18px; height: 18px; }
+/* SVG icons — crisp, theme-aware, no emoji inconsistencies */
+.ab-btn svg, .ab-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .ab-btn:hover { background: var(--surface-2); color: var(--ink); border-color: var(--accent);
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 30%, transparent); }
 .ab-btn:active { transform: scale(.95); }
-.ab-btn.ai-accent { color: var(--ai-2); border-color: var(--ai); }
-.ab-btn.ai-accent:hover { background: color-mix(in srgb, var(--ai) 12%, var(--surface));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--ai) 30%, transparent); }
-.ab-icon { font-size: 1.15em; line-height: 1; }
-.ab-label { font-size: .62em; text-transform: uppercase; letter-spacing: .03em; opacity: .8; }
-.ab-sep { width: 1px; height: 28px; background: var(--line); margin: 0 4px; flex-shrink: 0; }
+.ab-icon { display: flex; align-items: center; justify-content: center; line-height: 1; }
+.ab-label { font-size: .62em; text-transform: uppercase; letter-spacing: .03em; opacity: .8; white-space: nowrap; }
+.ab-sep { width: 1px; height: 28px; background: var(--line); margin: 0 2px; flex-shrink: 0; }
 .ab-ai { color: var(--ai-2); border-color: var(--ai); }
 .ab-ai:hover { background: color-mix(in srgb, var(--ai) 12%, var(--surface));
   box-shadow: 0 0 8px color-mix(in srgb, var(--ai) 30%, transparent); }

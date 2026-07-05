@@ -197,32 +197,8 @@
     </div>
   </aside>
 
-  <!-- BOTTOM ACTION BAR — the hotbar -->
-  <div id="actionbar">
-    <div class="ab-group ab-left">
-      <button class="ab-btn" data-action="add-box" title="Add box">
-        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg><span>Box</span></button>
-      <button class="ab-btn" data-action="add-sphere" title="Add sphere">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg><span>Sphere</span></button>
-      <button class="ab-btn" data-action="add-cylinder" title="Add cylinder">
-        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/></svg><span>Cylinder</span></button>
-      <button class="ab-btn" data-action="add-plane" title="Add plane">
-        <svg viewBox="0 0 24 24"><path d="M2 16l10-6 10 6-10 6z"/></svg><span>Plane</span></button>
-      <button class="ab-btn" data-action="import-model" title="Import 3D model or image">
-        <svg viewBox="0 0 24 24"><path d="M12 3v12M12 15l-4-4M12 15l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Import</span></button>
-    </div>
-    <div class="ab-group ab-center">
-      <button class="ab-btn" id="ab-play" title="Play animation">
-        <svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg><span>Play</span></button>
-      <span class="ab-time" id="ab-time">0:00 / 0:02</span>
-    </div>
-    <div class="ab-group ab-right">
-      <button class="ab-btn ai-accent" id="ab-generate" title="Generate with AI">
-        <span class="ab-ic">✦</span><span>Generate</span></button>
-      <button class="ab-btn" id="ab-assets" title="Browse assets">
-        <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg><span>Assets</span></button>
-    </div>
-  </div>
+  <!-- BOTTOM ACTION BAR — populated dynamically by hotbar.js based on context -->
+  <div id="actionbar"></div>
 
 </main>
 
