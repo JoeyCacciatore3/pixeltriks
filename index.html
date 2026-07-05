@@ -149,7 +149,7 @@
       <!-- ADJUST TAB (was Image) -->
       <div class="ptab-pane" data-pane="adjust" hidden>
         <h3 class="panel-h first">Light &amp; colour</h3>
-        <canvas id="histogram" class="histogram" width="288" height="56" aria-hidden="true" title="Luminance histogram"></canvas>
+        <canvas id="histogram" class="histogram" width="288" height="48" aria-hidden="true" title="Luminance histogram"></canvas>
 
         <div class="adj-group" id="adj-sliders"><!-- sliders injected by JS --></div>
 
@@ -162,34 +162,38 @@
         <h3 class="panel-h">Filters</h3>
         <div class="filter-strip" id="filter-strip"><!-- presets injected --></div>
 
-        <h3 class="panel-h">Texture</h3>
-        <div class="s3-row">
-          <button class="text-btn ghost" id="tex-normal">Normal map</button>
-          <button class="text-btn ghost" id="tex-seamless">Seamless tile</button>
-        </div>
+        <details class="panel-section">
+          <summary class="panel-h" style="cursor:pointer; margin:0; padding:.4rem 0 .3rem">Texture tools</summary>
+          <div class="s3-row" style="margin-top:.3rem">
+            <button class="text-btn ghost" id="tex-normal">Normal map</button>
+            <button class="text-btn ghost" id="tex-seamless">Seamless tile</button>
+          </div>
+        </details>
       </div>
 
       <!-- LAYERS TAB -->
       <div class="ptab-pane" data-pane="layers" hidden>
+        <div class="layer-props">
+          <div class="layer-props-row">
+            <label class="mini compact">Blend <select id="lyr-blend"></select></label>
+            <label class="mini compact">Opacity <span id="lyr-opacity-val">100%</span>
+              <input type="range" id="lyr-opacity" min="0" max="100" value="100">
+            </label>
+          </div>
+        </div>
         <div class="layer-toolbar">
           <button class="icon-btn sm" id="lyr-add" title="New layer"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-          <button class="icon-btn sm" id="lyr-fx" title="Add adjustment layer (non-destructive)"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="15" r="5"/></svg></button>
-          <button class="icon-btn sm" id="lyr-style" title="Layer style — outline, glow, shadow, bevel, emboss"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></svg></button>
+          <button class="icon-btn sm" id="lyr-fx" title="Adjustment layer"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="15" r="5"/></svg></button>
+          <button class="icon-btn sm" id="lyr-style" title="Layer style"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z"/></svg></button>
           <button class="icon-btn sm" id="lyr-dup" title="Duplicate"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4h12"/></svg></button>
           <button class="icon-btn sm" id="lyr-merge" title="Merge down"><svg viewBox="0 0 24 24"><path d="M7 4h10M5 9h14M8 14h8M11 19h2"/></svg></button>
           <button class="icon-btn sm danger" id="lyr-del" title="Delete"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></button>
         </div>
-        <div class="layer-props">
-          <label class="mini">Blend
-            <select id="lyr-blend"></select>
-          </label>
-          <label class="mini">Opacity <span id="lyr-opacity-val">100%</span>
-            <input type="range" id="lyr-opacity" min="0" max="100" value="100">
-          </label>
-        </div>
         <ul id="layer-list" class="layer-list"></ul>
-        <h3 class="panel-h">History</h3>
-        <ul id="history-list" class="history-list"></ul>
+        <details class="panel-section" open>
+          <summary class="panel-h" style="cursor:pointer; margin:0; padding:.4rem 0 .3rem">History</summary>
+          <ul id="history-list" class="history-list"></ul>
+        </details>
       </div>
 
       <!-- PROPERTIES TAB (3D scene — content built by ui/scene3d-ui.js) -->
