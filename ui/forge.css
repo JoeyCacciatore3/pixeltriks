@@ -33,7 +33,7 @@
   --game-active-bg: color-mix(in srgb, var(--accent) 18%, var(--surface));
   /* metrics */
   --bar-h:     clamp(48px, 6vh, 56px);
-  --rail-w:    68px;
+  --rail-w:    92px;
   --panel-w:   clamp(280px, 24vw, 340px);
   --r:         12px;
   --r-sm:      8px;
@@ -136,12 +136,32 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
 
 /* toolbar actions removed — moved to bottom action bar */
 
-/* ------------------------- tool option bar ----------------------- */
+/* ─────────── tool options flyout (extends right from active tool) ─────────── */
 #optbar {
-  flex: 0 0 auto; min-height: 44px;
-  display: flex; align-items: center; gap: .7rem; flex-wrap: wrap;
-  padding: .4rem .8rem; background: var(--surface);
-  border-bottom: var(--game-border-w) solid var(--game-border); z-index: 20;
+  position: absolute;
+  /* left + top set by JS to align with the active tool button */
+  display: flex; align-items: center; gap: .5rem; flex-wrap: nowrap;
+  white-space: nowrap;
+  padding: .4rem .7rem;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(12px);
+  border: var(--game-border-w) solid var(--game-border);
+  border-left: 0;
+  border-radius: 0 var(--game-r) var(--game-r) 0;
+  box-shadow: 4px 2px 16px rgba(0,0,0,.35);
+  z-index: 60;
+  min-height: 42px;
+  animation: flyout-in .15s ease;
+}
+@keyframes flyout-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+/* connector triangle pointing left into the rail */
+#optbar::before {
+  content: ''; position: absolute; left: -8px; top: 50%; transform: translateY(-50%);
+  border: 8px solid transparent; border-right-color: color-mix(in srgb, var(--surface) 96%, transparent);
+  filter: drop-shadow(-2px 0 2px rgba(0,0,0,.15));
 }
 #optbar .opt { display: flex; align-items: center; gap: .45rem; color: var(--ink-2);
   font-size: .88em; font-weight: 600; }
@@ -537,6 +557,28 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
     padding: 4px 8px; border-width: 1.5px; }
   .rail-sep { width: 1px; height: auto; margin: 4px 3px; align-self: stretch; }
   .color-tool { flex: 0 0 auto; }
+  /* Optbar flyout: above tool strip on mobile */
+  #optbar {
+    left: 0; right: 0; bottom: 100%; top: auto;
+    border-radius: var(--game-r) var(--game-r) 0 0;
+    border: var(--game-border-w) solid var(--game-border);
+    border-bottom: 0;
+    box-shadow: 0 -4px 16px rgba(0,0,0,.3);
+    flex-wrap: wrap; white-space: normal;
+  }
+  /* Transform pad: float at bottom-left on mobile (tool rail is horizontal) */
+  .tpad {
+    position: fixed; bottom: 70px; left: 8px; z-index: 50;
+    margin-top: 0; border-top: 0;
+    grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px);
+    gap: 2px; padding: 3px;
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    backdrop-filter: blur(10px);
+    border: var(--game-border-w) solid var(--game-border);
+    border-radius: calc(var(--game-r) + 2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  .tpad-btn svg { width: 14px; height: 14px; }
   #actionbar { display: none; }
   #stage {
     grid-template-columns: 1fr;
@@ -664,44 +706,45 @@ body[data-mode="3d"] #sel-bar { display: none; }
 .ab-accent { color: var(--accent); border-color: var(--accent); }
 
 /* ─── TRANSFORM PAD (joystick) ─── */
+/* ─── Transform Pad — embedded at bottom of tool rail ─── */
 .tpad {
-  position: fixed; bottom: 64px; left: 12px; z-index: 50;
-  display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px);
-  gap: 3px; padding: 6px;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(10px);
-  border: var(--game-border-w) solid var(--game-border);
-  border-radius: calc(var(--game-r) + 4px);
-  box-shadow: 0 4px 20px rgba(0,0,0,.4);
-  transition: opacity .2s, transform .2s;
+  margin-top: auto;           /* push to bottom of flex column */
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px; padding: 3px;
+  background: var(--bg);
+  border-top: var(--game-border-w) solid var(--game-border);
+  border-radius: 0;
+  transition: opacity .2s;
 }
-.tpad-active { opacity: 1; transform: scale(1); }
-.tpad-dimmed { opacity: .35; pointer-events: none; transform: scale(.92); }
+.tpad-active { opacity: 1; }
+.tpad-dimmed { opacity: .3; pointer-events: none; }
 
 .tpad-btn {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  width: 44px; height: 44px;
-  border-radius: var(--game-r);
-  border: var(--game-border-w) solid var(--game-border);
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1;
+  border-radius: calc(var(--game-r) - 2px);
+  border: 1.5px solid var(--game-border);
   background: var(--surface);
   color: var(--ink-2); cursor: pointer;
-  font-size: .72rem; font-weight: 700;
+  font-size: 0; /* hide text labels, SVG only */
   transition: .1s background, .1s color, .1s border-color, .1s transform, .1s box-shadow;
   user-select: none; touch-action: none;
+  padding: 0;
 }
-.tpad-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.tpad-btn span { line-height: 1; }
+.tpad-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tpad-btn:hover { background: var(--surface-2); color: var(--ink); border-color: var(--accent);
   box-shadow: var(--game-glow); }
 .tpad-btn:active, .tpad-btn.pressed {
-  transform: scale(.9); background: var(--accent); color: var(--accent-ink);
+  transform: scale(.88); background: var(--accent); color: var(--accent-ink);
   border-color: var(--accent); box-shadow: var(--game-glow);
 }
-.tpad-btn.axis-locked { opacity: .25; pointer-events: none; }
+.tpad-btn.axis-locked { opacity: .2; pointer-events: none; }
 
-/* Center button (axis mode) */
-.tpad-c { background: var(--surface-2); border-color: var(--line); }
-.tpad-c .tpad-axis { font-size: 1.2em; }
+/* Center button (axis mode) — text, no SVG */
+.tpad-c { background: var(--surface-2); border-color: var(--line); font-size: 1em; }
+.tpad-c .tpad-axis { font-size: 1em; line-height: 1; }
 .tpad-c[data-axis="x"] { border-color: #e54d4d; color: #e54d4d; }
 .tpad-c[data-axis="y"] { border-color: #4de56b; color: #4de56b; }
 .tpad-c[data-axis="z"] { border-color: #4d8fe5; color: #4d8fe5; }
@@ -716,16 +759,6 @@ body[data-mode="3d"] #sel-bar { display: none; }
 .tpad-sw { grid-area: 3 / 1; }
 .tpad-s  { grid-area: 3 / 2; }
 .tpad-se { grid-area: 3 / 3; }
-
-/* Mobile: pad moves to bottom-left of viewport, slightly smaller */
-@media (max-width: 880px) {
-  .tpad {
-    bottom: 112px; left: 8px;
-    grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(3, 38px);
-    gap: 2px; padding: 4px;
-  }
-  .tpad-btn { width: 38px; height: 38px; font-size: .65rem; }
-}
 
 /* ============================= ASSET LIBRARY ============================= */
 .asset-tabs { display: flex; gap: .3rem; margin: .5rem 0; flex-wrap: wrap; }

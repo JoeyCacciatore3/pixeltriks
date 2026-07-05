@@ -421,6 +421,16 @@ window.GF = window.GF || {};
   function buildOptbar(name) {
     const bar = $('#optbar');
     let html = '';
+    /* Position the flyout: left edge at the rail's right edge, vertically centered on the tool button */
+    const toolBtn = $(`#toolrail .tool[data-tool="${name}"]`);
+    const stage = $('#stage');
+    if (toolBtn && stage) {
+      const btnRect = toolBtn.getBoundingClientRect();
+      const stageRect = stage.getBoundingClientRect();
+      const railW = $('#toolrail').getBoundingClientRect().width;
+      bar.style.left = railW + 'px';
+      bar.style.top = (btnRect.top - stageRect.top + btnRect.height / 2 - 21) + 'px';  // 21 = half of min-height 42
+    }
     if (name === 'brush') {
       html = seg('brush-mode', [['paint','Paint'],['erase','Erase']], V().brush.erasing ? 'erase' : 'paint')
            + optSlider('Size', 'brush-size', 1, 200, V().brush.size)

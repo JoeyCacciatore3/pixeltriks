@@ -101,14 +101,11 @@ GF.selectionBar = (function () {
   }
 
   function update() {
-    const bar = ensure();
-    const n = GF.select && GF.select.has && GF.select.has() ? GF.select.count() : 0;
-    bar.hidden = n === 0;
-    if (!n) { bounds = null; return; }
-    bounds = GF.select.bounds();
-    bar.querySelector('.sel-count').textContent = n.toLocaleString() + ' px selected';
-    requestAnimationFrame(() => position(true));
+    // The floating selection bar is DISABLED — the context hotbar (hotbar.js)
+    // now owns the selection action UI. This module is kept for its utility
+    // functions (cropTo, fillSelection) that the hotbar delegates to.
+    if (barEl) barEl.hidden = true;
   }
 
-  return { update, ensure, cropTo };
+  return { update, ensure, cropTo, fillSelection, deleteSelection, cutOut };
 })();

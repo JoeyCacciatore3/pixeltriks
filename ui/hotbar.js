@@ -81,53 +81,29 @@ GF.hotbar = (function () {
     'assets':       { icon: '🧩', label: 'Assets',   action: () => { const p = $('#panel'); if (p) p.dataset.tab = 'scene'; if (GF.assetsUI) GF.assetsUI.show(); } },
   };
 
-  /* ─── Selection action helper ───
-     Delegates to GF.selectionBar when available (it has the real fill/cutout/crop logic),
-     otherwise falls through to GF.api engine commands. */
+  /* ─── Selection action engine ───
+     Delegates to GF.selectionBar utility functions (selection-bar.js) for
+     canvas-level operations (fill, cutout, crop). Falls back to GF.api
+     engine commands for everything else. */
   function selAction(type) {
-    const U = GF.util, doc = D(), view = V();
-    const L = () => doc ? doc.active() : null;
+    const sb = GF.selectionBar;
     switch (type) {
       case 'remove':    run('contentAwareFill'); break;
-      case 'cutout':    run('layerViaCopy'); run('eraseSelection'); break;
-      case 'fill': {
-        const layer = L(); if (!layer || !layer.canvas) { GF.util.toast('Pick a pixel layer'); break; }
-        GF.history.push(doc.doc, 'fill selection');
-        const t = U.makeCanvas(doc.doc.width, doc.doc.height), tc = U.ctx2d(t);
-        tc.fillStyle = view.view.brush.color;
-        tc.fillRect(0, 0, t.width, t.height);
-        tc.globalCompositeOperation = 'destination-in';
-        tc.drawImage(GF.select.maskCanvas(), 0, 0);
-        U.ctx2d(layer.canvas).drawImage(t, -(layer.x || 0), -(layer.y || 0));
-        view.requestRender(); if (GF.ui) GF.ui.refreshLayers(); U.toast('Filled');
-        break;
-      }
+      case 'cutout':    if (sb) sb.cutOut(); else { run('layerViaCopy'); run('eraseSelection'); } break;
+      case 'fill':      if (sb) sb.fillSelection(); else run('eraseSelection'); break;
       case 'aiReplace': if (GF.ui) GF.ui.openAIDialog(); break;
       case 'recolor':   run('addAdjustment', { kind: 'hsl' }); break;
       case 'copyLayer': run('layerViaCopy'); break;
       case 'crop': {
         const b = GF.select.bounds();
         if (!b) { GF.util.toast('Nothing selected'); break; }
-        GF.history.push(doc.doc, 'crop to selection');
-        if (GF.selectionBar && GF.selectionBar.cropTo) {
-          GF.selectionBar.cropTo(b.x, b.y, b.w, b.h);
-        } else {
-          // Inline crop: resize every layer canvas to the selection region
-          for (const L of doc.doc.layers) {
-            if (!L.canvas) continue;
-            const c = U.makeCanvas(b.w, b.h); U.ctx2d(c).drawImage(L.canvas, (L.x || 0) - b.x, (L.y || 0) - b.y);
-            L.canvas = c; L.x = 0; L.y = 0;
-            if (L.mask) { const m = U.makeCanvas(b.w, b.h); U.ctx2d(m).drawImage(L.mask, -b.x, -b.y); L.mask = m; }
-          }
-          doc.doc.width = b.w; doc.doc.height = b.h;
-          GF.select.clear(); view.zoomFit(); if (GF.ui) GF.ui.refreshLayers();
-        }
+        if (sb) { GF.history.push(D().doc, 'crop to selection'); sb.cropTo(b.x, b.y, b.w, b.h); }
         break;
       }
-      case 'invert':    GF.select.invert(); view.requestRender(); break;
-      case 'delete':    run('eraseSelection'); break;
-      case 'expand':    if (GF.select.grow) { GF.select.grow(4); view.requestRender(); } break;
-      case 'feather':   if (GF.select.feather) { GF.select.feather(3); view.requestRender(); } break;
+      case 'invert':    GF.select.invert(); V().requestRender(); break;
+      case 'delete':    if (sb) sb.deleteSelection(); else run('eraseSelection'); break;
+      case 'expand':    if (GF.select.grow) { GF.select.grow(4); V().requestRender(); } break;
+      case 'feather':   if (GF.select.feather) { GF.select.feather(3); V().requestRender(); } break;
     }
   }
 

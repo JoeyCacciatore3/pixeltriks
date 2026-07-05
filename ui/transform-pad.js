@@ -1,14 +1,15 @@
 /* PixelTriks — transform-pad.js
    The "joystick" — a 3×3 grid of directional buttons for precise transforms.
-   Positioned bottom-left (left thumb on a game controller).
+   EMBEDDED at the bottom of the tool rail (left sidebar), NOT floating.
    9 buttons: 4 move (N/S/E/W), 2 rotate (NW/NE), 2 scale (SW/SE), 1 center (axis mode).
    Works on 2D layers AND 3D objects through GF.api.
 
    Architecture:
-   - Always visible when something is selected (dimmed otherwise)
+   - Lives inside #toolrail, pushed to bottom via flex margin-top:auto
+   - Active when something is selected (dimmed otherwise)
    - Center button cycles axis lock: Free → X → Y → Z (3D only)
    - Tap = 1 unit nudge. Hold = continuous with acceleration.
-   - Shift+tap = 10x nudge. Ctrl+tap = snap to grid.
+   - Shift+tap = 10x nudge.
 */
 'use strict';
 window.GF = window.GF || {};
@@ -25,7 +26,6 @@ GF.transformPad = (function () {
   let holdDir = null;          // currently held direction
   let holdStart = 0;           // timestamp of hold start
   let padEl = null;            // root DOM element
-  let visible = false;
 
   /* ─── Config ─── */
   const BASE_STEP_2D = 1;     // 1px per tap
@@ -60,7 +60,6 @@ GF.transformPad = (function () {
 
   /* ─── Transform actions ─── */
   function move(dx, dy, dz) {
-    // Apply axis lock
     if (axisMode === 'x') { dy = 0; dz = 0; }
     if (axisMode === 'y') { dx = 0; dz = 0; }
     if (axisMode === 'z') { dx = 0; dy = 0; }
@@ -75,7 +74,7 @@ GF.transformPad = (function () {
   function move2D(dx, dy) {
     const doc = D();
     if (!doc || !doc.doc.open) return;
-    const layer = doc.activeLayer();
+    const layer = doc.active();
     if (!layer) return;
     GF.history.push(doc.doc, 'move');
     layer.ox = (layer.ox || 0) + dx;
@@ -95,17 +94,13 @@ GF.transformPad = (function () {
   }
 
   function rotate(deg) {
-    if (is3D()) {
-      rotate3D(deg);
-    } else {
-      rotate2D(deg);
-    }
+    if (is3D()) { rotate3D(deg); } else { rotate2D(deg); }
   }
 
   function rotate2D(deg) {
     const doc = D();
     if (!doc || !doc.doc.open) return;
-    const layer = doc.activeLayer();
+    const layer = doc.active();
     if (!layer) return;
     GF.history.push(doc.doc, 'rotate');
     layer.rotation = ((layer.rotation || 0) + deg) % 360;
@@ -120,22 +115,18 @@ GF.transformPad = (function () {
     const rad = deg * Math.PI / 180;
     if (axisMode === 'x') obj.rotation.x += rad;
     else if (axisMode === 'z') obj.rotation.z += rad;
-    else obj.rotation.y += rad; // default: rotate around Y
+    else obj.rotation.y += rad;
     scene.requestRender();
   }
 
   function scale(factor) {
-    if (is3D()) {
-      scale3D(factor);
-    } else {
-      scale2D(factor);
-    }
+    if (is3D()) { scale3D(factor); } else { scale2D(factor); }
   }
 
   function scale2D(factor) {
     const doc = D();
     if (!doc || !doc.doc.open) return;
-    const layer = doc.activeLayer();
+    const layer = doc.active();
     if (!layer) return;
     GF.history.push(doc.doc, 'scale');
     layer.scaleX = (layer.scaleX || 1) * factor;
@@ -178,7 +169,7 @@ GF.transformPad = (function () {
 
   /* ─── Hold-to-repeat ─── */
   function startHold(dir, e) {
-    if (dir === 'c') return; // center doesn't repeat
+    if (dir === 'c') return;
     holdDir = dir;
     holdStart = performance.now();
     doHoldFrame(e);
@@ -188,10 +179,8 @@ GF.transformPad = (function () {
     if (!holdDir) return;
     const elapsed = performance.now() - holdStart;
     if (elapsed > ACCEL_DELAY) {
-      // Accelerate: ramp from 1x to ACCEL_MAX over 2 seconds
       const accelProgress = Math.min((elapsed - ACCEL_DELAY) / 2000, 1);
       const mult = 1 + accelProgress * (ACCEL_MAX - 1);
-      // Execute multiple times for smooth acceleration
       const times = Math.ceil(mult);
       for (let i = 0; i < times; i++) DIRS[holdDir](e);
     } else {
@@ -202,103 +191,83 @@ GF.transformPad = (function () {
 
   function stopHold() {
     holdDir = null;
-    if (holdTimer) {
-      cancelAnimationFrame(holdTimer);
-      holdTimer = null;
-    }
+    if (holdTimer) { cancelAnimationFrame(holdTimer); holdTimer = null; }
   }
 
-  /* ─── DOM ─── */
+  /* ─── DOM — embedded in #toolrail, not floating ─── */
   function build() {
     padEl = document.createElement('div');
     padEl.id = 'transform-pad';
-    padEl.className = 'tpad';
-    padEl.innerHTML = `
-      <button class="tpad-btn tpad-nw" data-dir="nw" title="Rotate left (CCW)">
-        <svg viewBox="0 0 24 24"><path d="M12 5C7.6 5 4 8.6 4 13h2c0-3.3 2.7-6 6-6s6 2.7 6 6h2c0-4.4-3.6-8-8-8z"/><path d="M7 9L4 13l3 4"/></svg>
-        <span>↶</span>
-      </button>
-      <button class="tpad-btn tpad-n" data-dir="n" title="Move up">
-        <svg viewBox="0 0 24 24"><path d="M12 4l-6 6h4v8h4v-8h4z"/></svg>
-        <span>↑</span>
-      </button>
-      <button class="tpad-btn tpad-ne" data-dir="ne" title="Rotate right (CW)">
-        <svg viewBox="0 0 24 24"><path d="M12 5c4.4 0 8 3.6 8 8h-2c0-3.3-2.7-6-6-6s-6 2.7-6 6H4c0-4.4 3.6-8 8-8z"/><path d="M17 9l3 4-3 4"/></svg>
-        <span>↷</span>
-      </button>
-      <button class="tpad-btn tpad-w" data-dir="w" title="Move left">
-        <svg viewBox="0 0 24 24"><path d="M4 12l6-6v4h8v4h-8v4z"/></svg>
-        <span>←</span>
-      </button>
-      <button class="tpad-btn tpad-c" data-dir="c" title="Axis mode: Free">
-        <span class="tpad-axis">${AXIS_LABELS[axisMode]}</span>
-      </button>
-      <button class="tpad-btn tpad-e" data-dir="e" title="Move right">
-        <svg viewBox="0 0 24 24"><path d="M20 12l-6-6v4H6v4h8v4z"/></svg>
-        <span>→</span>
-      </button>
-      <button class="tpad-btn tpad-sw" data-dir="sw" title="Scale down">
-        <svg viewBox="0 0 24 24"><path d="M5 19h14M12 5v14M8 15l4 4 4-4"/></svg>
-        <span>−</span>
-      </button>
-      <button class="tpad-btn tpad-s" data-dir="s" title="Move down">
-        <svg viewBox="0 0 24 24"><path d="M12 20l6-6h-4V6h-4v8H6z"/></svg>
-        <span>↓</span>
-      </button>
-      <button class="tpad-btn tpad-se" data-dir="se" title="Scale up">
-        <svg viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M8 9l4-4 4 4"/></svg>
-        <span>+</span>
-      </button>
-    `;
+    padEl.className = 'tpad tpad-dimmed';
+    padEl.setAttribute('role', 'group');
+    padEl.setAttribute('aria-label', 'Transform pad — move, rotate, scale');
+    padEl.innerHTML =
+      '<button class="tpad-btn tpad-nw" data-dir="nw" title="Rotate left (CCW)" aria-label="Rotate left">' +
+        '<svg viewBox="0 0 24 24"><path d="M12 5C7.6 5 4 8.6 4 13h2c0-3.3 2.7-6 6-6s6 2.7 6 6h2c0-4.4-3.6-8-8-8z"/><path d="M7 9L4 13l3 4"/></svg></button>' +
+      '<button class="tpad-btn tpad-n" data-dir="n" title="Move up" aria-label="Move up">' +
+        '<svg viewBox="0 0 24 24"><path d="M12 4l-6 6h4v8h4v-8h4z"/></svg></button>' +
+      '<button class="tpad-btn tpad-ne" data-dir="ne" title="Rotate right (CW)" aria-label="Rotate right">' +
+        '<svg viewBox="0 0 24 24"><path d="M12 5c4.4 0 8 3.6 8 8h-2c0-3.3-2.7-6-6-6s-6 2.7-6 6H4c0-4.4 3.6-8 8-8z"/><path d="M17 9l3 4-3 4"/></svg></button>' +
+      '<button class="tpad-btn tpad-w" data-dir="w" title="Move left" aria-label="Move left">' +
+        '<svg viewBox="0 0 24 24"><path d="M4 12l6-6v4h8v4h-8v4z"/></svg></button>' +
+      '<button class="tpad-btn tpad-c" data-dir="c" title="Axis mode: Free" aria-label="Cycle axis lock">' +
+        '<span class="tpad-axis">' + AXIS_LABELS[axisMode] + '</span></button>' +
+      '<button class="tpad-btn tpad-e" data-dir="e" title="Move right" aria-label="Move right">' +
+        '<svg viewBox="0 0 24 24"><path d="M20 12l-6-6v4H6v4h8v4z"/></svg></button>' +
+      '<button class="tpad-btn tpad-sw" data-dir="sw" title="Scale down" aria-label="Scale down">' +
+        '<svg viewBox="0 0 24 24"><path d="M5 19h14"/><path d="M8 15l4 4 4-4"/></svg></button>' +
+      '<button class="tpad-btn tpad-s" data-dir="s" title="Move down" aria-label="Move down">' +
+        '<svg viewBox="0 0 24 24"><path d="M12 20l6-6h-4V6h-4v8H6z"/></svg></button>' +
+      '<button class="tpad-btn tpad-se" data-dir="se" title="Scale up" aria-label="Scale up">' +
+        '<svg viewBox="0 0 24 24"><path d="M5 5h14"/><path d="M8 9l4-4 4 4"/></svg></button>';
 
-    // Event delegation
+    // Event delegation with pointer events for hold-to-repeat
     padEl.addEventListener('pointerdown', onDown);
     padEl.addEventListener('pointerup', onUp);
     padEl.addEventListener('pointerleave', onUp);
     padEl.addEventListener('contextmenu', e => e.preventDefault());
 
-    document.body.appendChild(padEl);
+    // Insert at the bottom of #toolrail (not document.body)
+    const rail = document.getElementById('toolrail');
+    if (rail) {
+      rail.appendChild(padEl);
+    } else {
+      // Fallback: append to body (shouldn't happen)
+      document.body.appendChild(padEl);
+    }
     updateVisibility();
   }
 
   function onDown(e) {
     const btn = e.target.closest('[data-dir]');
-    if (!btn) return;
+    if (!btn || padEl.classList.contains('tpad-dimmed')) return;
     e.preventDefault();
     btn.classList.add('pressed');
     const dir = btn.dataset.dir;
-
-    // Immediate tap action
     DIRS[dir](e);
-
-    // Start hold for continuous movement (not center)
-    if (dir !== 'c') {
-      startHold(dir, e);
-    }
+    if (dir !== 'c') startHold(dir, e);
   }
 
-  function onUp(e) {
+  function onUp() {
     stopHold();
-    padEl.querySelectorAll('.pressed').forEach(b => b.classList.remove('pressed'));
+    if (padEl) padEl.querySelectorAll('.pressed').forEach(b => b.classList.remove('pressed'));
   }
 
   /* ─── Visibility ─── */
   function updateVisibility() {
     if (!padEl) return;
-    const hasTarget = hasSelection();
-    padEl.classList.toggle('tpad-active', hasTarget);
-    padEl.classList.toggle('tpad-dimmed', !hasTarget);
-    visible = hasTarget;
+    const has = hasTarget();
+    padEl.classList.toggle('tpad-active', has);
+    padEl.classList.toggle('tpad-dimmed', !has);
   }
 
-  function hasSelection() {
+  function hasTarget() {
     if (is3D()) {
       const scene = S();
-      return scene && scene.selected && scene.selected();
-    } else {
-      const doc = D();
-      return doc && doc.doc.open && doc.activeLayer && doc.activeLayer();
+      return !!(scene && scene.selected && scene.selected());
     }
+    const doc = D();
+    return !!(doc && doc.doc.open && doc.active && doc.active());
   }
 
   /* ─── Center button updates ─── */
@@ -306,36 +275,31 @@ GF.transformPad = (function () {
     if (!padEl) return;
     const center = padEl.querySelector('.tpad-c');
     if (!center) return;
-    const axisSpan = center.querySelector('.tpad-axis');
-    if (axisSpan) axisSpan.textContent = AXIS_LABELS[axisMode];
+    const span = center.querySelector('.tpad-axis');
+    if (span) span.textContent = AXIS_LABELS[axisMode];
     center.title = 'Axis mode: ' + AXIS_TITLES[axisMode];
     center.dataset.axis = axisMode;
   }
 
   function updateAxisDimming() {
     if (!padEl) return;
-    // Dim directions that are locked out
-    const dirs = padEl.querySelectorAll('[data-dir]');
-    dirs.forEach(btn => {
+    padEl.querySelectorAll('[data-dir]').forEach(btn => {
       const dir = btn.dataset.dir;
-      let dimmed = false;
-      if (axisMode === 'x' && (dir === 'n' || dir === 's')) dimmed = true;
-      if (axisMode === 'y' && (dir === 'w' || dir === 'e')) dimmed = true;
-      if (axisMode === 'z' && (dir === 'n' || dir === 's' || dir === 'w' || dir === 'e')) dimmed = true;
-      btn.classList.toggle('axis-locked', dimmed);
+      let locked = false;
+      if (axisMode === 'x' && (dir === 'n' || dir === 's')) locked = true;
+      if (axisMode === 'y' && (dir === 'w' || dir === 'e')) locked = true;
+      if (axisMode === 'z' && (dir === 'n' || dir === 's' || dir === 'w' || dir === 'e')) locked = true;
+      btn.classList.toggle('axis-locked', locked);
     });
   }
 
-  /* ─── Public ─── */
+  /* ─── Public API ─── */
   function init() {
     build();
-    // Re-check visibility on relevant events
-    document.addEventListener('selectionchange', updateVisibility);
-    // Listen for custom events from the engine
+    window.addEventListener('pt:selectionchange', updateVisibility);
     window.addEventListener('pt:layerchange', updateVisibility);
     window.addEventListener('pt:sceneselect', updateVisibility);
     window.addEventListener('pt:modechange', () => {
-      // Reset axis mode when switching 2D/3D
       if (!is3D() && axisMode === 'z') axisMode = 'free';
       updateCenterButton();
       updateAxisDimming();
@@ -343,11 +307,9 @@ GF.transformPad = (function () {
     });
   }
 
-  function show() { if (padEl) padEl.style.display = ''; }
-  function hide() { if (padEl) padEl.style.display = 'none'; }
   function setAxis(mode) { axisMode = mode; updateCenterButton(); updateAxisDimming(); }
   function getAxis() { return axisMode; }
   function refresh() { updateVisibility(); }
 
-  return { init, show, hide, setAxis, getAxis, refresh };
+  return { init, setAxis, getAxis, refresh };
 })();

@@ -64,9 +64,6 @@
   </div>
 </header>
 
-<!-- ===================== CONTEXTUAL TOOL OPTIONS ===================== -->
-<div id="optbar" hidden></div>
-
 <!-- ============================= STAGE ============================= -->
 <main id="stage">
 
@@ -97,7 +94,11 @@
     <span class="rail-sep"></span>
     <label class="tool color-tool" title="Brush colour">
       <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></label>
+
   </nav>
+
+  <!-- Tool options flyout — positioned by JS at the active tool, extends rightward over viewport -->
+  <div id="optbar" class="tool-flyout" hidden></div>
 
   <!-- sidebar removed — scene tree in right panel, actions in bottom bar -->
 
