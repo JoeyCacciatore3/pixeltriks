@@ -178,12 +178,14 @@ GF.scene3d = (function () {
     document.body.dataset.mode = '3d';
     if (!raf) animate();
     refreshAll();
+    window.dispatchEvent(new CustomEvent('pt:modechange', { detail: { mode: '3d' } }));
     return true;
   }
   function exit() {
     modeEpoch++;
     document.body.dataset.mode = 'image';
     if (raf) { cancelAnimationFrame(raf); raf = null; }
+    window.dispatchEvent(new CustomEvent('pt:modechange', { detail: { mode: 'image' } }));
   }
 
   /* Auto-boot: start the 3D renderer as soon as the bundle is ready.

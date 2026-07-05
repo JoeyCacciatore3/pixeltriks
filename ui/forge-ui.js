@@ -105,6 +105,9 @@ window.GF = window.GF || {};
     wireGestures();
     wireProFeatures();
     wireActionBar();
+    // Game Deck modules — init after main UI
+    if (GF.transformPad) GF.transformPad.init();
+    if (GF.hotbar) GF.hotbar.init();
     GF.history.onChange(updateUndoRedo);
     setTool('move');
     updateUndoRedo();
@@ -148,6 +151,9 @@ window.GF = window.GF || {};
     setDims();
     drawHistogram();
     if (pendingIntent) { const k = pendingIntent; pendingIntent = null; runIntent(k); }
+    // Notify Game Deck modules
+    window.dispatchEvent(new CustomEvent('pt:docopen'));
+    if (GF.transformPad) GF.transformPad.refresh();
   }
 
   function refreshLayers() {
@@ -389,6 +395,9 @@ window.GF = window.GF || {};
     if (name === 'crop') startCrop();
     if (name === 'wand') showWandCoach();
     if (name === 'scene3d' && GF.scene3dUI) GF.scene3dUI.enter();
+    // Notify Game Deck modules
+    window.dispatchEvent(new CustomEvent('pt:toolchange', { detail: { tool: name, prev } }));
+    if (GF.transformPad) GF.transformPad.refresh();
   }
 
   /* First-run coach mark: the wand only pays off once you know "click → then an

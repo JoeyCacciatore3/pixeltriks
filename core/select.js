@@ -22,7 +22,7 @@ GF.select = (function () {
   let listeners = [];
 
   function onChange(fn) { listeners.push(fn); }
-  function emit() { viz = [null, null]; maskCnv = null; dimCnv = null; cachedCount = -1; listeners.forEach(f => f()); }
+  function emit() { viz = [null, null]; maskCnv = null; dimCnv = null; cachedCount = -1; listeners.forEach(f => f()); window.dispatchEvent(new CustomEvent('pt:selectionchange')); }
 
   function ensure() {
     const w = D().width, h = D().height;

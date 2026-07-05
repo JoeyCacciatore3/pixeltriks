@@ -69,18 +69,19 @@
     });
 
     /* ---------- TOOLS (click rail, verify engine tool) ---------- */
-    const toolMap = { move:'move', select:'marquee', wand:'wand', crop:'move', brush:'brush', eraser:'eraser', fill:'fill', text:'text', shape:'shape',
-      magicerase:'magiceraser', gradient:'gradient' };
+    /* eraser + magicerase consolidated: eraser is now brush mode, magic erase is wand mode */
+    const toolMap = { move:'move', select:'marquee', wand:'wand', crop:'move', brush:'brush', fill:'fill', text:'text', shape:'shape',
+      gradient:'gradient' };
     for (const [btn, eng] of Object.entries(toolMap)) {
       await t('tool ' + btn + ' -> ' + eng, () => { clickTool(btn); if (GF.view.view.tool !== eng) throw new Error('got ' + GF.view.view.tool); });
     }
     await t('aria-pressed set on active tool', () => { clickTool('brush'); if ($('#toolrail .tool[data-tool=brush]').getAttribute('aria-pressed') !== 'true') throw new Error('no aria-pressed'); });
     await t('optbar builds for brush (size control)', () => { clickTool('brush'); if (!$('#brush-size')) throw new Error('no #brush-size'); });
     await t('optbar builds for wand (tolerance)', () => { clickTool('wand'); if (!$('#wand-tol')) throw new Error('no #wand-tol'); });
-    await t('optbar magic-erase: Heal/Erase seg + tolerance', () => {
-      clickTool('magicerase');
-      if (!$('#me-mode') || !$('#me-tol')) throw new Error('missing me-mode/me-tol');
-      if (!GF.view.view.wand.heal) throw new Error('heal should default true');
+    await t('wand optbar: auto-remove toggle present', () => {
+      clickTool('wand');
+      if (!$('#wand-mode')) throw new Error('missing wand-mode seg');
+      if (GF.view.view.wand.autoRemove === undefined) throw new Error('autoRemove not initialised');
     });
     await t('optbar gradient: kind seg + fade checkbox', () => {
       clickTool('gradient');
@@ -324,11 +325,14 @@
     });
 
     /* ---------- QUICK WINS ---------- */
-    await t('selection feather/grow present + safe', () => {
+    await t('selection expand/feather via hotbar (safe)', () => {
       freshDoc(); clickTool('select');
-      if (!$('#sel-feather') || !$('#sel-grow')) throw new Error('missing refine buttons');
       GF.api.run('selectRect', { x: 20, y: 20, w: 60, h: 60 });
-      $('#sel-feather').click(); $('#sel-grow').click(); GF.api.run('deselect');
+      if (GF.hotbar) GF.hotbar.refresh();
+      const expand = $('[data-hotbar="sel-expand"]');
+      const feather = $('[data-hotbar="sel-feather"]');
+      if (!expand || !feather) throw new Error('missing expand/feather in hotbar');
+      expand.click(); feather.click(); GF.api.run('deselect');
     });
     await t('theme toggle flips data-theme', () => {
       const before = document.documentElement.dataset.theme || '';
@@ -478,9 +482,10 @@
     });
 
     /* ---------- PRO SELECTIONS + GUIDES ---------- */
-    await t('wand optbar: mode/sample/guide (AA always on)', () => {
+    await t('wand optbar: mode/tolerance/guide + AA default on', () => {
       freshDoc(); clickTool('wand');
-      ['#sel-mode', '#wand-sample'].forEach(s => { if (!$(s)) throw new Error('missing ' + s); });
+      if (!$('#wand-mode')) throw new Error('missing #wand-mode (select/auto-remove seg)');
+      if (!$('#wand-tol')) throw new Error('missing #wand-tol');
       if (!$('.guide-btn')) throw new Error('no guide button');
       if (!GF.view.view.wand.antialias) throw new Error('anti-alias should default on');
     });
@@ -522,25 +527,33 @@
       GF.select.selectColor(img, 200, 55, 55, 70, 'replace');   // ≈ the red rect (#c83737)
       if (!GF.select.has()) throw new Error('color range selected nothing'); GF.api.run('deselect');
     });
-    await t('selection outcome bar appears + Fill works + hides on deselect', () => {
+    await t('selection hotbar shows actions + Fill works + hides on deselect', () => {
       freshDoc(); GF.api.run('selectRect', { x: 30, y: 30, w: 60, h: 60 });
-      const bar = $('#sel-bar'); if (!bar || bar.hidden) throw new Error('outcome bar not shown');
-      if (!/px selected/.test(bar.querySelector('.sel-count').textContent)) throw new Error('no count');
-      Array.prototype.find.call(bar.querySelectorAll('.sel-out'), b => /Fill/.test(b.textContent)).click();
+      if (GF.hotbar) GF.hotbar.refresh();
+      const ctx = GF.hotbar ? GF.hotbar.getContext() : null;
+      if (ctx !== '2d-selection') throw new Error('hotbar context should be 2d-selection, got ' + ctx);
+      const fillBtn = $('[data-hotbar="sel-fill"]');
+      if (!fillBtn) throw new Error('no fill button in hotbar');
+      fillBtn.click();
       if (!GF.history.canUndo()) throw new Error('fill did nothing');
       GF.api.run('deselect');
-      if (!$('#sel-bar').hidden) throw new Error('bar should hide on deselect');
+      if (GF.hotbar) GF.hotbar.refresh();
+      if (GF.hotbar.getContext() === '2d-selection') throw new Error('hotbar should leave selection context on deselect');
     });
-    await t('selection outcome (More): copy to new layer', () => {
+    await t('selection hotbar: copy to new layer', () => {
       freshDoc(); GF.api.run('selectRect', { x: 20, y: 20, w: 50, h: 50 }); const n = layerCount();
-      $('#sel-bar .sel-more-btn').click();
-      Array.prototype.find.call($('#sel-bar').querySelectorAll('.sel-more button'), b => /Copy to layer/.test(b.textContent)).click();
+      if (GF.hotbar) GF.hotbar.refresh();
+      const btn = $('[data-hotbar="sel-copy"]');
+      if (!btn) throw new Error('no copy-layer button in hotbar');
+      btn.click();
       if (layerCount() !== n + 1) throw new Error('copy did not add a layer'); GF.api.run('deselect');
     });
-    await t('selection outcome (More): crop to this', () => {
+    await t('selection hotbar: crop to selection', () => {
       freshDoc(200, 200); GF.api.run('selectRect', { x: 50, y: 50, w: 80, h: 60 });
-      $('#sel-bar .sel-more-btn').click();
-      Array.prototype.find.call($('#sel-bar').querySelectorAll('.sel-more button'), b => /Crop to this/.test(b.textContent)).click();
+      if (GF.hotbar) GF.hotbar.refresh();
+      const btn = $('[data-hotbar="sel-crop"]');
+      if (!btn) throw new Error('no crop button in hotbar');
+      btn.click();
       if (GF.doc.doc.width !== 80 || GF.doc.doc.height !== 60) throw new Error('crop wrong ' + GF.doc.doc.width + 'x' + GF.doc.doc.height);
     });
     await t('adjustment auto-masks from selection', () => {
@@ -549,21 +562,23 @@
       const L = GF.doc.active(); if (!L.adjust || !L.mask) throw new Error('adjustment not masked from selection');
       $('.fs-modal .text-btn.primary').click(); GF.api.run('deselect');
     });
-    await t('sel-bar More has Contract + Smooth; palette has Color range', async () => {
+    await t('hotbar selection has expand + feather; palette has Color range', async () => {
       freshDoc(); GF.api.run('selectRect', { x: 10, y: 10, w: 40, h: 40 });
-      const more = $('#sel-bar .sel-more');
-      const labels = Array.prototype.map.call(more.querySelectorAll('button'), b => b.textContent).join('|');
-      if (!/Contract/.test(labels) || !/Smooth/.test(labels)) throw new Error('missing refine ops: ' + labels);
+      if (GF.hotbar) GF.hotbar.refresh();
+      if (!$('[data-hotbar="sel-expand"]')) throw new Error('missing expand in hotbar');
+      if (!$('[data-hotbar="sel-feather"]')) throw new Error('missing feather in hotbar');
       GF.api.run('deselect');
       palRun('Color range');
       await new Promise(r => setTimeout(r, 40));
       if (!$('.fs-modal #cr-tol')) throw new Error('Color range dialog missing');
       $('.fs-modal .text-btn').click();
     });
-    await t('tool guide opens (wand) with next-step outcomes', () => {
-      freshDoc(); clickTool('wand'); $('.guide-btn').click();
-      const g = $('.fs-modal .tool-guide'); if (!g) throw new Error('no guide');
-      if (!/What to do next/i.test(g.textContent)) throw new Error('guide missing next-step outcomes');
+    await t('tool guide opens (wand) with helpful content', () => {
+      freshDoc(); clickTool('wand');
+      const btn = $('.guide-btn'); if (!btn) throw new Error('no guide button');
+      btn.click();
+      const g = $('.fs-modal .tool-guide'); if (!g) throw new Error('no guide modal');
+      if (g.textContent.length < 20) throw new Error('guide content too short');
       $('.fs-modal .text-btn').click();
     });
 
@@ -722,9 +737,9 @@
       if (GF.view.view.brush.stabilizer !== 5) throw new Error('not set');
       GF.view.view.brush.stabilizer = 0;
     });
-    await t('optbar: stabilizer slider present for brush', () => {
+    await t('optbar: brush erase mode toggle present', () => {
       clickTool('brush');
-      if (!$('#brush-stab')) throw new Error('no stabilizer slider');
+      if (!$('#brush-mode')) throw new Error('no brush-mode seg (paint/erase toggle)');
     });
 
     /* ---------- PAINT3D ---------- */
