@@ -1,0 +1,30 @@
+# Cloudflare Pages custom headers
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# Service worker MUST revalidate every time — stale sw.js = stale app
+/sw.js
+  Cache-Control: no-cache, must-revalidate
+
+# Manifest can be cached briefly but should revalidate
+/manifest.webmanifest
+  Cache-Control: public, max-age=3600, must-revalidate
+
+# HTML — always fresh
+/index.html
+  Cache-Control: no-cache, must-revalidate
+/
+  Cache-Control: no-cache, must-revalidate
+
+# JS/CSS assets — 1 hour cache (SW handles offline; edge cache handles CDN)
+/*.js
+  Cache-Control: public, max-age=3600, must-revalidate
+/*.css
+  Cache-Control: public, max-age=3600, must-revalidate
+
+# Static assets — cache longer (images, fonts, models)
+/assets/*
+  Cache-Control: public, max-age=86400
+/vendor/*
+  Cache-Control: public, max-age=86400
+/icon.svg
+  Cache-Control: public, max-age=86400
