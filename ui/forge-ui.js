@@ -508,16 +508,42 @@ window.GF = window.GF || {};
 
   function wirePanel() {
     $$('.ptab').forEach(t => t.addEventListener('click', () => {
-      const tab = t.dataset.tab;
-      $('#panel').dataset.tab = tab;
-      $$('.ptab').forEach(x => { x.classList.toggle('on', x === t); x.setAttribute('aria-selected', x === t ? 'true' : 'false'); });
-      $$('.ptab-pane').forEach(p => p.hidden = p.dataset.pane !== tab);
-      const tg = $('#panel-toggle span'); if (tg) tg.textContent = t.textContent;
+      panelAutoSwitch = false;    // user manually picked — pause auto-switching
+      switchPanel(t.dataset.tab);
     }));
     const defTab = $('.ptab[data-tab="scene"]') || $('.ptab');
     defTab.classList.add('on'); // default Properties (3D)
     $('#adj-reset').addEventListener('click', resetAdjust);
     $('#adj-apply').addEventListener('click', applyAdjust);
+
+    // Re-enable auto-switch when mode/tool/selection changes
+    window.addEventListener('pt:modechange', () => { panelAutoSwitch = true; autoPanelSwitch(); });
+    window.addEventListener('pt:toolchange', e => { panelAutoSwitch = true; autoPanelSwitch(); });
+    window.addEventListener('pt:selectionchange', () => { if (panelAutoSwitch) autoPanelSwitch(); });
+  }
+
+  let panelAutoSwitch = true;
+  function switchPanel(tab) {
+    const panel = $('#panel');
+    panel.dataset.tab = tab;
+    $$('.ptab').forEach(x => { x.classList.toggle('on', x.dataset.tab === tab); x.setAttribute('aria-selected', x.dataset.tab === tab ? 'true' : 'false'); });
+    $$('.ptab-pane').forEach(p => p.hidden = p.dataset.pane !== tab);
+    const tg = $('#panel-toggle span'); if (tg) tg.textContent = tab === 'scene' ? 'Properties' : tab === 'layers' ? 'Layers' : 'Adjust';
+  }
+
+  /** P4: Context-sensitive panel — auto-switches tab based on what's happening */
+  function autoPanelSwitch() {
+    if (!panelAutoSwitch) return;
+    const mode = document.body.dataset.mode;
+    if (mode === '3d') {
+      switchPanel('scene');  // 3D mode → show Properties (objects, materials, scene tree)
+    } else if (curTool === 'crop') {
+      // Crop tool doesn't need panel — keep current
+    } else if (GF.select && GF.select.has && GF.select.has()) {
+      switchPanel('layers'); // Selection active → show layers (where to act)
+    } else {
+      switchPanel('layers'); // Default 2D → layers is most useful
+    }
   }
 
   /* The four headline actions, named once. Every surface that offers them —

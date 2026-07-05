@@ -73,6 +73,10 @@ GF.hotbar = (function () {
     'new-layer':    { icon: '+', label: 'New Layer',   action: () => run('layer.add') },
     'merge-down':   { icon: '⬇', label: 'Merge',     action: () => run('layer.mergeDown') },
 
+    // Global actions (moved from top bar for P6)
+    'export':       { icon: '💾', label: 'Export',    action: () => { const b = document.querySelector('#btn-export'); if (b) b.click(); }, class: 'ab-accent' },
+    'ai-tools':     { icon: '✦', label: 'AI',        action: () => { if (GF.ui) GF.ui.openAIDialog(); }, class: 'ab-ai' },
+
     // Empty state
     'open-file':    { icon: '📂', label: 'Open',     action: () => { if (GF.ui) document.querySelector('#btn-open').click(); } },
     'new-doc':      { icon: '+', label: 'New',        action: () => { if (GF.ui) document.querySelector('#empty-new').click(); } },
@@ -112,11 +116,11 @@ GF.hotbar = (function () {
 
   const CONTEXTS = {
     'empty': ['open-file', 'new-doc'],
-    '3d-idle': ['add-box', 'add-sphere', 'add-cylinder', 'add-plane', 'import-model', '|', 'anim-play', '|', 'ai-gen', 'assets'],
-    '3d-selected': ['obj-delete', 'obj-dup', 'obj-group', 'obj-material', 'obj-flatten', 'obj-frame', '|', 'anim-play'],
-    '2d-idle': ['enhance', 'remove-bg', 'ai-gen', 'quick-adjust', 'filters', '|', 'new-layer'],
+    '3d-idle': ['add-box', 'add-sphere', 'add-cylinder', 'add-plane', 'import-model', '|', 'anim-play', '|', 'ai-tools', 'assets', 'export'],
+    '3d-selected': ['obj-delete', 'obj-dup', 'obj-group', 'obj-material', 'obj-flatten', 'obj-frame', '|', 'anim-play', '|', 'export'],
+    '2d-idle': ['enhance', 'remove-bg', 'ai-tools', 'quick-adjust', 'filters', '|', 'new-layer', 'export'],
     '2d-selection': ['sel-remove', 'sel-cutout', 'sel-fill', 'sel-ai', 'sel-recolor', 'sel-copy', 'sel-crop', 'sel-expand', 'sel-feather', 'sel-invert', 'sel-delete'],
-    '2d-painting': ['swap-color', 'new-layer', 'merge-down', '|', 'ai-gen'],
+    '2d-painting': ['swap-color', 'new-layer', 'merge-down', '|', 'ai-tools', 'export'],
     'animation': ['anim-stop', 'anim-pause'],
   };
 

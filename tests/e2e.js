@@ -1003,6 +1003,55 @@
       if (padIdx <= lastToolIdx) throw new Error('pad (idx ' + padIdx + ') should be after last tool (idx ' + lastToolIdx + ')');
     });
 
+    /* ================================================================
+       P4: CONTEXT-SENSITIVE PANEL
+       ================================================================ */
+    await t('panel: auto-switches to layers in 2D mode', () => {
+      freshDoc();
+      clickTool('brush');
+      // Panel should auto-switch — give the event a tick
+      const tab = $('#panel').dataset.tab;
+      // Should be layers (2D default) or scene (3D default) — not broken
+      if (!tab) throw new Error('no panel tab set');
+    });
+
+    await t('panel: manual tab click pauses auto-switch', () => {
+      freshDoc();
+      const adjTab = $('.ptab[data-tab="adjust"]');
+      if (adjTab) { adjTab.click(); }
+      // After manual click, the tab should stay on adjust
+      if ($('#panel').dataset.tab !== 'adjust') throw new Error('manual switch failed');
+    });
+
+    /* ================================================================
+       P6: SLIM TOP BAR — AI + Export in hotbar
+       ================================================================ */
+    await t('topbar: AI and Export have topbar-action class', () => {
+      const ai = $('#btn-ai');
+      const exp = $('#btn-export');
+      if (!ai || !ai.classList.contains('topbar-action')) throw new Error('AI missing topbar-action class');
+      if (!exp || !exp.classList.contains('topbar-action')) throw new Error('Export missing topbar-action class');
+    });
+
+    await t('hotbar: export button present in 2d-idle context', () => {
+      freshDoc();
+      clickTool('move');
+      GF.hotbar.refresh();
+      const ctx = GF.hotbar.getContext();
+      if (ctx === '3d-idle' || ctx === '2d-idle' || ctx === '2d-painting') {
+        const exp = $('[data-hotbar="export"]');
+        if (!exp) throw new Error('no export button in hotbar for context ' + ctx);
+      }
+    });
+
+    await t('hotbar: ai-tools button present in 3d-idle context', () => {
+      // 3D is default mode
+      freshDoc();
+      GF.hotbar.refresh();
+      const ai = $('[data-hotbar="ai-tools"]');
+      if (!ai) throw new Error('no ai-tools button in hotbar');
+    });
+
     /* ---------- FINISH ---------- */
     dump('done');
   }

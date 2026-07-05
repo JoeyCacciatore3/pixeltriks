@@ -123,6 +123,9 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
 .tb-left  { justify-self: start; }
 .tb-center{ justify-self: center; }
 .tb-right { justify-self: end; }
+/* P6: Hide AI + Export from topbar when hotbar has them (doc open).
+   They stay as hidden triggers — hotbar clicks route through them. */
+body:not(.no-doc) .topbar-action { display: none; }
 .brand { display: flex; align-items: center; gap: .4rem; font-weight: 800;
   letter-spacing: .2px; margin: 0 .3rem; }
 .brand-mark { color: var(--accent); font-size: 1.1em; }
@@ -579,15 +582,26 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
     box-shadow: 0 4px 16px rgba(0,0,0,.4);
   }
   .tpad-btn svg { width: 14px; height: 14px; }
-  #actionbar { display: none; }
+  /* P5: Mobile two-row bottom = hotbar (fixed) + tool strip (fixed) */
   #stage {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
     grid-template-areas: "viewport";
-    padding-bottom: 62px;
+    padding-bottom: 108px; /* 62px toolrail + 44px hotbar + 2px border */
   }
 
-  /* panel -> bottom sheet */
+  /* Hotbar: fixed above tool strip */
+  #actionbar {
+    position: fixed; left: 0; right: 0; bottom: 62px; z-index: 16;
+    display: flex; height: 44px; padding: 2px 6px; gap: 4px;
+    background: var(--bg-2);
+    border-top: var(--game-border-w) solid var(--game-border);
+    overflow-x: auto; overflow-y: hidden;
+  }
+  #actionbar .ab-btn { min-width: 44px; min-height: 38px; padding: 3px 8px; flex: 0 0 auto; }
+  #actionbar .ab-btn .ab-label { font-size: .58em; }
+
+  /* panel -> bottom sheet (keep existing) */
   #panel {
     position: fixed; left: 0; right: 0; bottom: 0;
     height: min(72vh, 540px); flex: none;
@@ -604,22 +618,23 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
   /* mobile panel toggle FAB */
   #panel-toggle {
     display: flex; align-items: center; gap: .4rem;
-    position: fixed; right: 12px; bottom: calc(58px + env(safe-area-inset-bottom) + 12px);
+    position: fixed; right: 12px; bottom: calc(108px + env(safe-area-inset-bottom) + 12px);
     padding: .6em 1em; background: var(--accent); color: var(--accent-ink);
     border-radius: 999px; font-weight: 700; box-shadow: var(--shadow); z-index: 25;
   }
   body.sheet-open #panel-toggle { display: none; }
-  #touch-companion { display: flex; }
-  #sel-bar { bottom: calc(62px + env(safe-area-inset-bottom) + 10px); left: 50%;
-    transform: translateX(-50%); width: min(360px, 94%); }
-  .quick-actions { bottom: calc(62px + env(safe-area-inset-bottom) + 8px); right: 8px; left: 8px;
+  /* P5: Kill touch companion — hotbar + transform pad replace it */
+  #touch-companion { display: none !important; }
+  #sel-bar { display: none; }  /* hotbar handles selection actions now */
+  .quick-actions { bottom: calc(110px + env(safe-area-inset-bottom) + 8px); right: 8px; left: 8px;
     justify-content: center; gap: 10px; }
   .qa-chip { padding: 10px 14px; border-radius: 14px; font-size: .85rem; }
   .qa-label { display: none; }
   .qa-icon { font-size: 1.2em; }
-  .first-tip { bottom: calc(62px + env(safe-area-inset-bottom) + 8px); max-width: calc(100vw - 24px);
+  .first-tip { bottom: calc(110px + env(safe-area-inset-bottom) + 8px); max-width: calc(100vw - 24px);
     font-size: .68rem; }
-  /* actionbar hidden on mobile — tools are in bottom toolrail */
+  /* P6: Show AI/Export in topbar on mobile (no hotbar overlap since they scroll) */
+  body:not(.no-doc) .topbar-action { display: inline-flex; }
 }
 
 /* ------------- no-document state: quiet the chrome until work exists -------------
