@@ -534,6 +534,39 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .size-card small { display: block; color: var(--ink-2); font-weight: 400; font-size: .9em; }  /* ink-2 for 4.5:1 contrast */
 
 
+/* ── AI / smart tool indicators (competitor research: Pixlr pattern) ── */
+.ai-tool { position: relative; }
+.ai-badge {
+  position: absolute; top: 3px; right: 3px;
+  font-size: 8px; line-height: 1; color: var(--ai-2);
+  pointer-events: none; opacity: .7;
+  transition: .15s opacity;
+}
+.ai-tool:hover .ai-badge, .ai-tool.on .ai-badge { opacity: 1; }
+.ai-tool.on {
+  background: color-mix(in srgb, var(--ai) 16%, transparent);
+  border-color: var(--ai);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ai) 50%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ai) 30%, transparent);
+}
+.ai-tool.on .tlabel { color: var(--ai-2); }
+.ai-tool.on svg { color: var(--ai-2); }
+
+/* ── active tool pulse ── */
+@keyframes tool-pulse {
+  0%, 100% { box-shadow: var(--game-glow), inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+  50% { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 60%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+}
+@keyframes ai-pulse {
+  0%, 100% { box-shadow: 0 0 12px color-mix(in srgb, var(--ai) 50%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ai) 30%, transparent); }
+  50% { box-shadow: 0 0 20px color-mix(in srgb, var(--ai) 65%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--ai) 45%, transparent); }
+}
+.tool.on:not(.ai-tool) { animation: tool-pulse 2.5s ease-in-out infinite; }
+.ai-tool.on { animation: ai-pulse 2.5s ease-in-out infinite; }
+
 /* ---------------------- accessibility ---------------------- */
 :focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
 .tool:focus-visible, .icon-btn:focus-visible { outline-offset: -2px; }
