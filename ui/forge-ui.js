@@ -422,8 +422,53 @@ window.GF = window.GF || {};
   }
 
   function wireTools() {
-    $$('#toolrail .tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+    $('#toolrail .tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
     $('#brush-color').addEventListener('input', e => { V().brush.color = e.target.value; });
+
+    // ── Face-button colour palette ──
+    // Tracks 4 recent colours, persisted in localStorage.
+    // Clicking a face button sets the brush colour; using the colour picker pushes
+    // the previous colour onto the palette stack.
+    const FACE_ORDER = ['a', 'b', 'x', 'y'];
+    let recentColors;
+    try { recentColors = JSON.parse(localStorage.getItem('forge.recentColors')) || []; } catch (e) { recentColors = []; }
+    if (recentColors.length < 4) recentColors = ['#e8a33d', '#e5634d', '#5b9fd6', '#5bbf7a'].slice(0, 4);
+
+    function updateFacePalette() {
+      FACE_ORDER.forEach((f, i) => {
+        const btn = $(`.face-swatch.face-${f}`);
+        if (btn && recentColors[i]) btn.style.background = recentColors[i];
+      });
+    }
+    function pushColor(color) {
+      const hex = color.toLowerCase();
+      const idx = recentColors.indexOf(hex);
+      if (idx >= 0) recentColors.splice(idx, 1);
+      recentColors.unshift(hex);
+      if (recentColors.length > 4) recentColors.length = 4;
+      try { localStorage.setItem('forge.recentColors', JSON.stringify(recentColors)); } catch (e) {}
+      updateFacePalette();
+    }
+
+    updateFacePalette();
+
+    // Push previous color when picker changes
+    const colorInput = $('#brush-color');
+    let prevPickerColor = colorInput.value;
+    colorInput.addEventListener('change', () => {
+      pushColor(prevPickerColor);
+      prevPickerColor = colorInput.value;
+    });
+
+    // Click face button → set brush color
+    $('.face-swatch').forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        if (recentColors[i]) {
+          colorInput.value = recentColors[i];
+          V().brush.color = recentColors[i];
+        }
+      });
+    });
   }
   function setTool(name) {
     const prev = curTool;
