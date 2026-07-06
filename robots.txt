@@ -1,0 +1,7 @@
+# pixeltriks.com robots.txt
+# Allow all crawlers including AI engines
+
+User-agent: *
+Allow: /
+
+Sitemap: https://pixeltriks.com/sitemap.xml
