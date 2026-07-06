@@ -992,7 +992,7 @@ window.GF = window.GF || {};
       { group: 'View', label: 'Zoom out', hint: '[', run: () => zoomBtn(0.8) },
       { group: 'View', label: 'Fit to screen', run: () => GF.view.zoomFit() },
       { group: 'View', label: 'Toggle light / dark theme', run: toggleTheme },
-      { group: 'Help', label: 'Keyboard shortcuts', hint: '?', run: openCheatSheet },
+      { group: 'Help', label: 'Keyboard shortcuts', hint: '? / K', run: openCheatSheet },
       { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) { GF.scene3d.snapshotToLayer(); setTool('move'); } else U.toast('Add a 3D object first'); } },
       { group: '3D', label: 'Export GLB (3D scene)', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') },
     );
@@ -1124,7 +1124,7 @@ window.GF = window.GF || {};
       ['Pick colour', 'Alt-click (brush/fill)'], ['Curves', '⌘M'],
       ['Undo / Redo', '⌘Z / ⌘⇧Z'], ['Save project', '⌘S'], ['Export', '⌘E'],
       ['Select all / Invert', '⌘A / ⌘I'], ['Deselect', 'Esc'], ['Paste image', '⌘V'],
-      ['Zoom out / in', '[ / ]'], ['Fit to screen', 'click %'], ['Shortcuts', '?'],
+      ['Zoom out / in', '[ / ]'], ['Fit to screen', 'click %'], ['Shortcuts', '? / K'],
       ['3D: remove / frame object', 'Del / F'],
     ];
     modal({
@@ -1410,7 +1410,7 @@ window.GF = window.GF || {};
       if ((e.ctrlKey || e.metaKey) && k === 'k') { e.preventDefault(); openPalette(); return; }
       if (paletteEl) return;
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-      if (!typing && !modalEl && e.key === '?') { e.preventDefault(); openCheatSheet(); }
+      if (!typing && !modalEl && (e.key === '?' || k === 'k')) { e.preventDefault(); openCheatSheet(); }
     });
     checkRestore();
 
