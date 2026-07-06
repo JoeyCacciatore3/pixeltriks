@@ -1,16 +1,14 @@
 /* PixelTriks — selection-bar.js
-   Contextual outcome bar after any selection.
-   ALL actions visible as a flat grid. No hidden menus. */
+   Selection utility functions. The floating bar UI is removed —
+   the context hotbar (hotbar.js) owns the selection action UI.
+   This module provides the canvas operations that hotbar delegates to. */
 'use strict';
 window.GF = window.GF || {};
 
 GF.selectionBar = (function () {
   const U = GF.util, D = GF.doc;
-  const $ = s => document.querySelector(s);
   const V = () => GF.view.view;
   const run = (n, a) => { try { return GF.api.run(n, a); } catch (e) { U.toast(e.message); } };
-
-  let barEl = null, bounds = null, _vsig = '';
 
   function fillSelection() {
     const L = D.active(); if (!L || !L.canvas) return U.toast('Pick a pixel layer');
@@ -46,66 +44,8 @@ GF.selectionBar = (function () {
     GF.select.clear(); GF.view.zoomFit(); GF.ui.refreshLayers();
   }
 
-  /* Every action the user can take on a selection — all visible, no hiding */
-  const ACTIONS = [
-    { ic: '🩹', label: 'Remove',      fn: () => run('contentAwareFill') },
-    { ic: '✂️', label: 'Cut Out',      fn: cutOut },
-    { ic: '🪣', label: 'Fill',         fn: fillSelection },
-    { ic: '✦',  label: 'AI Replace',   fn: () => GF.ui.openAIDialog && GF.ui.openAIDialog(), ai: true },
-    { ic: '🎨', label: 'Recolor',      fn: () => run('addAdjustment', { kind: 'hsl' }) },
-    { ic: '⧉',  label: 'Copy Layer',   fn: () => run('layerViaCopy') },
-    { ic: '⌗',  label: 'Crop to This', fn: () => { const b = GF.select.bounds(); if (b) { GF.history.push(D.doc, 'crop'); cropTo(b.x, b.y, b.w, b.h); } } },
-    { ic: '⇄',  label: 'Invert',       fn: () => { GF.select.invert(); GF.view.requestRender(); } },
-    { ic: '🗑', label: 'Delete',        fn: deleteSelection },
-  ];
+  /* update() is a no-op — kept for API compatibility with forge-ui.js */
+  function update() {}
 
-  function ensure() {
-    if (barEl) return barEl;
-    const bar = document.createElement('div'); bar.id = 'sel-bar'; bar.hidden = true;
-    const btns = ACTIONS.map((a, i) =>
-      `<button class="sel-act${a.ai ? ' ai' : ''}" data-i="${i}" title="${a.label}">
-         <span class="sa-ic">${a.ic}</span><span class="sa-lb">${a.label}</span>
-       </button>`).join('');
-    bar.innerHTML =
-      `<div class="sel-head">
-         <span class="sel-count"></span>
-         <button class="sel-x" type="button" title="Deselect (Esc)">✕</button>
-       </div>
-       <div class="sel-actions">${btns}</div>`;
-    $('#viewport').appendChild(bar);
-    const act = fn => { if (!D.doc.open) return U.toast('Open an image first'); fn(); update(); };
-    bar.querySelectorAll('.sel-act').forEach(b => b.addEventListener('click', () => act(ACTIONS[+b.dataset.i].fn)));
-    bar.querySelector('.sel-x').addEventListener('click', () => { GF.select.clear(); GF.view.requestRender(); });
-    const vp = $('#viewport');
-    ['wheel', 'pointermove', 'pointerup'].forEach(ev => vp.addEventListener(ev, () => position(), { passive: true }));
-    window.addEventListener('resize', () => position(true));
-    barEl = bar; return bar;
-  }
-
-  function position(force) {
-    const bar = barEl; if (!bar || bar.hidden) return;
-    if (!matchMedia('(min-width: 881px)').matches) { bar.classList.remove('floating'); bar.style.left = ''; bar.style.top = ''; _vsig = ''; return; }
-    const v = V(); if (!v || !bounds) return;
-    const sig = Math.round(v.zoom * 1000) + '|' + Math.round(v.panX) + '|' + Math.round(v.panY);
-    if (sig === _vsig && !force) return;
-    _vsig = sig;
-    bar.classList.add('floating');
-    const bw = bar.offsetWidth, bh = bar.offsetHeight;
-    const vpr = $('#viewport').getBoundingClientRect();
-    const cx = v.panX + (bounds.x + bounds.w / 2) * v.zoom;
-    let top = v.panY + bounds.y * v.zoom - bh - 14;
-    if (top < 8) top = v.panY + (bounds.y + bounds.h) * v.zoom + 14;
-    const left = U.clamp(cx, bw / 2 + 8, vpr.width - bw / 2 - 8);
-    top = U.clamp(top, 8, vpr.height - bh - 8);
-    bar.style.left = left + 'px'; bar.style.top = top + 'px';
-  }
-
-  function update() {
-    // The floating selection bar is DISABLED — the context hotbar (hotbar.js)
-    // now owns the selection action UI. This module is kept for its utility
-    // functions (cropTo, fillSelection) that the hotbar delegates to.
-    if (barEl) barEl.hidden = true;
-  }
-
-  return { update, ensure, cropTo, fillSelection, deleteSelection, cutOut };
+  return { update, cropTo, fillSelection, deleteSelection, cutOut };
 })();

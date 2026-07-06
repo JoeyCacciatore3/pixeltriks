@@ -187,7 +187,7 @@ body:not(.no-doc) .topbar-action { display: none; }
 #optbar .seg button:hover { color: var(--ink); background: var(--surface-2); }
 #optbar .seg button.on { background: var(--accent); color: var(--accent-ink); }
 #optbar .opt-hint { font-size: .72em; color: var(--ink-3); line-height: 1.3; font-weight: 500; }
-#optbar .opt-sep { width: 100%; height: 1px; background: var(--game-border); margin: .1rem 0; }
+/* .opt-sep removed — unused */
 #optbar label.opt-check { display: flex; align-items: center; gap: .4rem; font-size: .82em;
   font-weight: 600; color: var(--ink-2); cursor: pointer; }
 #optbar .text-btn { width: 100%; justify-content: center; }
@@ -624,40 +624,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .coach-card p { margin: 0 0 .6rem; font-size: .8em; color: var(--ink-2); line-height: 1.45; }
 .text-btn.sm { padding: .35em .9em; font-size: .85em; }
 
-/* ------------- contextual selection OUTCOME bar (intent-first) ------------- */
-#sel-bar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 9;
-  width: min(420px, 92%); padding: .55rem;
-  background: color-mix(in srgb, var(--bg-2) 97%, transparent);
-  backdrop-filter: blur(14px); border: var(--game-border-w) solid var(--accent);
-  border-radius: var(--r); box-shadow: var(--shadow), var(--game-glow);
-  animation: pop .18s ease; }
-#sel-bar.floating { bottom: auto; }
-
-.sel-head { display: flex; align-items: center; gap: .4rem; padding: .15rem .3rem .45rem; }
-.sel-count { flex: 1; font-size: .76em; font-weight: 700; color: var(--accent-2);
-  font-variant-numeric: tabular-nums; letter-spacing: .02em;
-  text-transform: uppercase; }
-.sel-x { color: var(--ink-3); width: 26px; height: 26px; border-radius: var(--game-r);
-  font-size: .85em; display: grid; place-items: center;
-  border: var(--game-border-w) solid var(--game-border); }
-.sel-x:hover { background: var(--surface-2); color: var(--ink); }
-
-/* flat grid — every action visible, no hidden menus */
-.sel-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem; }
-.sel-act { display: flex; flex-direction: column; align-items: center; gap: .25rem;
-  padding: .5rem .3rem; border-radius: var(--game-r); text-align: center;
-  color: var(--ink); background: var(--surface);
-  border: var(--game-border-w) solid var(--game-border);
-  font-weight: 700; font-size: .78em; text-transform: uppercase;
-  letter-spacing: .03em; }
-.sel-act:hover { background: var(--surface-2); border-color: var(--accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 30%, transparent); }
-.sel-act:active { transform: scale(.95); }
-.sel-act.ai { color: var(--ai-2); }
-.sel-act.ai:hover { border-color: var(--ai-2);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--ai) 30%, transparent); }
-.sa-ic { font-size: 1.2rem; }
-.sa-lb { line-height: 1.1; }
+/* selection bar removed — hotbar.js owns selection UI now; see selection-bar.js for utility functions */
 
 /* ---------------------- tool guides ---------------------- */
 .guide-btn { font-weight: 800; color: var(--ink-3);
@@ -838,7 +805,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   #touch-companion { display: none !important; }
   .kbd-badge { display: none; }
   .rail-quick { display: none; }
-  #sel-bar { display: none; }  /* hotbar handles selection actions now */
+  /* sel-bar removed — hotbar handles selection actions */
   .quick-actions { bottom: calc(110px + env(safe-area-inset-bottom) + 8px); right: 8px; left: 8px;
     justify-content: center; gap: 10px; }
   .qa-chip { padding: 10px 14px; border-radius: 14px; font-size: .85rem; }
@@ -863,7 +830,7 @@ body.no-doc #touch-companion { display: none; }
 #scene3d-host canvas { width: 100%; height: 100%; display: block; touch-action: none; }
 /* 2D canvas overlays the 3D host only during texture-paint mode */
 body[data-mode="paint"] #view-canvas { z-index: 2; }
-body[data-mode="3d"] #sel-bar { display: none; }
+/* sel-bar 3D override removed — bar itself is gone */
 
 .s3-row { display: flex; gap: .3rem; align-items: center; margin: .3rem 0; flex-wrap: wrap; }
 .s3-row .text-btn { flex: 1; white-space: nowrap; font-size: .82em; padding: .4em .6em; }

@@ -1507,7 +1507,7 @@ window.GF = window.GF || {};
   }
 
   /* Selection bar — delegated to ui/selection-bar.js (GF.selectionBar) */
-  function updateSelBar() { if (GF.selectionBar) GF.selectionBar.update(); }
+  function updateSelBar() { /* no-op — hotbar owns selection UI */ }
 
   function cropDocTo(x, y, w, h) {
     if (GF.selectionBar) GF.selectionBar.cropTo(x, y, w, h);
