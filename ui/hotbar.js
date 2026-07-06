@@ -322,9 +322,9 @@ GF.hotbar = (function () {
   function wireEvents() {
     // Click delegation
     barEl.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-hotbar]');
+      const btn = e.target.closest('[data-hotbar]');
       if (!btn) return;
-      var action = ACTIONS[btn.dataset.hotbar];
+      const action = ACTIONS[btn.dataset.hotbar];
       if (action) action.action();
     });
 
@@ -355,7 +355,7 @@ GF.hotbar = (function () {
   }
 
   function refresh() {
-    var ctx = detect();
+    const ctx = detect();
     render(ctx);
   }
 
