@@ -438,7 +438,7 @@ window.GF = window.GF || {};
     buildOptbar(name);
     if (name === 'crop') startCrop();
     if (name === 'wand') showWandCoach();
-    if (name === 'scene3d' && GF.scene3dUI) GF.scene3dUI.enter();
+    if (name === 'scene3d') { show3DCoach(); if (GF.scene3dUI) GF.scene3dUI.enter(); }
     // Notify Game Deck modules
     window.dispatchEvent(new CustomEvent('pt:toolchange', { detail: { tool: name, prev } }));
     if (GF.transformPad) GF.transformPad.refresh();
@@ -460,6 +460,23 @@ window.GF = window.GF || {};
     const dismiss = () => { try { localStorage.setItem('forge.wandSeen', '1'); } catch (e) {} if (c.parentNode) c.remove(); };
     $('#coach-ok').addEventListener('click', dismiss);
     GF.select.onChange(() => { if (GF.select.has() && document.body.contains(c)) dismiss(); });  // or auto-dismiss on first real selection
+  }
+
+  /* First-run coach mark for 3D workspace: show once to highlight the
+     2D→3D converter power (competitor research: Monster Mash pattern). */
+  function show3DCoach() {
+    let seen; try { seen = localStorage.getItem('forge.3dSeen'); } catch (e) { return; }
+    if (seen || $('#coach')) return;
+    const c = document.createElement('div'); c.id = 'coach';
+    c.innerHTML = `<div class="coach-card">
+        <b>✦ 3D Workspace</b>
+        <p>Add primitives or import GLB models, then pose and texture them.
+           Use <b>Extrude</b>, <b>Relief</b>, or <b>Lathe</b> to convert any 2D layer into 3D.</p>
+        <button class="text-btn primary sm" id="coach-ok">Got it</button>
+      </div>`;
+    $('#viewport').appendChild(c);
+    const dismiss = () => { try { localStorage.setItem('forge.3dSeen', '1'); } catch (e) {} if (c.parentNode) c.remove(); };
+    $('#coach-ok').addEventListener('click', dismiss);
   }
 
   function buildOptbar(name) {
