@@ -1,9 +1,9 @@
 /* PixelTriks — service worker (offline app shell).
    Registers only over http(s); a no-op when the app is opened from file://. */
 'use strict';
-const CACHE = 'forge-v34';
+const CACHE = 'forge-v35';
 const ASSETS = [
-  './', './index.html', './manifest.webmanifest', './icon.svg',
+  './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './ui/forge.css', './ui/forge-ui.js', './ui/scene3d-ui.js', './ui/assets-ui.js',
   './ui/timeline-ui.js', './ui/polish.js', './ui/three-bundle.js',
   './ui/hotbar.js', './ui/transform-pad.js', './ui/selection-bar.js', './ui/tool-guides.js',

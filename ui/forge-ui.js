@@ -1589,10 +1589,7 @@ window.GF = window.GF || {};
     else { /* fallback inline */ }
     refreshLayers(); setDims();
   }
-  function cropToSelection() {
-    const b = GF.select.bounds(); if (!b) return U.toast('Nothing selected');
-    cropDocTo(b.x, b.y, b.w, b.h); U.toast('Cropped to selection ' + b.w + '×' + b.h);
-  }
+  /* cropToSelection removed — hotbar sel-crop action (hotbar.js) is the canonical path */
 
   /* Tool guides — delegated to ui/tool-guides.js (GF.toolGuides) */
   let curTool = 'brush';

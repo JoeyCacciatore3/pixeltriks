@@ -193,7 +193,6 @@ body:not(.no-doc) .topbar-action { display: none; }
 #optbar .seg button:hover { color: var(--ink); background: var(--surface-2); }
 #optbar .seg button.on { background: var(--accent); color: var(--accent-ink); }
 #optbar .opt-hint { font-size: .72em; color: var(--ink-3); line-height: 1.3; font-weight: 500; }
-/* .opt-sep removed — unused */
 #optbar label.opt-check { display: flex; align-items: center; gap: .4rem; font-size: .82em;
   font-weight: 600; color: var(--ink-2); cursor: pointer; }
 #optbar .text-btn { width: 100%; justify-content: center; }
@@ -985,20 +984,10 @@ body[data-mode="paint"] #view-canvas { z-index: 2; }
 .ab-icon { display: flex; align-items: center; justify-content: center; line-height: 1; }
 .ab-label { font: 600 .62em/1 var(--mono); text-transform: uppercase; letter-spacing: .03em; opacity: .8; white-space: nowrap; }
 
-/* face-button color accents (ABXY-inspired) */
-.hb-btn.ab-face-a { color: var(--face-a); }
-.hb-btn.ab-face-a:hover { border-color: var(--face-a); box-shadow: 0 0 8px color-mix(in srgb, var(--face-a) 40%, transparent); }
-.hb-btn.ab-face-b { color: var(--face-b); }
-.hb-btn.ab-face-b:hover { border-color: var(--face-b); box-shadow: 0 0 8px color-mix(in srgb, var(--face-b) 40%, transparent); }
-.hb-btn.ab-face-x { color: var(--face-x); }
-.hb-btn.ab-face-x:hover { border-color: var(--face-x); box-shadow: 0 0 8px color-mix(in srgb, var(--face-x) 40%, transparent); }
-.hb-btn.ab-face-y { color: var(--face-y); }
-.hb-btn.ab-face-y:hover { border-color: var(--face-y); box-shadow: 0 0 8px color-mix(in srgb, var(--face-y) 40%, transparent); }
 .ab-sep { width: 1px; height: 28px; background: var(--line); margin: 0 2px; flex-shrink: 0; }
 .ab-ai { color: var(--ai-2); border-color: var(--ai); }
 .ab-ai:hover { background: color-mix(in srgb, var(--ai) 12%, var(--surface));
   box-shadow: 0 0 8px color-mix(in srgb, var(--ai) 30%, transparent); }
-.ab-accent { color: var(--accent); border-color: var(--accent); }
 
 /* ============================= GUIDE PANE ================================ */
 .guide-pane { font-size: .88em; line-height: 1.5; color: var(--ink-2); }
