@@ -105,6 +105,19 @@ window.GF = window.GF || {};
     wireGestures();
     wireProFeatures();
     wireActionBar();
+    // Inject keyboard shortcut badges on tool buttons
+    const BADGE_MAP = { move:'V', select:'M', wand:'W', crop:'C', brush:'B',
+      fill:'G', gradient:'D', text:'T', shape:'U' };
+    $('#toolrail .tool[data-tool]').forEach(btn => {
+      const key = BADGE_MAP[btn.dataset.tool];
+      if (key) {
+        const badge = document.createElement('span');
+        badge.className = 'kbd-badge';
+        badge.textContent = key;
+        btn.appendChild(badge);
+      }
+    });
+
     // Game Deck modules — init after main UI
     if (GF.transformPad) GF.transformPad.init();
     if (GF.hotbar) GF.hotbar.init();
@@ -369,7 +382,16 @@ window.GF = window.GF || {};
     $('#btn-zoom-in').addEventListener('click', () => zoomBtn(1.25));
     $('#btn-zoom-out').addEventListener('click', () => zoomBtn(0.8));
     $('#zoom-label').addEventListener('click', () => { GF.view.zoomFit(); layoutCrop(); });
+    const dims = $('#doc-dims');
+    if (dims) dims.addEventListener('click', () => { if (D.doc.open) openImageSize(); });
     $('#btn-menu').addEventListener('click', openMenu);
+    const histBtn = $('#btn-history');
+    if (histBtn) histBtn.addEventListener('click', () => {
+      switchPanel('layers'); // layers tab has history
+      const p = $('#panel'); if (p && !p.classList.contains('open') && matchMedia('(max-width:880px)').matches) p.classList.add('open');
+    });
+    const kbdBtn = $('#btn-shortcuts');
+    if (kbdBtn) kbdBtn.addEventListener('click', openCheatSheet);
   }
   function zoomBtn(factor) {
     const r = $('#viewport').getBoundingClientRect();
@@ -1453,6 +1475,55 @@ window.GF = window.GF || {};
     GF.ui.init();
     $('#empty-state').hidden = false;
   }
+  /* =================================================================
+     Status bar — thin system HUD at the very bottom
+     ================================================================= */
+  function updateStatusBar() {
+    const sbLayers = $('#sb-layers');
+    const sbTool = $('#sb-tool');
+    const sbMode = $('#sb-mode');
+    const sbMem = $('#sb-mem');
+    const sbGpu = $('#sb-gpu');
+
+    if (sbLayers) {
+      const count = D.doc.open ? (D.doc.layers || []).length : 0;
+      sbLayers.textContent = '◧ ' + count + ' layer' + (count !== 1 ? 's' : '');
+    }
+    if (sbTool) {
+      const labels = { move:'Move', select:'Select', wand:'Wand', crop:'Crop', brush:'Brush',
+        fill:'Fill', gradient:'Gradient', text:'Text', shape:'Shape', scene3d:'3D Scene', pan:'Pan' };
+      sbTool.textContent = '▸ ' + (labels[curTool] || curTool);
+    }
+    if (sbMode) {
+      const mode = document.body.dataset.mode || '2d';
+      sbMode.textContent = '● ' + mode.toUpperCase();
+    }
+    if (sbMem && performance.memory) {
+      const mb = Math.round(performance.memory.usedJSHeapSize / 1048576);
+      sbMem.textContent = mb + ' MB';
+    } else if (sbMem) {
+      sbMem.textContent = '—';
+    }
+    if (sbGpu) {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      sbGpu.textContent = gl ? '⬡ WebGL2' : '⬡ WebGL';
+    }
+  }
+
+  // Wire status bar updates to existing events
+  const origRefreshLayers = refreshLayers;
+  function patchedRefreshLayers() {
+    origRefreshLayers();
+    updateStatusBar();
+  }
+  // Re-assign the reference used by the closure
+  GF.ui.refreshLayers = patchedRefreshLayers;
+
+  // Also update on tool change via the event bus
+  window.addEventListener('pt:toolchange', updateStatusBar);
+  window.addEventListener('pt:modechange', updateStatusBar);
+  window.addEventListener('pt:docopen', updateStatusBar);
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();

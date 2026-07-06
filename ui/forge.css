@@ -31,6 +31,12 @@
   --game-r:        8px;
   --game-glow:     0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);
   --game-active-bg: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  /* retro gamepad — bevel system */
+  --bevel-hi:      rgba(255,255,255,.08);
+  --bevel-lo:      rgba(0,0,0,.25);
+  --groove:        #1a1d24;
+  --groove-hi:     #3a3f4d;
+  --mono:          "Pixelify Sans", "JetBrains Mono", ui-monospace, monospace;
   /* metrics */
   --bar-h:     clamp(48px, 6vh, 56px);
   --rail-w:    92px;
@@ -121,6 +127,10 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
   gap: .5rem; padding: 0 .6rem;
   background: var(--bg-2); border-bottom: var(--game-border-w) solid var(--game-border);
   z-index: 30;
+  /* subtle scanline texture — very faint, just enough to feel retro */
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,.04) 2px, rgba(0,0,0,.04) 4px);
 }
 .tb-group { display: flex; align-items: center; gap: .35rem; }
 .tb-left  { justify-self: start; }
@@ -188,16 +198,18 @@ body:not(.no-doc) .topbar-action { display: none; }
   flex: 1 1 auto; min-height: 0; position: relative;
   display: grid;
   grid-template-columns: var(--rail-w) auto 1fr var(--panel-w);
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   grid-template-areas:
     "toolrail optbar viewport panel"
-    "toolrail optbar actionbar panel";
+    "toolrail optbar actionbar panel"
+    "statusbar statusbar statusbar statusbar";
 }
 #toolrail  { grid-area: toolrail; }
 #optbar    { grid-area: optbar; }
 #viewport  { grid-area: viewport; }
 #panel     { grid-area: panel; }
 #actionbar { grid-area: actionbar; }
+#statusbar { grid-area: statusbar; }
 
 /* tool rail — always visible: desktop = left column, mobile = bottom bar */
 #toolrail {
@@ -296,11 +308,13 @@ body:not(.no-doc) .topbar-action { display: none; }
 }
 .ptab {
   flex: 1; padding: .5em .3em; font-weight: 700; font-size: .72rem;
+  font-family: var(--mono);
   text-transform: uppercase; letter-spacing: .08em;
   color: var(--ink-3); background: transparent;
   border: var(--game-border-w) solid transparent;
   border-radius: 0; position: relative;
-  transition: color .15s, background .15s;
+  transition: color .15s, background .15s, box-shadow .15s;
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo);
 }
 .ptab:first-child { border-radius: var(--game-r) 0 0 var(--game-r); }
 .ptab:last-child { border-radius: 0 var(--game-r) var(--game-r) 0; }
@@ -308,7 +322,8 @@ body:not(.no-doc) .topbar-action { display: none; }
 .ptab.on {
   color: var(--accent-ink, #fff); background: var(--accent);
   border-color: var(--accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -1px 0 rgba(0,0,0,.2),
+    0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .panel-body { flex: 1; overflow-y: auto; padding: .7rem; }
 .ptab-pane { animation: fade .2s ease; }
@@ -440,8 +455,16 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   transition: opacity .2s ease, transform .2s ease; }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* document dimensions readout */
-.dims { font-size: .82em; color: var(--ink-3); font-variant-numeric: tabular-nums; padding: 0 .3rem; }
+/* document dimensions readout — clickable badge */
+.dims {
+  font: 600 .72em/1 var(--mono); color: var(--ink-3);
+  font-variant-numeric: tabular-nums; padding: .25em .5em;
+  background: var(--bg); border-radius: var(--game-r);
+  border: 1px solid var(--game-border);
+  cursor: pointer; transition: .12s color, .12s border-color;
+}
+.dims:hover { color: var(--ink-2); border-color: var(--accent); }
+.dims:empty { display: none; }
 
 /* generic modal — game-deck framed */
 .fs-modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center;
@@ -643,6 +666,50 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .text-btn.primary:active { box-shadow: 0 1px 0 color-mix(in srgb, var(--accent) 50%, #000); }
 #topbar, #panel, #toolrail { transition: background .25s ease; }
 
+/* ── retro gamepad bevel ── */
+.text-btn, .ab-btn, .pro-btn, .tpad-btn, .intent {
+  box-shadow: inset 0 1px 0 var(--bevel-hi), inset 0 -1px 0 var(--bevel-lo); }
+.text-btn:active, .ab-btn:active, .pro-btn:active, .tpad-btn:active {
+  box-shadow: inset 0 1px 0 var(--bevel-lo), inset 0 -1px 0 var(--bevel-hi); }
+.text-btn.primary { box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -1px 0 rgba(0,0,0,.3),
+  0 1px 0 color-mix(in srgb, var(--accent) 50%, #000), var(--shadow-sm); }
+
+/* ── grooved separators ── */
+.rail-sep {
+  background: none;
+  border-top: 1px solid var(--groove);
+  border-bottom: 1px solid var(--groove-hi);
+  height: 0; }
+.ab-sep {
+  background: none;
+  border-left: 1px solid var(--groove);
+  border-right: 1px solid var(--groove-hi);
+  width: 0; }
+
+/* ── shortcut badges on tool buttons ── */
+.tool .kbd-badge {
+  position: absolute; top: 3px; right: 3px;
+  font: 600 .5rem/1 var(--mono);
+  color: var(--ink-3); background: var(--bg);
+  padding: 1px 3px; border-radius: 3px;
+  border: 1px solid var(--game-border);
+  pointer-events: none; opacity: .7;
+  text-transform: uppercase; letter-spacing: .02em; }
+.tool:hover .kbd-badge { opacity: 1; color: var(--ink-2); }
+.tool.on .kbd-badge { opacity: 1; color: var(--accent-2); border-color: var(--accent); }
+.tool { position: relative; }
+
+/* ── active tool pulse ── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: var(--game-glow), inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+  50% { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+}
+.tool.on { animation: glow-pulse 2.5s ease-in-out infinite; }
+
+/* ── mono font for status / stats ── */
+.mono { font-family: var(--mono); }
+
 /* ===================================================================
    RESPONSIVE — phones & narrow tablets
    =================================================================== */
@@ -693,7 +760,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   .tpad {
     position: fixed; bottom: 70px; left: 8px; z-index: 50;
     margin-top: 0; border-top: 0;
-    grid-template-columns: repeat(3, 32px); grid-template-rows: repeat(3, 32px);
+    grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px);
     gap: 2px; padding: 3px;
     background: color-mix(in srgb, var(--bg) 94%, transparent);
     backdrop-filter: blur(10px);
@@ -709,6 +776,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
     grid-template-areas: "viewport";
     padding-bottom: 108px; /* 62px toolrail + 44px hotbar + 2px border */
   }
+  #statusbar { display: none; }
   #optbar { grid-area: unset; }
 
   /* Hotbar: fixed above tool strip */
@@ -748,6 +816,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   body.sheet-open #panel-toggle { display: none; }
   /* P5: Kill touch companion — hotbar + transform pad replace it */
   #touch-companion { display: none !important; }
+  .kbd-badge { display: none; }
   #sel-bar { display: none; }  /* hotbar handles selection actions now */
   .quick-actions { bottom: calc(110px + env(safe-area-inset-bottom) + 8px); right: 8px; left: 8px;
     justify-content: center; gap: 10px; }
@@ -831,10 +900,10 @@ body[data-mode="3d"] #sel-bar { display: none; }
 /* Context label pill — shows what mode the hotbar is in */
 .ab-ctx-label {
   flex: 0 0 auto; padding: 3px 8px; margin-right: 4px;
-  font-size: .56em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  font: 800 .56em/1.6 var(--mono); letter-spacing: .12em; text-transform: uppercase;
   color: var(--accent-2); background: color-mix(in srgb, var(--accent) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  border-radius: 999px; white-space: nowrap; line-height: 1.6;
+  border-radius: 999px; white-space: nowrap;
 }
 
 .ab-btn {
@@ -853,12 +922,27 @@ body[data-mode="3d"] #sel-bar { display: none; }
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 30%, transparent); }
 .ab-btn:active { transform: scale(.95); }
 .ab-icon { display: flex; align-items: center; justify-content: center; line-height: 1; }
-.ab-label { font-size: .62em; text-transform: uppercase; letter-spacing: .03em; opacity: .8; white-space: nowrap; }
+.ab-label { font: 600 .62em/1 var(--mono); text-transform: uppercase; letter-spacing: .03em; opacity: .8; white-space: nowrap; }
 .ab-sep { width: 1px; height: 28px; background: var(--line); margin: 0 2px; flex-shrink: 0; }
 .ab-ai { color: var(--ai-2); border-color: var(--ai); }
 .ab-ai:hover { background: color-mix(in srgb, var(--ai) 12%, var(--surface));
   box-shadow: 0 0 8px color-mix(in srgb, var(--ai) 30%, transparent); }
 .ab-accent { color: var(--accent); border-color: var(--accent); }
+
+/* ============================= SYSTEM STATUS BAR ========================= */
+#statusbar {
+  display: flex; align-items: center;
+  height: 24px; padding: 0 10px; gap: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--groove);
+  font: 500 .62rem/1 var(--mono);
+  color: var(--ink-3); letter-spacing: .02em;
+  overflow: hidden; white-space: nowrap;
+  user-select: none;
+}
+.sb-item { padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+.sb-sep { width: 1px; height: 12px; background: var(--game-border); flex-shrink: 0; }
+.sb-right { margin-left: auto; }
 
 /* ─── TRANSFORM PAD (joystick) ─── */
 /* ─── Transform Pad — embedded at bottom of tool rail ─── */
@@ -878,7 +962,7 @@ body[data-mode="3d"] #sel-bar { display: none; }
 
 .tpad-btn {
   display: flex; align-items: center; justify-content: center;
-  aspect-ratio: 1;
+  aspect-ratio: 1; min-width: 28px; min-height: 28px;
   border-radius: calc(var(--game-r) - 2px);
   border: 1.5px solid var(--game-border);
   background: var(--surface);

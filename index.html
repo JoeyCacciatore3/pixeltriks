@@ -41,7 +41,7 @@
 <!-- High-quality UI type (Inter); degrades to the system stack offline / on file:// -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pixelify+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="ui/forge.css">
 <!-- Three.js (vendored, offline-first) — ui/three-bundle.js statically imports
      it through this map and hands it to core/scene3d.js via window.__THREE_BUNDLE -->
@@ -85,6 +85,12 @@
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
       <span class="kbd">⌘K</span>
     </button>
+    <button class="icon-btn" id="btn-history" title="Undo history" aria-label="Undo history">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+      <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M8 14h8"/></svg>
+    </button>
     <button class="icon-btn" id="btn-theme" title="Toggle light / dark" aria-label="Toggle theme">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
     </button>
@@ -121,8 +127,8 @@
     <button class="tool" data-tool="scene3d" title="3D workspace" aria-label="3D workspace">
       <svg viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><path d="M12 11L4 6.5M12 11l8-4.5M12 11v9"/></svg><span class="tlabel">3D</span></button>
     <span class="rail-sep"></span>
-    <label class="tool color-tool" title="Brush colour">
-      <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></label>
+    <button class="tool color-tool" title="Brush colour" aria-label="Brush colour" type="button">
+      <span class="color-chip"><input type="color" id="brush-color" value="#e8a33d"></span><span class="tlabel">Color</span></button>
 
   </nav>
 
@@ -177,7 +183,7 @@
     <div class="panel-body">
       <!-- ADJUST TAB (was Image) -->
       <div class="ptab-pane" data-pane="adjust" hidden>
-        <h3 class="panel-h first">Light &amp; colour</h3>
+        <h2 class="panel-h first">Light &amp; colour</h2>
         <canvas id="histogram" class="histogram" width="288" height="48" aria-hidden="true" title="Luminance histogram"></canvas>
 
         <div class="adj-group" id="adj-sliders"><!-- sliders injected by JS --></div>
@@ -188,7 +194,7 @@
           <button class="text-btn primary wide" id="adj-apply">Apply</button>
         </div>
 
-        <h3 class="panel-h">Filters</h3>
+        <h2 class="panel-h">Filters</h2>
         <div class="filter-strip" id="filter-strip"><!-- presets injected --></div>
 
         <details class="panel-section">
@@ -232,6 +238,19 @@
 
   <!-- BOTTOM ACTION BAR — populated dynamically by hotbar.js based on context -->
   <div id="actionbar"></div>
+
+  <!-- SYSTEM STATUS BAR — thin HUD footer with live stats -->
+  <div id="statusbar">
+    <span class="sb-item" id="sb-gpu" title="GPU status">⬡ WebGL2</span>
+    <span class="sb-sep"></span>
+    <span class="sb-item" id="sb-layers" title="Layers">◧ 0 layers</span>
+    <span class="sb-sep"></span>
+    <span class="sb-item" id="sb-tool" title="Active tool">▸ Move</span>
+    <span class="sb-sep"></span>
+    <span class="sb-item" id="sb-mode" title="Mode">● 3D</span>
+    <span class="sb-sep"></span>
+    <span class="sb-item sb-right" id="sb-mem" title="Memory estimate">—</span>
+  </div>
 
 </main>
 
