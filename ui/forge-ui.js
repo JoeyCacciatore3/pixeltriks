@@ -422,7 +422,7 @@ window.GF = window.GF || {};
   }
 
   function wireTools() {
-    $('#toolrail .tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+    $$('#toolrail .tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
     $('#brush-color').addEventListener('input', e => { V().brush.color = e.target.value; });
 
     // ── Face-button colour palette ──
@@ -461,7 +461,7 @@ window.GF = window.GF || {};
     });
 
     // Click face button → set brush color
-    $('.face-swatch').forEach((btn, i) => {
+    $$('.face-swatch').forEach((btn, i) => {
       btn.addEventListener('click', () => {
         if (recentColors[i]) {
           colorInput.value = recentColors[i];
