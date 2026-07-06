@@ -117,7 +117,7 @@ window.GF = window.GF || {};
     // Inject keyboard shortcut badges on tool buttons
     const BADGE_MAP = { move:'V', select:'M', wand:'W', crop:'C', brush:'B',
       fill:'G', gradient:'D', text:'T', shape:'U' };
-    $('#toolrail .tool[data-tool]').forEach(btn => {
+    document.querySelectorAll('#toolrail .tool[data-tool]').forEach(btn => {
       const key = BADGE_MAP[btn.dataset.tool];
       if (key) {
         const badge = document.createElement('span');
