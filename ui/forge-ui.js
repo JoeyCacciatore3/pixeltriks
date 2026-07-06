@@ -1402,7 +1402,7 @@ window.GF = window.GF || {};
     checkRestore();
 
     // Wire assets tab — 3D primitives
-    $('#asset-prims .pro-btn[data-prim]').forEach(b => b.addEventListener('click', () => {
+    $$('#asset-prims .pro-btn[data-prim]').forEach(b => b.addEventListener('click', () => {
       if (GF.scene3d) GF.scene3d.addPrimitive(b.dataset.prim);
       else U.toast('Switch to 3D mode first');
     }));
