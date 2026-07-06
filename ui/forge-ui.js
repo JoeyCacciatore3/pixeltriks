@@ -114,6 +114,19 @@ window.GF = window.GF || {};
     qk('#qk-zoomfit', () => GF.view.zoomFit());
     qk('#qk-newlayer', () => run('addLayer', {}));
 
+    // Tool rail scroll fade — remove bottom mask when fully scrolled
+    const rail = $('#toolrail');
+    if (rail) {
+      const checkScroll = () => {
+        const atEnd = rail.scrollHeight - rail.scrollTop - rail.clientHeight < 4;
+        rail.classList.toggle('scrolled-end', atEnd);
+        rail.classList.toggle('no-scroll', rail.scrollHeight <= rail.clientHeight);
+      };
+      rail.addEventListener('scroll', checkScroll, { passive: true });
+      checkScroll();  // initial check
+      new ResizeObserver(checkScroll).observe(rail);
+    }
+
     // Inject keyboard shortcut badges on tool buttons
     const BADGE_MAP = { move:'V', select:'M', wand:'W', crop:'C', brush:'B',
       fill:'G', gradient:'D', text:'T', shape:'U' };
@@ -777,17 +790,17 @@ window.GF = window.GF || {};
     modal({
       title: 'Export',
       body: (D.doc.open ? `
-        <h4 class="m-sec">Image</h4>
+        <h3 class="m-sec">Image</h3>
         <div class="row"><label>Format<select id="m-fmt"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></label>
         <label>Scale<select id="m-scale"><option value="1">1× (${D.doc.width}×${D.doc.height})</option><option value="2">2×</option><option value="0.5">0.5×</option></select></label></div>` : '')
       + (has3d ? `
-        <h4 class="m-sec">3D scene</h4>
+        <h3 class="m-sec">3D scene</h3>
         <div class="row m-actions">
           <button class="text-btn ghost" data-x="glb">GLB model</button>
           <button class="text-btn ghost" data-x="page">Interactive web page…</button>
         </div>` : '')
       + `
-        <h4 class="m-sec">Project</h4>
+        <h3 class="m-sec">Project</h3>
         <div class="row m-actions">
           <button class="text-btn ghost" data-x="save">Save project file</button>
           ${D.doc.open ? '<button class="text-btn ghost" data-x="layers">Layers as files</button>' : ''}

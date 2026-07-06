@@ -224,6 +224,13 @@ body:not(.no-doc) .topbar-action { display: none; }
   background: var(--bg-2); border-right: var(--game-border-w) solid var(--game-border);
   overflow-y: auto; z-index: 15;
   grid-area: toolrail;
+  /* fade hint when rail scrolls — reveals content below fold */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+/* remove fade once fully scrolled or when all content fits */
+#toolrail.scrolled-end, #toolrail.no-scroll {
+  mask-image: none; -webkit-mask-image: none;
 }
 .tool {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -290,7 +297,7 @@ body:not(.no-doc) .topbar-action { display: none; }
 .empty-card h1 { font: 800 clamp(1.5rem, 3.5vw, 2rem)/1.1 var(--mono); margin: .3rem 0 .15rem; }
 .empty-card p { color: var(--ink-2); margin: .2rem 0 1rem; line-height: 1.5; font-size: .9em; }
 .empty-actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
-.empty-hint { font-size: .78em; color: var(--ink-3); margin-top: .8rem; }
+.empty-hint { font-size: .78em; color: var(--ink-2); margin-top: .8rem; }  /* ink-2 for 4.5:1 contrast */
 
 /* intent-first launcher — controller deck cards */
 .intent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: 1rem 0 .8rem; }
@@ -307,7 +314,7 @@ body:not(.no-doc) .topbar-action { display: none; }
   color: var(--accent-2); }
 .intent .in-ic svg { width: 18px; height: 18px; }
 .intent b { font: 700 .85em/1.2 var(--mono); }
-.intent small { color: var(--ink-3); font-size: .72em; }
+.intent small { color: var(--ink-2); font-size: .72em; }  /* ink-2 passes 4.5:1 contrast; ink-3 was 3.4:1 */
 @media (max-width: 560px) { .intent-grid { grid-template-columns: repeat(2, 1fr); } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 
@@ -524,7 +531,7 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .size-card:hover { border-color: var(--line); }
 .size-card.on { border-color: var(--accent); color: var(--accent-2);
   box-shadow: var(--game-glow); }
-.size-card small { display: block; color: var(--ink-3); font-weight: 400; font-size: .9em; }
+.size-card small { display: block; color: var(--ink-2); font-weight: 400; font-size: .9em; }  /* ink-2 for 4.5:1 contrast */
 
 
 /* ---------------------- accessibility ---------------------- */
@@ -982,7 +989,7 @@ body[data-mode="paint"] #view-canvas { z-index: 2; }
 
 .tpad-btn {
   display: flex; align-items: center; justify-content: center;
-  aspect-ratio: 1; min-width: 28px; min-height: 28px;
+  aspect-ratio: 1; min-width: 44px; min-height: 44px;  /* WCAG 2.5.8: 44×44 touch target */
   border-radius: calc(var(--game-r) - 2px);
   border: 1.5px solid var(--game-border);
   background: var(--surface);
