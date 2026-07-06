@@ -37,6 +37,11 @@
   --groove:        #1a1d24;
   --groove-hi:     #3a3f4d;
   --mono:          "Pixelify Sans", "JetBrains Mono", ui-monospace, monospace;
+  /* face-button palette (ABXY-inspired action categories) */
+  --face-a:        #5bbf7a;  /* green — confirm / primary */
+  --face-b:        #e5634d;  /* red — destructive / cancel */
+  --face-x:        #5b9fd6;  /* blue — utility / info */
+  --face-y:        #e8a33d;  /* yellow — creative / accent */
   /* metrics */
   --bar-h:     clamp(48px, 6vh, 56px);
   --rail-w:    92px;
@@ -139,9 +144,10 @@ button { font-family: inherit; color: inherit; cursor: pointer; border: 0;
 /* P6: Hide AI + Export from topbar when hotbar has them (doc open).
    They stay as hidden triggers — hotbar clicks route through them. */
 body:not(.no-doc) .topbar-action { display: none; }
-.brand { display: flex; align-items: center; gap: .4rem; font-weight: 800;
-  letter-spacing: .2px; margin: 0 .3rem; }
-.brand-mark { color: var(--accent); font-size: 1.1em; }
+.brand { display: flex; align-items: center; gap: .4rem; font: 800 1em/1 var(--mono);
+  letter-spacing: .5px; margin: 0 .3rem; }
+.brand-mark { color: var(--accent); font-size: 1.2em;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 50%, transparent); }
 .menu-btn { display: none; }
 
 .zoom-pill { display: flex; align-items: center; background: var(--surface);
@@ -233,7 +239,7 @@ body:not(.no-doc) .topbar-action { display: none; }
   box-shadow: var(--game-glow), inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .tool svg { width: 22px; height: 22px; }
-.tlabel { font-size: 9.5px; line-height: 1; font-weight: 700; letter-spacing: .3px;
+.tlabel { font: 700 9.5px/1 var(--mono); letter-spacing: .3px;
   text-transform: uppercase; color: var(--ink-3); }
 .tool:hover .tlabel { color: var(--ink-2); }
 .tool.on .tlabel { color: var(--accent-2); }
@@ -281,7 +287,7 @@ body:not(.no-doc) .topbar-action { display: none; }
 .empty-card { text-align: center; max-width: 560px; animation: pop .4s ease; }
 .empty-mark { font-size: 2.8rem; color: var(--accent);
   filter: drop-shadow(0 4px 16px color-mix(in srgb, var(--accent) 40%, transparent)); }
-.empty-card h1 { font-size: clamp(1.5rem, 3.5vw, 2rem); margin: .3rem 0 .15rem; font-weight: 800; }
+.empty-card h1 { font: 800 clamp(1.5rem, 3.5vw, 2rem)/1.1 var(--mono); margin: .3rem 0 .15rem; }
 .empty-card p { color: var(--ink-2); margin: .2rem 0 1rem; line-height: 1.5; font-size: .9em; }
 .empty-actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
 .empty-hint { font-size: .78em; color: var(--ink-3); margin-top: .8rem; }
@@ -300,7 +306,7 @@ body:not(.no-doc) .topbar-action { display: none; }
   border-radius: var(--game-r); background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-2); }
 .intent .in-ic svg { width: 18px; height: 18px; }
-.intent b { font-size: .85em; font-weight: 700; }
+.intent b { font: 700 .85em/1.2 var(--mono); }
 .intent small { color: var(--ink-3); font-size: .72em; }
 @media (max-width: 560px) { .intent-grid { grid-template-columns: repeat(2, 1fr); } }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } }
@@ -351,10 +357,12 @@ body:not(.no-doc) .topbar-action { display: none; }
 
 /* Section headers — game-deck accent bar */
 .panel-h {
-  font-size: .65rem; text-transform: uppercase; letter-spacing: .14em;
-  color: var(--accent); margin: 1.2rem 0 .5rem; font-weight: 700;
+  font: 700 .65rem/1.2 var(--mono); text-transform: uppercase; letter-spacing: .14em;
+  color: var(--accent); margin: 1.2rem 0 .5rem;
   padding-left: .4rem;
   border-left: 3px solid var(--accent);
+  border-top: 1px solid var(--groove-hi);
+  padding-top: .6rem;
 }
 .panel-h.first { margin-top: .2rem; }
 
@@ -911,6 +919,16 @@ body[data-mode="paint"] #view-canvas { z-index: 2; }
 .ab-btn:active { transform: scale(.95); }
 .ab-icon { display: flex; align-items: center; justify-content: center; line-height: 1; }
 .ab-label { font: 600 .62em/1 var(--mono); text-transform: uppercase; letter-spacing: .03em; opacity: .8; white-space: nowrap; }
+
+/* face-button color accents (ABXY-inspired) */
+.hb-btn.ab-face-a { color: var(--face-a); }
+.hb-btn.ab-face-a:hover { border-color: var(--face-a); box-shadow: 0 0 8px color-mix(in srgb, var(--face-a) 40%, transparent); }
+.hb-btn.ab-face-b { color: var(--face-b); }
+.hb-btn.ab-face-b:hover { border-color: var(--face-b); box-shadow: 0 0 8px color-mix(in srgb, var(--face-b) 40%, transparent); }
+.hb-btn.ab-face-x { color: var(--face-x); }
+.hb-btn.ab-face-x:hover { border-color: var(--face-x); box-shadow: 0 0 8px color-mix(in srgb, var(--face-x) 40%, transparent); }
+.hb-btn.ab-face-y { color: var(--face-y); }
+.hb-btn.ab-face-y:hover { border-color: var(--face-y); box-shadow: 0 0 8px color-mix(in srgb, var(--face-y) 40%, transparent); }
 .ab-sep { width: 1px; height: 28px; background: var(--line); margin: 0 2px; flex-shrink: 0; }
 .ab-ai { color: var(--ai-2); border-color: var(--ai); }
 .ab-ai:hover { background: color-mix(in srgb, var(--ai) 12%, var(--surface));

@@ -92,7 +92,7 @@ GF.hotbar = (function () {
     'import-model': { icon: I.import,    label: 'Import',   action: () => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.glb,.gltf,.obj,.fbx,.png,.jpg,.webp,.svg'; i.onchange = e => { if (e.target.files[0]) GF.library.handleDrop([e.target.files[0]]); }; i.click(); } },
 
     // ─── 3D object actions ───
-    'obj-delete':   { icon: I.trash,     label: 'Delete',    action: () => run('scene3d.deleteSelected') },
+    'obj-delete':   { icon: I.trash,     label: 'Delete',    action: () => run('scene3d.deleteSelected'), class: 'ab-face-b' },
     'obj-dup':      { icon: I.duplicate, label: 'Duplicate', action: () => run('scene3d.duplicateSelected') },
     'obj-group':    { icon: I.group,     label: 'Group',     action: () => run('scene3d.groupSelected') },
     'obj-material': { icon: I.material,  label: 'Material',  action: () => { const p = $('#panel'); if (p) p.dataset.tab = 'scene'; } },
@@ -100,7 +100,7 @@ GF.hotbar = (function () {
     'obj-flatten':  { icon: I.flatten2d, label: 'To 2D',     action: () => run('scene3d.flattenToLayer') },
 
     // ─── Animation ───
-    'anim-play':    { icon: I.play,  label: 'Play',  action: () => { if (GF.animation) GF.animation.play(); }, class: 'ab-accent' },
+    'anim-play':    { icon: I.play,  label: 'Play',  action: () => { if (GF.animation) GF.animation.play(); }, class: 'ab-face-a' },
     'anim-pause':   { icon: I.pause, label: 'Pause', action: () => { if (GF.animation) GF.animation.pause(); } },
     'anim-stop':    { icon: I.stop,  label: 'Stop',  action: () => { if (GF.animation) GF.animation.stop(); } },
 
@@ -120,7 +120,7 @@ GF.hotbar = (function () {
     'sel-copy':     { icon: I.copy,      label: 'Copy Lyr', action: () => selAction('copyLayer') },
     'sel-crop':     { icon: I.cropSel,   label: 'Crop',     action: () => selAction('crop') },
     'sel-invert':   { icon: I.invert,    label: 'Invert',   action: () => run('select.invert') },
-    'sel-delete':   { icon: I.trash,     label: 'Delete',   action: () => selAction('delete') },
+    'sel-delete':   { icon: I.trash,     label: 'Delete',   action: () => selAction('delete'), class: 'ab-face-b' },
     'sel-expand':   { icon: I.expand,    label: 'Expand',   action: () => selAction('expand') },
     'sel-feather':  { icon: I.feather,   label: 'Feather',  action: () => selAction('feather') },
     'sel-none':     { icon: I.deselect,  label: 'Deselect', action: () => { GF.select.clear(); V().requestRender(); } },
@@ -147,7 +147,7 @@ GF.hotbar = (function () {
     'copy-clip':    { icon: I.clipboard, label: 'Copy',  action: () => run('copyToClipboard') },
 
     // ─── Global / export ───
-    'export':       { icon: I.exportF, label: 'Export', action: () => { const b = document.querySelector('#btn-export'); if (b) b.click(); }, class: 'ab-accent' },
+    'export':       { icon: I.exportF, label: 'Export', action: () => { const b = document.querySelector('#btn-export'); if (b) b.click(); }, class: 'ab-face-a' },
     'ai-tools':     { icon: I.ai,      label: 'AI',     action: () => { if (GF.ui) GF.ui.openAIDialog(); }, class: 'ab-ai' },
 
     // ─── Empty state ───
