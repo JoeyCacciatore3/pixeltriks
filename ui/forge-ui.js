@@ -105,6 +105,15 @@ window.GF = window.GF || {};
     wireGestures();
     wireProFeatures();
     wireActionBar();
+    // Wire quick-action buttons in tool rail
+    const qk = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
+    qk('#qk-fliph', () => run('flipH'));
+    qk('#qk-flipv', () => run('flipV'));
+    qk('#qk-rotcw', () => run('rotateCW'));
+    qk('#qk-rotccw', () => run('rotateCCW'));
+    qk('#qk-zoomfit', () => GF.view.zoomFit());
+    qk('#qk-newlayer', () => run('addLayer', {}));
+
     // Inject keyboard shortcut badges on tool buttons
     const BADGE_MAP = { move:'V', select:'M', wand:'W', crop:'C', brush:'B',
       fill:'G', gradient:'D', text:'T', shape:'U' };
@@ -560,7 +569,8 @@ window.GF = window.GF || {};
     panel.dataset.tab = tab;
     $$('.ptab').forEach(x => { x.classList.toggle('on', x.dataset.tab === tab); x.setAttribute('aria-selected', x.dataset.tab === tab ? 'true' : 'false'); });
     $$('.ptab-pane').forEach(p => p.hidden = p.dataset.pane !== tab);
-    const tg = $('#panel-toggle span'); if (tg) tg.textContent = tab === 'scene' ? 'Properties' : tab === 'layers' ? 'Layers' : 'Adjust';
+    const tg = $('#panel-toggle span');
+    if (tg) tg.textContent = { scene:'Properties', layers:'Layers', adjust:'Adjust', assets:'Assets', guide:'Guide' }[tab] || tab;
   }
 
   /** P4: Context-sensitive panel — auto-switches tab based on what's happening */
@@ -1390,6 +1400,51 @@ window.GF = window.GF || {};
       if (!typing && !modalEl && e.key === '?') { e.preventDefault(); openCheatSheet(); }
     });
     checkRestore();
+
+    // Wire assets tab — 3D primitives
+    $('#asset-prims .pro-btn[data-prim]').forEach(b => b.addEventListener('click', () => {
+      if (GF.scene3d) GF.scene3d.addPrimitive(b.dataset.prim);
+      else U.toast('Switch to 3D mode first');
+    }));
+    const importModel = $('#asset-import-model');
+    if (importModel) importModel.addEventListener('click', pickFile);
+    const importTex = $('#asset-import-texture');
+    if (importTex) importTex.addEventListener('click', pickFile);
+
+    // Wire guide tab — updates on tool change
+    window.addEventListener('pt:toolchange', updateGuide);
+    updateGuide();
+  }
+
+  /* ---- Context-sensitive guide content ---- */
+  const GUIDE_CONTENT = {
+    move: { title: 'Move Tool', keys: [['V','Select this tool'],['Drag','Move active layer'],['Shift+Drag','Constrain axis']], tip: 'The transform pad (bottom-left) lets you nudge 1px at a time. Hold Shift for 10px steps.' },
+    select: { title: 'Marquee Select', keys: [['M','Select this tool'],['Shift+Drag','Add to selection'],['Alt+Drag','Subtract'],['Ctrl+A','Select all']], tip: 'After selecting, use the action bar to fill, delete, cut out, or apply AI effects.' },
+    wand: { title: 'Smart Select', keys: [['W','Select this tool'],['Click','Select similar pixels'],['Shift+Click','Add'],['Alt+Click','Subtract']], tip: 'Adjust Tolerance in the tool options to control how much is selected. Higher = more forgiving.' },
+    crop: { title: 'Crop Tool', keys: [['C','Select this tool'],['Drag handles','Resize crop area'],['Drag center','Move crop area']], tip: 'Use the aspect ratio presets in tool options. Straighten slider rotates before cropping.' },
+    brush: { title: 'Brush Tool', keys: [['B','Select this tool'],['[/]','Decrease/increase size'],['Alt+Click','Pick color'],['Shift+Click','Straight line']], tip: 'Toggle between Paint and Erase modes in tool options. Enable Pixel mode for crisp 1px drawing.' },
+    fill: { title: 'Fill Tool', keys: [['G','Select this tool'],['Click','Flood fill area']], tip: 'Adjust Tolerance to control how far the fill spreads. Lower = more precise boundaries.' },
+    gradient: { title: 'Gradient Tool', keys: [['D','Select this tool'],['Drag','Draw gradient']], tip: 'Choose Linear or Radial in tool options. Enable "Fade to transparent" for overlay effects.' },
+    text: { title: 'Text Tool', keys: [['T','Select this tool'],['Click canvas','Place text']], tip: 'Double-click a text layer in the Layers panel to re-edit it. Add outlines for readable text on any background.' },
+    shape: { title: 'Shape Tool', keys: [['U','Select this tool'],['Drag','Draw shape'],['Shift+Drag','Constrain proportions']], tip: 'Choose between Rect, Ellipse, and Line. Toggle Fill on/off for outlined vs filled shapes.' },
+    scene3d: { title: '3D Workspace', keys: [['Orbit','Left-drag'],['Pan','Middle-drag / Shift+drag'],['Zoom','Scroll wheel'],['Delete','Remove selected'],['F','Frame selected']], tip: 'Add primitives from the Assets tab. Use the transform pad to nudge position, rotation, and scale precisely.' },
+  };
+
+  function updateGuide() {
+    const body = $('#guide-body');
+    if (!body) return;
+    const g = GUIDE_CONTENT[curTool];
+    if (!g) {
+      body.innerHTML = '<p class="guide-intro">No guide available for this tool.</p>';
+      return;
+    }
+    let html = '<div class="guide-section"><h3>Shortcuts</h3>';
+    g.keys.forEach(([key, desc]) => {
+      html += `<p><span class="kbd">${key}</span> ${desc}</p>`;
+    });
+    html += '</div>';
+    html += `<div class="guide-section"><h3>Tips</h3><p>${g.tip}</p></div>`;
+    body.innerHTML = html;
   }
 
   /* ---- action bar buttons (bottom hotbar + any [data-action] element) ---- */
