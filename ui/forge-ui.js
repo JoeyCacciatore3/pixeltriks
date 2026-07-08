@@ -1600,7 +1600,9 @@ window.GF = window.GF || {};
   function boot() {
     GF.view.init();
     GF.ui.init();
-    $('#empty-state').hidden = false;
+    // $('#empty-state').hidden = false;
+    // --- Nate: Start with a default canvas instead of a dialog.
+    GF.api.run('newDoc', { w: 1080, h: 1080, bg: null });
   }
   /* =================================================================
      Status bar — thin system HUD at the very bottom
