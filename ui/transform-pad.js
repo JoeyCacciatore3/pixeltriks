@@ -58,6 +58,18 @@ GF.transformPad = (function () {
     return e && e.shiftKey ? SCALE_STEP_FINE : SCALE_STEP;
   }
 
+  /* ─── Gesture batching (continuous input: gamepad sticks) ───
+     A stick drag calls move/rotate/scale every frame; startGesture pushes
+     ONE history entry for the whole drag instead of one per frame. */
+  let inGesture = false;
+  function startGesture(label) {
+    if (inGesture) return;
+    inGesture = true;
+    const doc = D();
+    if (doc && doc.doc.open && !is3D()) GF.history.push(doc.doc, label || 'transform');
+  }
+  function endGesture() { inGesture = false; }
+
   /* ─── Transform actions ─── */
   function move(dx, dy, dz) {
     if (axisMode === 'x') { dy = 0; dz = 0; }
@@ -76,7 +88,7 @@ GF.transformPad = (function () {
     if (!doc || !doc.doc.open) return;
     const layer = doc.active();
     if (!layer) return;
-    GF.history.push(doc.doc, 'move');
+    if (!inGesture) GF.history.push(doc.doc, 'move');
     layer.ox = (layer.ox || 0) + dx;
     layer.oy = (layer.oy || 0) + dy;
     V().requestRender();
@@ -108,7 +120,7 @@ GF.transformPad = (function () {
     if (!doc || !doc.doc.open) return;
     const layer = doc.active();
     if (!layer) return;
-    GF.history.push(doc.doc, 'rotate');
+    if (!inGesture) GF.history.push(doc.doc, 'rotate');
     layer.rotation = ((layer.rotation || 0) + deg) % 360;
     V().requestRender();
   }
@@ -133,7 +145,7 @@ GF.transformPad = (function () {
     if (!doc || !doc.doc.open) return;
     const layer = doc.active();
     if (!layer) return;
-    GF.history.push(doc.doc, 'scale');
+    if (!inGesture) GF.history.push(doc.doc, 'scale');
     layer.scaleX = (layer.scaleX || 1) * factor;
     layer.scaleY = (layer.scaleY || 1) * factor;
     V().requestRender();
@@ -324,5 +336,5 @@ GF.transformPad = (function () {
   function getAxis() { return axisMode; }
   function refresh() { updateVisibility(); }
 
-  return { init, setAxis, getAxis, refresh };
+  return { init, setAxis, getAxis, refresh, startGesture, endGesture };
 })();

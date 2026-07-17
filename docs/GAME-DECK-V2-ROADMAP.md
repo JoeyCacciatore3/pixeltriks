@@ -212,7 +212,10 @@ same `transform.nudge.*` commands the d-pad fires; both are clients of
    (shortcut + palette), Group (real button), Curves/Color-ops (Adjustments
    section), 3D paint (hotbar slot in 3d-selected).
 
-### Phase D — Physical gamepad (cheap by now — it's just a binding table)
+### Phase D — Physical gamepad (cheap by now — it's just a binding table) — ✅ DONE
+> Shipped as `ui/gamepad.js`. Deviations from the §3 table, v1: A is reserved
+> (confirm only in palette), no L1+R2 clone chord yet, no paint-context brush
+> sizing on L2, zoom not yet on a stick. All are additive follow-ups.
 1. `ui/gamepad.js`: rAF poll, edge detection, scaled-radial dead zone + response
    curve, chord resolution → `GF.commands.execute()`; analog verbs → TransformManager.
 2. Binding table from §3; persistent HUD glyph strip (hotbar = face-button legend).

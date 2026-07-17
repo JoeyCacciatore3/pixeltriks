@@ -285,6 +285,12 @@ GF.hotbar = (function () {
 
     barEl.innerHTML = html;
 
+    // Gamepad legend: X/Y face buttons run the first two slots — badge them
+    // (visible only while a controller is connected, via body.gamepad-on)
+    const btns = barEl.querySelectorAll('.ab-btn');
+    if (btns[0]) btns[0].dataset.pad = 'X';
+    if (btns[1]) btns[1].dataset.pad = 'Y';
+
     // Animate in
     requestAnimationFrame(function () {
       barEl.classList.remove('ab-switching');
@@ -338,5 +344,11 @@ GF.hotbar = (function () {
 
   function getContext() { return currentContext; }
 
-  return { init, refresh, detect, getContext };
+  /** Current context's action ids in order (no separators) — the gamepad's
+      X/Y face buttons execute slots 0 and 1 of this list. */
+  function contextActions() {
+    return (CONTEXTS[currentContext] || []).filter(id => id !== '|');
+  }
+
+  return { init, refresh, detect, getContext, contextActions };
 })();

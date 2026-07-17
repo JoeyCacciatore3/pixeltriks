@@ -785,6 +785,17 @@ GF.scene3d = (function () {
     const pt = new T.Vector3();
     return ray.ray.intersectPlane(plane, pt) ? pt : null;
   }
+  /** Orbit the camera around the controls target (gamepad right stick). */
+  function orbitCamera(dYaw, dPitch) {
+    if (!THREE || !camera || !controls) return;
+    const off = camera.position.clone().sub(controls.target);
+    const sph = new THREE.Spherical().setFromVector3(off);
+    sph.theta -= dYaw;
+    sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi - dPitch));
+    camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+    camera.lookAt(controls.target);
+  }
+
   /** Frame the selected object (or the whole scene) in view. */
   function frame() {
     if (!THREE || !renderer) return;
@@ -907,7 +918,7 @@ GF.scene3d = (function () {
     addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, duplicateObject, setVisible,
     listObjects, getObject, setObject, byId, count,
     // selection / interaction
-    select, selected, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame,
+    select, selected, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame, orbitCamera,
     rendererEl: () => renderer ? renderer.domElement : null,
     // gizmo (TransformControls)
     setGizmoMode: mode => { if (gizmo) gizmo.setMode(mode); },

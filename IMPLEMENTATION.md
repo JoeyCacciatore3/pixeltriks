@@ -47,7 +47,24 @@
       transform pad's ENTIRE 3D path was dead (pad hidden in 3D, would have thrown if shown)
 - [x] sw.js v37 + cache list gains context.js/commands.js (and the missing transform-manager.js)
 
-### Phase D (physical gamepad) — NOT STARTED — registry makes this a pure binding table
+### Phase D: Physical gamepad — COMPLETE ✅ (Jul 17)
+- [x] `ui/gamepad.js` — rAF poll of `navigator.getGamepads()`, per-button edge detection,
+      scaled-radial dead zone + power response curve (1.6), W3C standard mapping
+- [x] Discrete inputs are a PURE BINDING TABLE → `GF.commands.execute()`:
+      d-pad ◄► = undo/redo (Dreams convention) · ▲▼ = 1px nudge · Start = palette ·
+      Select = 2D↔3D · X/Y = hotbar slots 1/2 · B = deselect · L1/R1 = cycle layer/object ·
+      L3 = fit view
+- [x] Dreams-style trigger clutches: left stick moves; hold L2 + stick = rotate,
+      hold R2 + stick = scale; trigger half-press = fine (0.25×) precision
+- [x] Right stick = orbit camera in 3D (new `scene3d.orbitCamera`) / pan canvas in 2D
+- [x] Gesture batching: a stick drag = ONE history entry (`transformPad.startGesture`/
+      `endGesture`; 2D verbs suppress per-frame history pushes during a gesture)
+- [x] Hotbar IS the face-button legend: first two slots get X/Y badges while a
+      controller is connected (`body.gamepad-on`); connect toast teaches the grammar
+- [x] Controller-navigable palette: d-pad browses, A runs, B/Start closes
+      (reuses the palette's own keyboard handling)
+- [x] Chromium rumble on connect/undo/redo (guarded — progressive enhancement);
+      cheat sheet gains a gamepad row; sw v38 caches gamepad.js
 
 
 ## Phase 1: Layout Restructure — COMPLETE ✅

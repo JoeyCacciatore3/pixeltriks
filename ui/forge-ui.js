@@ -143,6 +143,7 @@ window.GF = window.GF || {};
     // Game Deck modules — init after main UI
     if (GF.transformPad) GF.transformPad.init();
     if (GF.hotbar) GF.hotbar.init();
+    if (GF.gamepad) GF.gamepad.init();
     GF.history.onChange(updateUndoRedo);
     setTool('move');
     updateUndoRedo();
@@ -1033,6 +1034,15 @@ window.GF = window.GF || {};
     reg({ id: 'view.zoomOut', title: 'Zoom out', group: 'View', hint: '[', run: () => zoomBtn(0.8) });
     reg({ id: 'view.fit', title: 'Fit to screen', group: 'View', run: () => GF.view.zoomFit() });
     reg({ id: 'view.theme', title: 'Toggle light / dark theme', group: 'View', run: toggleTheme });
+    reg({ id: 'view.commandPalette', title: 'Command palette', group: 'View', hint: '⌘K', palette: false, run: openPalette });
+    reg({ id: 'view.toggleMode', title: 'Toggle 2D / 3D workspace', group: 'View', run: () => {
+      if (document.body.dataset.mode === '3d') {
+        setTool('move');
+        // setTool only exits 3D when the previous tool was scene3d; at boot the
+        // app is mode=3d with tool=move, so force the exit if mode didn't flip
+        if (document.body.dataset.mode === '3d' && GF.scene3dUI) GF.scene3dUI.exit();
+      } else setTool('scene3d');
+    } });
     reg({ id: 'help.shortcuts', title: 'Keyboard shortcuts', group: 'Help', hint: '? / K', run: openCheatSheet });
     reg({ id: 'scene3d.flatten2d', title: 'Flatten 3D render to layer', group: '3D', run: () => { if (GF.scene3d && GF.scene3d.count()) GF.scene3dUI.flattenAndReturn(); else U.toast('Add a 3D object first'); } });
     reg({ id: 'scene3d.exportGlb', title: 'Export GLB (3D scene)', group: '3D', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') });
@@ -1165,6 +1175,7 @@ window.GF = window.GF || {};
       ['Pick colour', 'Alt-click (brush/fill)'], ['Curves', '⌘M'],
       ['Undo / Redo', '⌘Z / ⌘⇧Z'], ['Save project', '⌘S'], ['Export', '⌘E'],
       ['Select all / Invert', '⌘A / ⌘I'], ['Deselect', 'Esc'], ['Paste image', '⌘V'],
+      ['🎮 Gamepad', 'Stick = move · L2/R2+stick = rotate/scale · ◄► = undo/redo · X/Y = hotbar · Start = palette'],
       ['Zoom out / in', '[ / ]'], ['Fit to screen', 'click %'], ['Shortcuts', '? / K'],
       ['3D: remove / frame object', 'Del / F'],
     ];

@@ -87,6 +87,42 @@
       if (GF.commands.lookup('b') !== 'tool.brush') throw new Error('b → ' + GF.commands.lookup('b'));
       if (GF.commands.lookup(']') !== 'view.zoomIn') throw new Error('] → ' + GF.commands.lookup(']'));
     });
+
+    /* ---------- GAMEPAD (Phase D — pure parts; no controller in headless) ---------- */
+    await t('gamepad: module + commands registered', () => {
+      if (!GF.gamepad || typeof GF.gamepad.init !== 'function') throw new Error('GF.gamepad missing');
+      for (const id of ['cycle.prev', 'cycle.next', 'view.commandPalette', 'view.toggleMode'])
+        if (!GF.commands.has(id)) throw new Error('missing command: ' + id);
+    });
+    await t('gamepad: scaled radial dead zone + response curve', () => {
+      const s = GF.gamepad._shape;
+      if (s(0.1, 0).mag !== 0) throw new Error('inside dead zone should be 0');
+      if (Math.abs(s(1, 0).x - 1) > 0.001) throw new Error('full deflection should be ~1, got ' + s(1, 0).x);
+      const half = s(0.6, 0).x;
+      if (!(half > 0 && half < 0.6)) throw new Error('curve should ease-in, got ' + half);
+    });
+    await t('gamepad: hotbar exposes slots + X/Y legend badges', () => {
+      GF.hotbar.refresh();
+      const ids = GF.hotbar.contextActions();
+      if (!Array.isArray(ids) || !ids.length) throw new Error('contextActions empty');
+      const first = document.querySelector('#actionbar .ab-btn');
+      if (!first || first.dataset.pad !== 'X') throw new Error('first hotbar slot missing X badge');
+    });
+    await t('gamepad: stick gesture = ONE history entry', () => {
+      freshDoc(120, 120);
+      GF.context.sync();
+      if (GF.context.get('mode3d')) GF.commands.execute('view.toggleMode');  // nudge targets the 2D layer
+      GF.transformPad.setAxis('free');   // an earlier axis-lock test may have left x/y lock on
+      const L = D.active();
+      const ox0 = L.ox || 0;
+      GF.transformPad.startGesture('test gesture');
+      GF.commands.execute('transform.nudge', { dx: 5 });
+      GF.commands.execute('transform.nudge', { dx: 5 });
+      GF.transformPad.endGesture();
+      if ((D.active().ox || 0) !== ox0 + 10) throw new Error('nudges not applied: ' + D.active().ox);
+      GF.api.run('undo');
+      if ((D.active().ox || 0) !== ox0) throw new Error('one undo should revert the whole gesture, ox=' + D.active().ox);
+    });
     await t('shared UI entry points exported (pickFile / dialogs / flatten)', () => {
       for (const f of ['pickFile', 'openNewDialog', 'openExportDialog'])
         if (typeof GF.ui[f] !== 'function') throw new Error('GF.ui.' + f + ' missing');
