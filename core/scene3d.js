@@ -595,6 +595,24 @@ GF.scene3d = (function () {
     detach(o);
     hist.push('remove ' + o.name, () => { attach(o); applyMaterial(o); }, () => detach(o));
   }
+  /** Duplicate an object — primitive or imported model — with its transform
+      and material, offset so the copy is visible. Returns the new id. */
+  function duplicateObject(id) {
+    const src = byId(id == null ? selectedId : id); if (!src) return null;
+    const o = {
+      id: nextId++, name: src.name + ' copy', kind: src.kind, prim: src.prim,
+      node: src.node.clone(true), visible: src.visible,
+      mat: Object.assign({}, src.mat), _origMats: new Map()
+    };
+    o.material = src.material.clone();
+    // clone(true) shares material refs with the source — re-point ours at the copy
+    o.node.traverse(ch => { if (ch.isMesh && ch.material === src.material) ch.material = o.material; });
+    if (o.node.isMesh && o.node.material === src.material) o.node.material = o.material;
+    o.node.position.x += 0.5;
+    attach(o); applyMaterial(o); select(o.id);
+    hist.push('duplicate ' + src.name, () => detach(o), () => { attach(o); applyMaterial(o); });
+    return o.id;
+  }
   function setVisible(id, v) {
     const o = byId(id); if (!o || o.visible === !!v) return;
     const apply = val => { o.visible = val; o.node.visible = val; emit(); };
@@ -886,7 +904,7 @@ GF.scene3d = (function () {
     // lifecycle
     enter, exit, isActive, onChange, setStatusCallback: fn => { statusCb = fn; },
     // objects
-    addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, setVisible,
+    addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, duplicateObject, setVisible,
     listObjects, getObject, setObject, byId, count,
     // selection / interaction
     select, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame,
@@ -924,6 +942,17 @@ if (GF.api && GF.api.register) {
     return GF.scene3d.setMaterial(a.id, p);
   });
   R('scene3d.snapshotToLayer', '', 'Render the 3D scene at document resolution onto a new 2D layer', () => GF.scene3d.snapshotToLayer());
+  R('scene3d.deleteSelected', 'id?', 'Remove a 3D object (default: the selected one)', a => {
+    const id = (a && a.id != null) ? a.id : GF.scene3d.selectedId();
+    if (id == null) throw new Error('no 3D object selected');
+    GF.scene3d.removeObject(id);
+  });
+  R('scene3d.duplicateSelected', 'id?', 'Duplicate a 3D object (default: the selected one)', a => {
+    const id = (a && a.id != null) ? a.id : GF.scene3d.selectedId();
+    if (id == null) throw new Error('no 3D object selected');
+    return GF.scene3d.duplicateObject(id);
+  });
+  R('scene3d.frameSelected', '', 'Frame the selected object (or whole scene) in view', () => GF.scene3d.frame());
   R('scene3d.exportGLB', 'selection?("scene"|"selected")', 'Export the 3D scene as a .glb file', a => GF.scene3d.exportGLB(a || {}));
   R('scene3d.gizmo', 'mode?("translate"|"rotate"|"scale"), space?("world"|"local")', 'Set the transform gizmo mode and/or coordinate space', a => {
     if (a.mode) GF.scene3d.setGizmoMode(a.mode);

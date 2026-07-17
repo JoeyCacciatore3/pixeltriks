@@ -30,7 +30,8 @@ GF.api = (function () {
       { group: 'Layer', label: 'New layer', needsDoc: true });
   cmd('duplicateLayer', '', 'Duplicate the active layer', () => { GF.history.push(D.doc, 'dup'); return D.duplicateActive().id; },
       { group: 'Layer', label: 'Duplicate layer', needsDoc: true });
-  cmd('deleteLayer', '', 'Delete the active layer', () => { GF.history.push(D.doc, 'del'); D.deleteActive(); });
+  cmd('deleteLayer', '', 'Delete the active layer', () => { GF.history.push(D.doc, 'del'); D.deleteActive(); },
+      { group: 'Layer', label: 'Delete layer', needsDoc: true });
   cmd('setActiveLayer', 'id', 'Make a layer active', a => { D.doc.activeId = a.id; });
   cmd('setLayer', 'name?, visible?, opacity?(0-1), blend?, x?, y?', 'Set properties on the active layer', a => { const l = L(); ['name','visible','opacity','blend','x','y'].forEach(k => { if (a[k] !== undefined) l[k] = a[k]; }); });
   cmd('mergeDown', '', 'Merge active layer into the one below', () => { GF.history.push(D.doc, 'merge'); D.mergeDown(); },
@@ -127,6 +128,8 @@ GF.api = (function () {
   cmd('cutToLayer', 'cut?(bool=true), bevel?(bool)', 'Cut the current selection onto its own layer (optionally beveled)', a => GF.retouch.cutToLayer(L(), a));
   cmd('smartUpscale', 'factor(2|4), mode?("pixel"|"photo")', 'Upscale the document', a => GF.retouch.smartUpscale(a.factor || 2, a.mode || 'pixel'));
   cmd('filter', 'name("grayscale"|"invert"|"blur"|"sharpen"|"edge"|"autoLevels"), …', 'Apply a one-shot filter (respects selection)', a => GF.filters.applyToLayer(L(), a.name, img => GF.filters[a.name](img)));
+  cmd('autoEnhance', '', 'Auto levels + vibrance boost on the active layer', () => { GF.filters.applyToLayer(L(), 'enhance', img => { GF.filters.autoLevels(img); GF.filters.hsl(img, 0, 10, 0); }); U.toast('Enhanced'); },
+      { group: 'Adjust', label: 'Auto enhance', needsDoc: true });
   cmd('brightnessContrast', 'brightness(-100..100), contrast(-100..100)', 'Adjust the active layer', a => GF.filters.applyToLayer(L(), 'bc', img => GF.filters.brightnessContrast(img, a.brightness || 0, a.contrast || 0)));
   cmd('hsl', 'h(-180..180), s(-100..100), l(-100..100)', 'Hue/saturation/lightness', a => GF.filters.applyToLayer(L(), 'hsl', img => GF.filters.hsl(img, a.h || 0, a.s || 0, a.l || 0)));
   cmd('flipLayer', 'horizontal?(bool)', 'Flip the active layer', a => { GF.history.push(D.doc, 'flip'); D.flipLayer(L(), a.horizontal !== false); },

@@ -50,22 +50,17 @@
       freshDoc(200, 200);
       if (!D.doc.open || D.doc.width !== 200 || layerCount() !== 1) throw new Error('state ' + D.doc.width + ' layers=' + layerCount());
     });
-    await t('empty-state hidden when doc open', () => { if (!$('#empty-state').hidden) throw new Error('empty-state visible'); });
+    await t('no-doc chrome cleared when doc open', () => { if (document.body.classList.contains('no-doc')) throw new Error('body still has .no-doc'); });
     await t('#doc-dims label updated', () => { if ($('#doc-dims').textContent !== '200×200') throw new Error('"' + $('#doc-dims').textContent + '"'); });
-    await t('intent: "Create a 3D scene" activates the 3D tool immediately', () => {
-      $('.intent[data-intent=scene]').click();
-      const on = $('#toolrail .tool[data-tool=scene3d]').classList.contains('on');
-      // 3D is always on — no mode switch needed
-      
-      if (!on) throw new Error('3D tool not active');
+    await t('catalog: Phase A commands registered', () => {
+      const names = GF.api.describe().map(c => c.name);
+      for (const n of ['autoEnhance', 'scene3d.deleteSelected', 'scene3d.duplicateSelected', 'scene3d.frameSelected'])
+        if (!names.includes(n)) throw new Error('missing command: ' + n);
     });
-    await t('intent: "Turn an image into 3D" routes on open', () => {
-      $('.intent[data-intent=image3d]').click();   // remembers intent + opens picker (noop headless)
-      freshDoc(150, 150);                           // newDoc → onDocumentOpened consumes the intent
-      const on = $('#toolrail .tool[data-tool=scene3d]').classList.contains('on');
-      GF.ui.setTool('move');
-      
-      if (!on) throw new Error('intent did not route to 3D');
+    await t('shared UI entry points exported (pickFile / dialogs / flatten)', () => {
+      for (const f of ['pickFile', 'openNewDialog', 'openExportDialog'])
+        if (typeof GF.ui[f] !== 'function') throw new Error('GF.ui.' + f + ' missing');
+      if (typeof GF.scene3dUI.flattenAndReturn !== 'function') throw new Error('scene3dUI.flattenAndReturn missing');
     });
 
     /* ---------- TOOLS (click rail, verify engine tool) ---------- */
@@ -781,8 +776,8 @@
     });
 
     /* ---------- POLISH ---------- */
-    await t('polish: quick-actions bar exists in DOM', () => {
-      if (!$('#quick-actions')) throw new Error('no quick-actions bar');
+    await t('polish: quick-actions chips removed (hotbar is the single home)', () => {
+      if ($('#quick-actions')) throw new Error('duplicate quick-actions bar still in DOM');
     });
     await t('polish: first-use tip definitions exist', () => {
       if (!GF.polish || typeof GF.polish.showTip !== 'function') throw new Error('showTip missing');

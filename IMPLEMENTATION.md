@@ -1,5 +1,34 @@
 # PixelTriks — Implementation Progress
 
+## Game Deck V2 (see docs/GAME-DECK-V2-ROADMAP.md)
+
+### Phase A: Stop the bleeding — COMPLETE ✅ (Jul 17)
+- [x] Fixed boot crash: forge-ui wired removed `#empty-open`/`#empty-new`/`.intent`/`#empty-state`
+      DOM (null deref killed init → hotbar/transform-pad/undo buttons all dead). e2e went 28/151 → 160/165.
+- [x] Fixed 15 dead buttons calling renamed catalog commands:
+      hotbar `layer.add`→`addLayer`, `layer.mergeDown`→`mergeDown`, `select.invert`→`invertSelection`,
+      `adjust.autoLevels`→new `autoEnhance`; rail quick-actions `flipH/flipV/rotateCW/rotateCCW`→`flipLayer`/`rotateLayer`
+- [x] Registered missing 3D commands: `scene3d.deleteSelected`, `scene3d.duplicateSelected` (new engine
+      `duplicateObject` — works on models too, with history), `scene3d.frameSelected`
+- [x] Removed never-implemented buttons: `obj-group` (no engine grouping — future work), `swap-color`
+- [x] Removed dangling `wireActionBar` (`#ab-generate`/`#ab-assets`) + orphaned `ui/game-deck.css`; sw cache → v36
+
+### Phase C: Dedup sweep (one home per command) — COMPLETE ✅ (Jul 17)
+- [x] Import: hotbar's hand-rolled file input now routes through the shared `#file-input` →
+      `GF.exporter.handleFiles` pipeline (routes by extension: image→layer, glb/hdr→scene, json→project).
+      Assets-library import and 3D-texture import stay separate — different *destinations*, not duplicates.
+- [x] Enhance: single `autoEnhance` catalog command (palette entry now derived, hotbar calls it; deleted forge-ui `ACTIONS.enhance`)
+- [x] Remove-BG: hotbar now calls the config-aware `GF.ui.actions.removeBg` (was raw `GF.ai.removeBg` — second code path)
+- [x] Flatten 3D: `scene3dUI.flattenAndReturn` is the one wrapper (hotbar + palette + 3D panel)
+- [x] Selection ops: hotbar fallback reimplementations removed — `GF.selectionBar` is the single implementation
+- [x] Removed polish.js floating 3D quick-action chips (same-view duplicate of hotbar 3d-selected context;
+      contained hand-rolled duplicate + a third material picker). Hotbar is the single home; 3D Paint moved there.
+- [x] Unburied: Delete layer (palette via ui metadata), Curves (button in Adjust pane), 3D paint (hotbar slot)
+- [x] `GF.ui` exports shared entry points: `pickFile`, `openNewDialog`, `openExportDialog`, `actions`
+
+### Phase B (command registry) + Phase D (physical gamepad) — NOT STARTED
+
+
 ## Phase 1: Layout Restructure — COMPLETE ✅
 - [x] Step 1: HTML Grid Shell
 - [x] Step 2: Scene Tree to Sidebar

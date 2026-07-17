@@ -1,104 +1,13 @@
 /* PixelTriks — polish.js
-   Phase 5 UX polish: contextual quick-actions for 3D objects,
-   first-use tooltips, and visual undo snapshot. */
+   Phase 5 UX polish: first-use tooltips and visual undo snapshot.
+   (The floating 3D quick-action chips were removed — the context hotbar's
+   3d-selected context is the single home for those actions.) */
 'use strict';
 window.GF = window.GF || {};
 
 GF.polish = (function () {
   const $ = s => document.querySelector(s);
   const LS_KEY = 'pt-dismissed-tips';
-
-  /* =================================================================
-     Contextual quick-actions — floating chips near selected 3D object
-     ================================================================= */
-  let qBar = null;
-
-  function buildQuickActions() {
-    if (qBar) return;
-    qBar = document.createElement('div');
-    qBar.id = 'quick-actions';
-    qBar.className = 'quick-actions';
-    qBar.hidden = true;
-    document.body.appendChild(qBar);
-
-    if (GF.scene3d) {
-      GF.scene3d.onChange(updateQuickActions);
-    }
-  }
-
-  function updateQuickActions() {
-    if (!qBar || !GF.scene3d) return;
-    const id = GF.scene3d.selectedId();
-    if (id == null) { qBar.hidden = true; return; }
-
-    const actions = [
-      { label: 'Paint', icon: '🖌', fn: () => { if (GF.paint3d) GF.paint3d.enter(id); } },
-      { label: 'Material', icon: '◆', fn: () => showMaterialPicker(id) },
-      { label: 'Frame', icon: '⊞', fn: () => GF.scene3d.frame() },
-      { label: 'Duplicate', icon: '⊕', fn: () => duplicateObject(id) },
-      { label: 'Delete', icon: '✕', fn: () => GF.scene3d.removeObject(id) },
-    ];
-
-    qBar.innerHTML = '';
-    actions.forEach(a => {
-      const chip = document.createElement('button');
-      chip.className = 'qa-chip';
-      chip.title = a.label;
-      chip.innerHTML = `<span class="qa-icon">${a.icon}</span><span class="qa-label">${a.label}</span>`;
-      chip.addEventListener('click', a.fn);
-      qBar.appendChild(chip);
-    });
-    qBar.hidden = false;
-  }
-
-  function showMaterialPicker(id) {
-    if (!GF.texture) return;
-    const presets = GF.texture.listPresets();
-    if (!presets.length) return;
-    const existing = document.querySelector('.qa-mat-menu');
-    if (existing) { existing.remove(); return; }
-
-    const menu = document.createElement('div');
-    menu.className = 'qa-mat-menu tb-dropdown-menu';
-    menu.style.cssText = 'position:fixed;z-index:999;max-height:280px;overflow-y:auto;';
-    const rect = qBar.getBoundingClientRect();
-    menu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
-    menu.style.right = '16px';
-
-    presets.forEach(p => {
-      const item = document.createElement('div');
-      item.className = 'tb-dropdown-item';
-      item.textContent = p.label;
-      item.addEventListener('click', async () => {
-        menu.remove();
-        const maps = GF.texture.generateMaterial(p.id, 512, 512);
-        if (!maps) return;
-        const colorKey = GF.scene3d.addImageSource(maps.color, p.label + '-color');
-        const normalKey = GF.scene3d.addImageSource(maps.normal, p.label + '-normal');
-        GF.scene3d.setMaterial(id, {
-          mapSource: colorKey, normalSource: normalKey,
-          metalness: p.metalness, roughness: p.roughness
-        });
-        GF.util.toast(p.label + ' applied');
-      });
-      menu.appendChild(item);
-    });
-    document.body.appendChild(menu);
-    const close = e => { if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('pointerdown', close); } };
-    setTimeout(() => document.addEventListener('pointerdown', close), 0);
-  }
-
-  function duplicateObject(id) {
-    if (!GF.scene3d) return;
-    const o = GF.scene3d.getObject(id);
-    if (!o) return;
-    GF.scene3d.addPrimitive(o.prim || 'box').then(newId => {
-      if (newId != null) {
-        GF.scene3d.setObject(newId, { px: o.px + 0.5, py: o.py, pz: o.pz, rx: o.rx, ry: o.ry, rz: o.rz, sx: o.sx, sy: o.sy, sz: o.sz });
-        GF.util.toast('Duplicated');
-      }
-    });
-  }
 
   /* =================================================================
      First-use tooltips — one-sentence hints, dismissible, stored
@@ -177,7 +86,6 @@ GF.polish = (function () {
      ================================================================= */
   function init() {
     loadDismissed();
-    buildQuickActions();
 
     if (GF.ui && GF.ui.setTool) {
       const origSetTool = GF.ui.setTool;
@@ -195,5 +103,5 @@ GF.polish = (function () {
     else setTimeout(go, 0);
   }
 
-  return { showTip, updateQuickActions };
+  return { showTip };
 })();

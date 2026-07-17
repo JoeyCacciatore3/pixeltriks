@@ -104,13 +104,12 @@ window.GF = window.GF || {};
     wireMobile();
     wireGestures();
     wireProFeatures();
-    wireActionBar();
     // Wire quick-action buttons in tool rail
     const qk = (id, fn) => { const b = $(id); if (b) b.addEventListener('click', fn); };
-    qk('#qk-fliph', () => run('flipH'));
-    qk('#qk-flipv', () => run('flipV'));
-    qk('#qk-rotcw', () => run('rotateCW'));
-    qk('#qk-rotccw', () => run('rotateCCW'));
+    qk('#qk-fliph', () => run('flipLayer', { horizontal: true }));
+    qk('#qk-flipv', () => run('flipLayer', { horizontal: false }));
+    qk('#qk-rotcw', () => run('rotateLayer', { cw: true }));
+    qk('#qk-rotccw', () => run('rotateLayer', { cw: false }));
     qk('#qk-zoomfit', () => GF.view.zoomFit());
     qk('#qk-newlayer', () => run('addLayer', {}));
 
@@ -172,7 +171,6 @@ window.GF = window.GF || {};
   }
 
   function onDocumentOpened() {
-    $('#empty-state').hidden = true;
     document.body.classList.remove('no-doc');
     stopCrop();
     if (V().wand) V().wand.seed = null;
@@ -185,7 +183,6 @@ window.GF = window.GF || {};
     updateZoomLabel();
     setDims();
     drawHistogram();
-    if (pendingIntent) { const k = pendingIntent; pendingIntent = null; runIntent(k); }
     // Notify Game Deck modules
     window.dispatchEvent(new CustomEvent('pt:docopen'));
     if (GF.transformPad) GF.transformPad.refresh();
@@ -293,7 +290,8 @@ window.GF = window.GF || {};
     });
   }
 
-  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool, openAIDialog, modal };
+  GF.ui = { init, onDocumentOpened, refreshLayers, updateZoomLabel, showCursorPos, openTextDialog, setTool, openAIDialog, modal,
+            pickFile, openNewDialog, openExportDialog };
 
   /* =================================================================
      Build dynamic UI
@@ -371,32 +369,8 @@ window.GF = window.GF || {};
   /* =================================================================
      Wiring
      ================================================================= */
-  /* Intent-first launcher: the empty-state cards name an OUTCOME. Picking one
-     remembers the intent, opens the file picker, and once the image loads we
-     route straight to that action (see runIntent, fired from onDocumentOpened). */
-  let pendingIntent = null;
-  function wireIntents() {
-    $$('.intent').forEach(b => b.addEventListener('click', () => {
-      const kind = b.dataset.intent;
-      if (kind === 'blank') { pendingIntent = null; openNewDialog(); return; }
-      // scene-first cards act immediately — no file required
-      if (kind === 'scene') { pendingIntent = null; setTool('scene3d'); return; }
-      if (kind === 'texturemodel') { pendingIntent = null; setTool('scene3d'); U.toast('Drop a .glb anywhere, or use Import model… in the 3D panel'); return; }
-      pendingIntent = kind; pickFile();
-    }));
-  }
-  function runIntent(kind) {
-    switch (kind) {
-      case 'image3d': setTool('scene3d'); U.toast('Pick a converter under Make 3D — Extrude cutout turns your subject into a 3D piece'); break;
-      case 'edit':    break;   // just an open — the full editor is the destination
-    }
-  }
-
   function wireTopbar() {
     $('#btn-open').addEventListener('click', pickFile);
-    $('#empty-open').addEventListener('click', () => { pendingIntent = null; pickFile(); });
-    $('#empty-new').addEventListener('click', openNewDialog);
-    wireIntents();
     $('#btn-undo').addEventListener('click', () => run('undo'));
     $('#btn-redo').addEventListener('click', () => run('redo'));
     $('#btn-export').addEventListener('click', openExportDialog);
@@ -631,6 +605,7 @@ window.GF = window.GF || {};
     defTab.classList.add('on'); // default Properties (3D)
     $('#adj-reset').addEventListener('click', resetAdjust);
     $('#adj-apply').addEventListener('click', applyAdjust);
+    const ac = $('#adj-curves'); if (ac) ac.addEventListener('click', () => { if (D.doc.open) openCurves(); else U.toast('Open an image first'); });
 
     // Re-enable auto-switch when mode/tool/selection changes
     window.addEventListener('pt:modechange', () => { panelAutoSwitch = true; autoPanelSwitch(); });
@@ -666,10 +641,6 @@ window.GF = window.GF || {};
   /* The four headline actions, named once. Every surface that offers them —
      wand bar, palette, api — calls these, never a sibling button's click(). */
   const ACTIONS = {
-    enhance() {
-      const L = D.active(); GF.filters.applyToLayer(L, 'enhance', i => { GF.filters.autoLevels(i); GF.filters.hsl(i,0,10,0); });
-      GF.view.requestRender(); refreshLayers(); U.toast('Enhanced');
-    },
     removeBg() {
       // auto-upgrade to AI cutout when a remove.bg key is configured; else classic
       if (GF.ai && GF.ai.hasKey() && GF.ai.config().provider === 'removebg') {
@@ -687,6 +658,7 @@ window.GF = window.GF || {};
     },
     genFill() { openAIDialog(); },
   };
+  GF.ui.actions = ACTIONS;   // (assigned here — ACTIONS is const, not hoisted)
 
   /* defer so any pending UI state paints before the (synchronous, heavy) op runs */
   function busyHero(sel, fn) {
@@ -1042,7 +1014,6 @@ window.GF = window.GF || {};
       { group: 'File', label: 'Export…', hint: 'Ctrl+E', run: openExportDialog },
       { group: 'File', label: 'Save project', hint: 'Ctrl+S', run: () => GF.exporter.saveProject() },
       { group: 'Edit', label: 'Paste image', hint: 'Ctrl+V', run: () => U.toast('Press Ctrl/⌘V to paste an image') },
-      { group: 'Adjust', label: 'Auto enhance', run: () => guarded(ACTIONS.enhance) },
       { group: 'Adjust', label: 'Curves…', hint: 'Ctrl+M', run: openCurves },
       { group: 'Retouch', label: 'Remove background', run: () => guarded(ACTIONS.removeBg) },
       { group: 'Retouch', label: 'Color replace…', run: () => guarded(openColorReplace) },
@@ -1055,7 +1026,7 @@ window.GF = window.GF || {};
       { group: 'View', label: 'Fit to screen', run: () => GF.view.zoomFit() },
       { group: 'View', label: 'Toggle light / dark theme', run: toggleTheme },
       { group: 'Help', label: 'Keyboard shortcuts', hint: '? / K', run: openCheatSheet },
-      { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) { GF.scene3d.snapshotToLayer(); setTool('move'); } else U.toast('Add a 3D object first'); } },
+      { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) GF.scene3dUI.flattenAndReturn(); else U.toast('Add a 3D object first'); } },
       { group: '3D', label: 'Export GLB (3D scene)', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') },
     );
     // every ui-annotated engine command, straight from the catalog.
@@ -1520,26 +1491,6 @@ window.GF = window.GF || {};
     html += '</div>';
     html += `<div class="guide-section"><h3>Tips</h3><p>${g.tip}</p></div>`;
     body.innerHTML = html;
-  }
-
-  /* ---- action bar buttons (bottom hotbar + any [data-action] element) ---- */
-  function wireActionBar() {
-    $$('[data-action]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const a = btn.dataset.action;
-        if (a === 'add-box') GF.api.run('scene3d.addPrimitive', { kind: 'box' });
-        else if (a === 'add-sphere') GF.api.run('scene3d.addPrimitive', { kind: 'sphere' });
-        else if (a === 'add-cylinder') GF.api.run('scene3d.addPrimitive', { kind: 'cylinder' });
-        else if (a === 'add-plane') GF.api.run('scene3d.addPrimitive', { kind: 'plane' });
-        else if (a === 'import-model') $('#file-input').click();
-      });
-    });
-    const gen = $('#ab-generate');
-    if (gen) gen.addEventListener('click', () => { if (GF.ui.openAIDialog) GF.ui.openAIDialog(); });
-    const assets = $('#ab-assets');
-    if (assets) assets.addEventListener('click', () => {
-      const tab = $('.ptab[data-tab="scene"]'); if (tab) tab.click();
-    });
   }
 
   /* =================================================================

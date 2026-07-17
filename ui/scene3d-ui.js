@@ -436,5 +436,5 @@ GF.scene3dUI = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); refresh(); });
   else { ensurePane(); refresh(); }
 
-  return { enter, exit, optbarHtml, wireOptbar, refresh, publishDialog };
+  return { enter, exit, optbarHtml, wireOptbar, refresh, publishDialog, flattenAndReturn };
 })();
