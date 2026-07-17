@@ -83,14 +83,20 @@ GF.transformPad = (function () {
   }
 
   function move3D(dx, dy, dz) {
+    const n = node3D();
+    if (!n) return;
+    GF.transformManager.requestTransform(n, { position: {
+      x: n.position.x + dx,
+      y: n.position.y + dz,   // Y is up in three.js
+      z: n.position.z + dy,   // Z is depth
+    } }, 'transform-pad');
+  }
+
+  /** THREE node of the selected 3D object (scene renders continuously). */
+  function node3D() {
     const scene = S();
-    if (!scene) return;
-    const obj = scene.selected();
-    if (!obj) return;
-    obj.position.x += dx;
-    obj.position.y += dz;  // Y is up in three.js
-    obj.position.z += dy;  // Z is depth
-    scene.requestRender();
+    const o = scene && scene.selected && scene.selected();
+    return o ? (o.node || o) : null;
   }
 
   function rotate(deg) {
@@ -108,15 +114,14 @@ GF.transformPad = (function () {
   }
 
   function rotate3D(deg) {
-    const scene = S();
-    if (!scene) return;
-    const obj = scene.selected();
-    if (!obj) return;
+    const n = node3D();
+    if (!n) return;
     const rad = deg * Math.PI / 180;
-    if (axisMode === 'x') obj.rotation.x += rad;
-    else if (axisMode === 'z') obj.rotation.z += rad;
-    else obj.rotation.y += rad;
-    scene.requestRender();
+    const rot = { x: n.rotation.x, y: n.rotation.y, z: n.rotation.z };
+    if (axisMode === 'x') rot.x += rad;
+    else if (axisMode === 'z') rot.z += rad;
+    else rot.y += rad;
+    GF.transformManager.requestTransform(n, { rotation: rot }, 'transform-pad');
   }
 
   function scale(factor) {
@@ -135,15 +140,14 @@ GF.transformPad = (function () {
   }
 
   function scale3D(factor) {
-    const scene = S();
-    if (!scene) return;
-    const obj = scene.selected();
-    if (!obj) return;
-    if (axisMode === 'x') obj.scale.x *= factor;
-    else if (axisMode === 'y') obj.scale.y *= factor;
-    else if (axisMode === 'z') obj.scale.z *= factor;
-    else { obj.scale.x *= factor; obj.scale.y *= factor; obj.scale.z *= factor; }
-    scene.requestRender();
+    const n = node3D();
+    if (!n) return;
+    const s = { x: n.scale.x, y: n.scale.y, z: n.scale.z };
+    if (axisMode === 'x') s.x *= factor;
+    else if (axisMode === 'y') s.y *= factor;
+    else if (axisMode === 'z') s.z *= factor;
+    else { s.x *= factor; s.y *= factor; s.z *= factor; }
+    GF.transformManager.requestTransform(n, { scale: s }, 'transform-pad');
   }
 
   function cycleAxis() {
@@ -295,6 +299,15 @@ GF.transformPad = (function () {
 
   /* ─── Public API ─── */
   function init() {
+    // The pad's verbs join the command registry so any input surface
+    // (palette, keyboard, future gamepad) drives the same intents. The pad's
+    // own buttons call the local functions directly — hold-to-repeat runs at
+    // frame rate and must not pay per-call context syncs.
+    const reg = GF.commands.register;
+    reg({ id: 'transform.nudge', title: 'Nudge selected (dx/dy/dz)', group: 'Transform', palette: false, run: a => move(a.dx || 0, a.dy || 0, a.dz || 0) });
+    reg({ id: 'transform.rotateStep', title: 'Rotate selected by step', group: 'Transform', palette: false, run: a => rotate(a.deg == null ? ROT_STEP : a.deg) });
+    reg({ id: 'transform.scaleStep', title: 'Scale selected by step', group: 'Transform', palette: false, run: a => scale(a.factor == null ? SCALE_STEP : a.factor) });
+    reg({ id: 'transform.cycleAxis', title: 'Cycle transform axis lock', group: 'Transform', when: 'docOpen', run: cycleAxis });
     build();
     window.addEventListener('pt:selectionchange', updateVisibility);
     window.addEventListener('pt:layerchange', updateVisibility);

@@ -26,7 +26,28 @@
 - [x] Unburied: Delete layer (palette via ui metadata), Curves (button in Adjust pane), 3D paint (hotbar slot)
 - [x] `GF.ui` exports shared entry points: `pickFile`, `openNewDialog`, `openExportDialog`, `actions`
 
-### Phase B (command registry) + Phase D (physical gamepad) — NOT STARTED
+### Phase B: Command registry — COMPLETE ✅ (Jul 17)
+- [x] `core/context.js` — context keys (docOpen, mode3d, selectionActive, has3dSelection,
+      painting, textTool, animPlaying) + VS Code-style when-clause parser (`!`, `&&`, `||`, parens);
+      `sync()` is the ONE reader that turns app state into keys
+- [x] `core/commands.js` — the registry: `register` (throws on duplicate id / taken home slot),
+      `execute` (context-gated), `bind`/`lookup` (key bindings as data; bind throws on unknown id),
+      `palette()`, `importApi()` (every ui-annotated GF.api command → `api.<name>`), `assertIds()`
+- [x] Palette derives 100% from the registry — tools, dialogs, engine commands, adjustment
+      layers, filters, texture tools all registered once in forge-ui `registerCommands()`;
+      palette rows show the command's home path (GIMP-style placement teaching)
+- [x] Keyboard is data: `mod+z`→api.undo, tool letters→tool.*, `[`/`]`→view.zoom*, etc. —
+      wireKeyboard just resolves a key signature through `GF.commands.lookup`
+- [x] Hotbar renders from the registry (ids = data-hotbar attrs, icons/titles/classes on the
+      command); `init()` asserts every id in every context layout — a renamed command is now
+      a BOOT ERROR, not a dead button. `detect()` derives from shared context keys.
+- [x] Transform pad verbs registered (`transform.nudge/rotateStep/scaleStep/cycleAxis`) for
+      future input surfaces; pad's 3D writes now route through `GF.transformManager`
+- [x] Found + fixed while porting: scene3d never exported `selected`/`requestRender`, so the
+      transform pad's ENTIRE 3D path was dead (pad hidden in 3D, would have thrown if shown)
+- [x] sw.js v37 + cache list gains context.js/commands.js (and the missing transform-manager.js)
+
+### Phase D (physical gamepad) — NOT STARTED — registry makes this a pure binding table
 
 
 ## Phase 1: Layout Restructure — COMPLETE ✅

@@ -170,10 +170,10 @@ same `transform.nudge.*` commands the d-pad fires; both are clients of
 
 ## 5. Roadmap (ordered; each phase ships independently)
 
-> **Status 2026-07-17:** Phase A ✅ and Phase C ✅ are DONE (see IMPLEMENTATION.md
-> for the change list; e2e 28/151 → 161/165 — the 4 remaining failures are
-> pre-existing headless-environment issues, failing at HEAD too). Phases B, D, E
-> are next. Notes: `obj-group` was removed rather than fixed (engine has no
+> **Status 2026-07-17:** Phases A ✅, B ✅, C ✅ are DONE (see IMPLEMENTATION.md
+> for the change list; e2e 28/151 → 166/170 — the 4 remaining failures are
+> pre-existing headless-environment issues, failing at HEAD too). Phases D, E
+> are next; the registry makes the gamepad a pure binding table. Notes: `obj-group` was removed rather than fixed (engine has no
 > grouping — real feature work, tracked for later); asset-library import and
 > 3D-texture import were kept separate from the main file pipeline because they
 > have different destinations (library / texture slot), not because of drift.
@@ -190,7 +190,7 @@ same `transform.nudge.*` commands the d-pad fires; both are clients of
    index.html): fold into Phase C or delete.
 4. Add `ui` metadata to `deleteLayer` + other palette-absent commands; run e2e.
 
-### Phase B — Command registry (the modular core)
+### Phase B — Command registry (the modular core) — ✅ DONE
 1. `core/commands.js` (registry + execute) + `core/context.js` (context keys +
    when-parser). Boot-time assertions: unknown-id and same-view-duplicate throw.
 2. Port the **command palette** to render from the registry (lowest risk,

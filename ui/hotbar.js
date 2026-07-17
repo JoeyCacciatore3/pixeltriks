@@ -19,7 +19,6 @@ GF.hotbar = (function () {
   const S = () => GF.scene3d;
   const V = () => GF.view;
   const U = GF.util;
-  const is3D = () => document.body.dataset.mode === '3d';
   const run = (n, a) => { try { return GF.api.run(n, a); } catch (e) { U.toast(e.message); } };
 
   let barEl = null;
@@ -77,81 +76,78 @@ GF.hotbar = (function () {
     clipboard: '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 2h6v3H9z"/></svg>',
   };
 
-  /* ─── Action definitions ───
-     Each action: { icon (SVG string), label, action (fn), class? } */
-
-  const ACTIONS = {
-    // ─── 3D primitives ───
-    'add-box':      { icon: I.box,       label: 'Box',      action: () => run('scene3d.addPrimitive', { kind: 'box' }) },
-    'add-sphere':   { icon: I.sphere,    label: 'Sphere',   action: () => run('scene3d.addPrimitive', { kind: 'sphere' }) },
-    'add-cylinder': { icon: I.cylinder,  label: 'Cylinder', action: () => run('scene3d.addPrimitive', { kind: 'cylinder' }) },
-    'add-plane':    { icon: I.plane,     label: 'Plane',    action: () => run('scene3d.addPrimitive', { kind: 'plane' }) },
-    'import-model': { icon: I.import,    label: 'Import',   action: () => { const fi = $('#file-input'); if (fi) fi.click(); } },
-
-    // ─── 3D object actions ───
-    'obj-delete':   { icon: I.trash,     label: 'Delete',    action: () => run('scene3d.deleteSelected'), class: 'ab-face-b' },
-    'obj-dup':      { icon: I.duplicate, label: 'Duplicate', action: () => run('scene3d.duplicateSelected') },
-    'obj-paint':    { icon: I.ink,       label: 'Paint',     action: () => { const id = S() && S().selectedId(); if (id != null && GF.paint3d) GF.paint3d.enter(id); } },
-    'obj-material': { icon: I.material,  label: 'Material',  action: () => { const p = $('#panel'); if (p) p.dataset.tab = 'scene'; } },
-    'obj-frame':    { icon: I.frame,     label: 'Frame',     action: () => run('scene3d.frameSelected') },
-    'obj-flatten':  { icon: I.flatten2d, label: 'To 2D',     action: () => { if (GF.scene3dUI) GF.scene3dUI.flattenAndReturn(); } },
-
-    // ─── Animation ───
-    'anim-play':    { icon: I.play,  label: 'Play',  action: () => { if (GF.animation) GF.animation.play(); }, class: 'ab-face-a' },
-    'anim-pause':   { icon: I.pause, label: 'Pause', action: () => { if (GF.animation) GF.animation.pause(); } },
-    'anim-stop':    { icon: I.stop,  label: 'Stop',  action: () => { if (GF.animation) GF.animation.stop(); } },
-
-    // ─── 2D quick actions (image editing) ───
-    'enhance':      { icon: I.enhance, label: 'Enhance',   action: () => run('autoEnhance'), class: 'ab-ai' },
-    'remove-bg':    { icon: I.wand,    label: 'Remove BG', action: () => { if (GF.ui && GF.ui.actions) GF.ui.actions.removeBg(); }, class: 'ab-ai' },
-    'ai-gen':       { icon: I.robot,   label: 'AI Gen',    action: () => { if (GF.ui) GF.ui.openAIDialog(); }, class: 'ab-ai' },
-    'quick-adjust': { icon: I.adjust,  label: 'Adjust',    action: () => { const p = $('#panel'); if (p) p.dataset.tab = 'adjust'; } },
-
-    // ─── 2D selection outcomes ───
-    'sel-remove':   { icon: I.removeSel, label: 'Remove',   action: () => selAction('remove') },
-    'sel-cutout':   { icon: I.scissors,  label: 'Cut Out',  action: () => selAction('cutout') },
-    'sel-fill':     { icon: I.bucket,    label: 'Fill',     action: () => selAction('fill') },
-    'sel-ai':       { icon: I.robot,     label: 'AI Fill',  action: () => selAction('aiReplace'), class: 'ab-ai' },
-    'sel-recolor':  { icon: I.recolor,   label: 'Recolor',  action: () => selAction('recolor') },
-    'sel-copy':     { icon: I.copy,      label: 'Copy Lyr', action: () => selAction('copyLayer') },
-    'sel-crop':     { icon: I.cropSel,   label: 'Crop',     action: () => selAction('crop') },
-    'sel-invert':   { icon: I.invert,    label: 'Invert',   action: () => run('invertSelection') },
-    'sel-delete':   { icon: I.trash,     label: 'Delete',   action: () => selAction('delete'), class: 'ab-face-b' },
-    'sel-expand':   { icon: I.expand,    label: 'Expand',   action: () => selAction('expand') },
-    'sel-feather':  { icon: I.feather,   label: 'Feather',  action: () => selAction('feather') },
-    'sel-none':     { icon: I.deselect,  label: 'Deselect', action: () => { GF.select.clear(); V().requestRender(); } },
-
-    // ─── 2D painting workflow ───
-    'new-layer':    { icon: I.newLayer, label: 'New Layer', action: () => run('addLayer') },
-    'merge-down':   { icon: I.merge,   label: 'Merge',     action: () => run('mergeDown') },
-
-    // ─── Transform operations ───
-    'flip-h':       { icon: I.flipH,     label: 'Flip H',   action: () => run('flipLayer', { horizontal: true }) },
-    'flip-v':       { icon: I.flipV,     label: 'Flip V',   action: () => run('flipLayer', { horizontal: false }) },
-    'rotate-cw':    { icon: I.rotateCW,  label: 'Rot CW',   action: () => run('rotateLayer', { cw: true }) },
-    'rotate-ccw':   { icon: I.rotateCCW, label: 'Rot CCW',  action: () => run('rotateLayer', { cw: false }) },
-    'upscale':      { icon: I.upscale,   label: 'Upscale',  action: () => run('smartUpscale', { factor: 2, mode: 'photo' }) },
-    'trim':         { icon: I.trim,      label: 'Trim',     action: () => run('trim') },
-    'flatten-all':  { icon: I.flatAll,   label: 'Flatten',  action: () => run('flatten') },
-    'dup-layer':    { icon: I.duplicate, label: 'Dup Lyr',  action: () => run('duplicateLayer') },
-    'add-mask':     { icon: I.mask,      label: 'Mask',     action: () => run('addMask', { init: 'reveal' }) },
-
-    // ─── Creative tools ───
-    'ink-outline':  { icon: I.ink,   label: 'Ink Lines', action: () => run('inkOutline', { newLayer: true }) },
-    'clean-colors': { icon: I.clean, label: 'Clean',     action: () => run('cleanColors', { colors: 8 }) },
-    'copy-clip':    { icon: I.clipboard, label: 'Copy',  action: () => run('copyToClipboard') },
-
-    // ─── Global / export ───
-    'export':       { icon: I.exportF, label: 'Export', action: () => { if (GF.ui) GF.ui.openExportDialog(); }, class: 'ab-face-a' },
-    'ai-tools':     { icon: I.ai,      label: 'AI',     action: () => { if (GF.ui) GF.ui.openAIDialog(); }, class: 'ab-ai' },
-
-    // ─── Empty state ───
-    'open-file':    { icon: I.open, label: 'Open', action: () => { if (GF.ui) GF.ui.pickFile(); } },
-    'new-doc':      { icon: I.plus, label: 'New',  action: () => { if (GF.ui) GF.ui.openNewDialog(); } },
-
-    // ─── Assets ───
-    'assets':       { icon: I.assets, label: 'Assets', action: () => { const p = $('#panel'); if (p) p.dataset.tab = 'scene'; if (GF.assetsUI) GF.assetsUI.show(); } },
-  };
+  /* ─── Command registrations ───
+     Every hotbar action is a registry command: declared once, rendered from
+     GF.commands, executed via GF.commands.execute. palette:false — these are
+     hotbar placements; the palette covers the same operations via their
+     canonical entries (api.*, file.*, …). Ids are the data-hotbar attributes. */
+  function registerCommands() {
+    // [id, icon, title, run, hotbarClass?]
+    const defs = [
+      // 3D primitives
+      ['add-box',      I.box,       'Box',       () => run('scene3d.addPrimitive', { kind: 'box' })],
+      ['add-sphere',   I.sphere,    'Sphere',    () => run('scene3d.addPrimitive', { kind: 'sphere' })],
+      ['add-cylinder', I.cylinder,  'Cylinder',  () => run('scene3d.addPrimitive', { kind: 'cylinder' })],
+      ['add-plane',    I.plane,     'Plane',     () => run('scene3d.addPrimitive', { kind: 'plane' })],
+      ['import-model', I.import,    'Import',    () => { const fi = $('#file-input'); if (fi) fi.click(); }],
+      // 3D object actions
+      ['obj-delete',   I.trash,     'Delete',    () => run('scene3d.deleteSelected'), 'ab-face-b'],
+      ['obj-dup',      I.duplicate, 'Duplicate', () => run('scene3d.duplicateSelected')],
+      ['obj-paint',    I.ink,       'Paint',     () => { const id = S() && S().selectedId(); if (id != null && GF.paint3d) GF.paint3d.enter(id); }],
+      ['obj-material', I.material,  'Material',  () => { const p = $('#panel'); if (p) p.dataset.tab = 'scene'; }],
+      ['obj-frame',    I.frame,     'Frame',     () => run('scene3d.frameSelected')],
+      ['obj-flatten',  I.flatten2d, 'To 2D',     () => { if (GF.scene3dUI) GF.scene3dUI.flattenAndReturn(); }],
+      // animation
+      ['anim-play',    I.play,      'Play',      () => { if (GF.animation) GF.animation.play(); }, 'ab-face-a'],
+      ['anim-pause',   I.pause,     'Pause',     () => { if (GF.animation) GF.animation.pause(); }],
+      ['anim-stop',    I.stop,      'Stop',      () => { if (GF.animation) GF.animation.stop(); }],
+      // 2D quick actions
+      ['enhance',      I.enhance,   'Enhance',   () => run('autoEnhance'), 'ab-ai'],
+      ['remove-bg',    I.wand,      'Remove BG', () => { if (GF.ui && GF.ui.actions) GF.ui.actions.removeBg(); }, 'ab-ai'],
+      ['ai-gen',       I.robot,     'AI Gen',    () => { if (GF.ui) GF.ui.openAIDialog(); }, 'ab-ai'],
+      ['quick-adjust', I.adjust,    'Adjust',    () => { const p = $('#panel'); if (p) p.dataset.tab = 'adjust'; }],
+      // 2D selection outcomes
+      ['sel-remove',   I.removeSel, 'Remove',    () => selAction('remove')],
+      ['sel-cutout',   I.scissors,  'Cut Out',   () => selAction('cutout')],
+      ['sel-fill',     I.bucket,    'Fill',      () => selAction('fill')],
+      ['sel-ai',       I.robot,     'AI Fill',   () => selAction('aiReplace'), 'ab-ai'],
+      ['sel-recolor',  I.recolor,   'Recolor',   () => selAction('recolor')],
+      ['sel-copy',     I.copy,      'Copy Lyr',  () => selAction('copyLayer')],
+      ['sel-crop',     I.cropSel,   'Crop',      () => selAction('crop')],
+      ['sel-invert',   I.invert,    'Invert',    () => run('invertSelection')],
+      ['sel-delete',   I.trash,     'Delete',    () => selAction('delete'), 'ab-face-b'],
+      ['sel-expand',   I.expand,    'Expand',    () => selAction('expand')],
+      ['sel-feather',  I.feather,   'Feather',   () => selAction('feather')],
+      ['sel-none',     I.deselect,  'Deselect',  () => { GF.select.clear(); V().requestRender(); }],
+      // 2D painting workflow
+      ['new-layer',    I.newLayer,  'New Layer', () => run('addLayer')],
+      ['merge-down',   I.merge,     'Merge',     () => run('mergeDown')],
+      // transform operations
+      ['flip-h',       I.flipH,     'Flip H',    () => run('flipLayer', { horizontal: true })],
+      ['flip-v',       I.flipV,     'Flip V',    () => run('flipLayer', { horizontal: false })],
+      ['rotate-cw',    I.rotateCW,  'Rot CW',    () => run('rotateLayer', { cw: true })],
+      ['rotate-ccw',   I.rotateCCW, 'Rot CCW',   () => run('rotateLayer', { cw: false })],
+      ['upscale',      I.upscale,   'Upscale',   () => run('smartUpscale', { factor: 2, mode: 'photo' })],
+      ['trim',         I.trim,      'Trim',      () => run('trim')],
+      ['flatten-all',  I.flatAll,   'Flatten',   () => run('flatten')],
+      ['dup-layer',    I.duplicate, 'Dup Lyr',   () => run('duplicateLayer')],
+      ['add-mask',     I.mask,      'Mask',      () => run('addMask', { init: 'reveal' })],
+      // creative tools
+      ['ink-outline',  I.ink,       'Ink Lines', () => run('inkOutline', { newLayer: true })],
+      ['clean-colors', I.clean,     'Clean',     () => run('cleanColors', { colors: 8 })],
+      ['copy-clip',    I.clipboard, 'Copy',      () => run('copyToClipboard')],
+      // global / export
+      ['export',       I.exportF,   'Export',    () => { if (GF.ui) GF.ui.openExportDialog(); }, 'ab-face-a'],
+      ['ai-tools',     I.ai,        'AI',        () => { if (GF.ui) GF.ui.openAIDialog(); }, 'ab-ai'],
+      // empty state
+      ['open-file',    I.open,      'Open',      () => { if (GF.ui) GF.ui.pickFile(); }],
+      ['new-doc',      I.plus,      'New',       () => { if (GF.ui) GF.ui.openNewDialog(); }],
+      // assets
+      ['assets',       I.assets,    'Assets',    () => { const p = $('#panel'); if (p) p.dataset.tab = 'scene'; if (GF.assetsUI) GF.assetsUI.show(); }],
+    ];
+    defs.forEach(([id, icon, title, fn, cls]) =>
+      GF.commands.register({ id, icon, title, palette: false, hotbar: cls ? { class: cls } : {}, run: fn }));
+  }
 
   /* ─── Selection action engine ───
      Delegates to GF.selectionBar (selection-bar.js) for the canvas-level
@@ -247,35 +243,17 @@ GF.hotbar = (function () {
     'animation': ['anim-stop', 'anim-pause'],
   };
 
-  /* ─── Context detection ─── */
+  /* ─── Context detection — derived from the shared context keys ─── */
   function detect() {
-    const doc = D();
-
-    // No document open
-    if (!doc || !doc.doc.open) return 'empty';
-
-    // Animation playing
-    if (GF.animation && GF.animation.isPlaying && GF.animation.isPlaying()) return 'animation';
-
+    const c = GF.context;
+    c.sync();
+    if (!c.get('docOpen')) return 'empty';
+    if (c.get('animPlaying')) return 'animation';
     // Selection takes priority — a selection always gets outcome actions
-    const sel = GF.select;
-    if (sel && sel.has && sel.has()) return '2d-selection';
-
-    // 3D mode
-    if (is3D()) {
-      const scene = S();
-      if (scene && scene.selected && scene.selected()) return '3d-selected';
-      return '3d-idle';
-    }
-
-    // Check active tool for specialized contexts
-    const view = V();
-    if (view && view.view) {
-      const tool = view.view.tool;
-      if (tool === 'brush' || tool === 'fill' || tool === 'gradient') return '2d-painting';
-      if (tool === 'text') return '2d-text';
-    }
-
+    if (c.get('selectionActive')) return '2d-selection';
+    if (c.get('mode3d')) return c.get('has3dSelection') ? '3d-selected' : '3d-idle';
+    if (c.get('painting')) return '2d-painting';
+    if (c.get('textTool')) return '2d-text';
     return '2d-idle';
   }
 
@@ -297,11 +275,11 @@ GF.hotbar = (function () {
         html += '<span class="ab-sep"></span>';
         continue;
       }
-      const a = ACTIONS[id];
-      if (!a) continue;
-      const cls = 'ab-btn' + (a.class ? ' ' + a.class : '');
-      html += '<button class="' + cls + '" data-hotbar="' + id + '" title="' + a.label + '">' +
-        '<span class="ab-icon">' + a.icon + '</span><span class="ab-label">' + a.label + '</span>' +
+      const c = GF.commands.get(id);
+      if (!c) continue;   // init() asserted all ids — this guards mid-boot races only
+      const cls = 'ab-btn' + (c.hotbar && c.hotbar.class ? ' ' + c.hotbar.class : '');
+      html += '<button class="' + cls + '" data-hotbar="' + id + '" title="' + c.title + '">' +
+        '<span class="ab-icon">' + c.icon + '</span><span class="ab-label">' + c.title + '</span>' +
         '</button>';
     }
 
@@ -315,12 +293,11 @@ GF.hotbar = (function () {
 
   /* ─── Event wiring ─── */
   function wireEvents() {
-    // Click delegation
+    // Click delegation — everything dispatches through the registry
     barEl.addEventListener('click', function (e) {
       const btn = e.target.closest('[data-hotbar]');
       if (!btn) return;
-      const action = ACTIONS[btn.dataset.hotbar];
-      if (action) action.action();
+      try { GF.commands.execute(btn.dataset.hotbar); } catch (err) { U.toast(err.message); }
     });
 
     // Listen to state changes and re-render
@@ -339,6 +316,11 @@ GF.hotbar = (function () {
 
   /* ─── Public ─── */
   function init() {
+    registerCommands();
+    // Boot integrity: every id the layout references must be registered.
+    // A renamed command is now a startup error, not a silently dead button.
+    GF.commands.assertIds(
+      Object.values(CONTEXTS).reduce((a, b) => a.concat(b), []).filter(x => x !== '|'), 'hotbar');
     barEl = document.getElementById('actionbar');
     if (!barEl) {
       barEl = document.createElement('div');

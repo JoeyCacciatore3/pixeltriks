@@ -57,6 +57,36 @@
       for (const n of ['autoEnhance', 'scene3d.deleteSelected', 'scene3d.duplicateSelected', 'scene3d.frameSelected'])
         if (!names.includes(n)) throw new Error('missing command: ' + n);
     });
+
+    /* ---------- COMMAND REGISTRY (Phase B) ---------- */
+    await t('registry: commands registered from all surfaces', () => {
+      for (const id of ['tool.brush', 'file.open', 'api.undo', 'sel-fill', 'obj-delete', 'transform.nudge', 'adjust.curves'])
+        if (!GF.commands.has(id)) throw new Error('missing registry command: ' + id);
+      if (GF.commands.list().length < 80) throw new Error('registry suspiciously small: ' + GF.commands.list().length);
+    });
+    await t('registry: unknown execute throws, duplicate register throws', () => {
+      let threw = 0;
+      try { GF.commands.execute('no.such.command'); } catch (e) { threw++; }
+      try { GF.commands.register({ id: 'file.open', run: () => {} }); } catch (e) { threw++; }
+      try { GF.commands.bind('mod+q', 'no.such.command'); } catch (e) { threw++; }
+      if (threw !== 3) throw new Error('integrity checks not enforced (' + threw + '/3 threw)');
+    });
+    await t('registry: when-clause evaluation gates visibility', () => {
+      GF.context.sync();
+      if (!GF.context.evaluate('docOpen')) throw new Error('docOpen should be true');
+      if (GF.context.evaluate('!docOpen && mode3d')) throw new Error('parser: bad && with !');
+      if (!GF.context.evaluate('docOpen || nonsenseKey')) throw new Error('parser: bad ||');
+    });
+    await t('palette derives from registry (tools + api + dialogs + filters)', () => {
+      const labels = GF.commands.palette().map(c => c.label);
+      for (const l of ['Brush (paint/erase)', 'Open image…', 'Undo', 'Filter: Vivid', 'Auto enhance', 'Color range…'])
+        if (!labels.includes(l)) throw new Error('palette missing: ' + l);
+    });
+    await t('keyboard bindings resolve through the registry', () => {
+      if (GF.commands.lookup('mod+z') !== 'api.undo') throw new Error('mod+z → ' + GF.commands.lookup('mod+z'));
+      if (GF.commands.lookup('b') !== 'tool.brush') throw new Error('b → ' + GF.commands.lookup('b'));
+      if (GF.commands.lookup(']') !== 'view.zoomIn') throw new Error('] → ' + GF.commands.lookup(']'));
+    });
     await t('shared UI entry points exported (pickFile / dialogs / flatten)', () => {
       for (const f of ['pickFile', 'openNewDialog', 'openExportDialog'])
         if (typeof GF.ui[f] !== 'function') throw new Error('GF.ui.' + f + ' missing');

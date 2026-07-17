@@ -94,6 +94,7 @@ window.GF = window.GF || {};
     buildAdjustUI();
     buildFilters();
     buildBlendOptions();
+    registerCommands();   // command registry: declare once, every surface renders from it
     wireTopbar();
     wireTools();
     wirePanel();
@@ -705,6 +706,9 @@ window.GF = window.GF || {};
     });
   }
 
+  /* Keyboard dispatch is DATA: key signature → command id, from the registry
+     binding table (see registerCommands). Only Escape stays special-cased —
+     it must coordinate with the modal/palette state. */
   function wireKeyboard() {
     window.addEventListener('keydown', e => {
       const k = e.key.toLowerCase();
@@ -715,20 +719,12 @@ window.GF = window.GF || {};
       if (modalEl) return;
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
       if (typing) return;
-      if ((e.ctrlKey || e.metaKey)) {
-        if (k === 'z') { e.preventDefault(); run(e.shiftKey ? 'redo' : 'undo'); return; }
-        if (k === 'y') { e.preventDefault(); run('redo'); return; }
-        if (k === 'c' && e.shiftKey) { e.preventDefault(); run('copyToClipboard'); return; }
-        if (k === 's') { e.preventDefault(); GF.exporter.saveProject(); return; }
-        if (k === 'e') { e.preventDefault(); openExportDialog(); return; }
-        if (k === 'm') { e.preventDefault(); if (D.doc.open) openCurves(); return; }
-        if (k === 'a') { e.preventDefault(); run('selectAll'); return; }
-        if (k === 'i') { e.preventDefault(); run('invertSelection'); return; }
-        return;
-      }
-      if (k === ']') { zoomBtn(1.2); return; }
-      if (k === '[') { zoomBtn(0.83); return; }
-      if (SHORTCUTS[k]) { setTool(SHORTCUTS[k]); }
+      const sig = ((e.ctrlKey || e.metaKey) ? 'mod+' : '') + (e.shiftKey ? 'shift+' : '') + k;
+      const id = GF.commands.lookup(sig) ||
+                 (!e.ctrlKey && !e.metaKey ? GF.commands.lookup(k) : null);  // shift+B still picks the brush
+      if (!id) return;   // unbound mod-combos (e.g. ⌘C) stay with the browser
+      e.preventDefault();
+      try { GF.commands.execute(id); } catch (err) { U.toast(err.message); }
     });
   }
 
@@ -993,58 +989,70 @@ window.GF = window.GF || {};
   /* =================================================================
      Command palette (⌘K) — fuzzy launcher for every action
      ================================================================= */
-  /* The palette is DERIVED, not hand-maintained: tools come from TOOLMAP +
-     SHORTCUTS, engine actions from the GF.api catalog (every command carrying
-     ui metadata), and only dialogs / composite UI actions are listed here. */
+  /* The palette is DERIVED from the command registry (GF.commands) — every
+     entry below is registered once in registerCommands(), engine actions are
+     imported from the GF.api catalog, and all surfaces render from there. */
   const TOOL_LABELS = {
     move: 'Move', select: 'Select', wand: 'Smart select', crop: 'Crop',
     brush: 'Brush (paint/erase)', fill: 'Fill', gradient: 'Gradient',
     text: 'Text', shape: 'Shape', scene3d: '3D workspace',
   };
-  function commandList() {
-    const cmds = Object.keys(TOOL_LABELS).map(t => {
+  /* Declare every UI-side command ONCE in the registry; bind keys as data.
+     GF.commands.bind throws on unknown ids and key collisions at boot. */
+  function registerCommands() {
+    const reg = GF.commands.register, bind = GF.commands.bind;
+
+    // engine actions, straight from the GF.api catalog (ids: api.<name>).
+    // needsDoc became when:'docOpen' — "a document must be open", NOT
+    // "active layer has pixels" (guarded() would wrongly block adjustment layers)
+    GF.commands.importApi();
+
+    // tools (single-letter bindings from SHORTCUTS)
+    Object.keys(TOOL_LABELS).forEach(t => {
       const key = Object.keys(SHORTCUTS).find(k => SHORTCUTS[k] === t);
-      return { group: 'Tools', label: TOOL_LABELS[t], hint: key ? key.toUpperCase() : undefined, run: () => setTool(t) };
+      reg({ id: 'tool.' + t, title: TOOL_LABELS[t], group: 'Tools', hint: key ? key.toUpperCase() : undefined, run: () => setTool(t) });
+      if (key) bind(key, 'tool.' + t);
     });
-    cmds.push(
-      // dialogs + composite actions that live UI-side by nature
-      { group: 'File', label: 'Open image…', run: pickFile },
-      { group: 'File', label: 'New canvas…', run: openNewDialog },
-      { group: 'File', label: 'Image size…', run: openImageSize },
-      { group: 'File', label: 'Export…', hint: 'Ctrl+E', run: openExportDialog },
-      { group: 'File', label: 'Save project', hint: 'Ctrl+S', run: () => GF.exporter.saveProject() },
-      { group: 'Edit', label: 'Paste image', hint: 'Ctrl+V', run: () => U.toast('Press Ctrl/⌘V to paste an image') },
-      { group: 'Adjust', label: 'Curves…', hint: 'Ctrl+M', run: openCurves },
-      { group: 'Retouch', label: 'Remove background', run: () => guarded(ACTIONS.removeBg) },
-      { group: 'Retouch', label: 'Color replace…', run: () => guarded(openColorReplace) },
-      { group: 'Retouch', label: 'Smart upscale 2×', run: () => guarded(() => run('smartUpscale', { factor: 2, mode: 'photo' })) },
-      { group: 'Select', label: 'Select subject', run: () => guarded(selectSubject) },
-      { group: 'Select', label: 'Color range…', run: () => guarded(openColorRange) },
-      { group: 'Layer', label: 'Layer style (outline / glow / shadow)…', run: () => guarded(openLayerStyle) },
-      { group: 'View', label: 'Zoom in', hint: ']', run: () => zoomBtn(1.25) },
-      { group: 'View', label: 'Zoom out', hint: '[', run: () => zoomBtn(0.8) },
-      { group: 'View', label: 'Fit to screen', run: () => GF.view.zoomFit() },
-      { group: 'View', label: 'Toggle light / dark theme', run: toggleTheme },
-      { group: 'Help', label: 'Keyboard shortcuts', hint: '? / K', run: openCheatSheet },
-      { group: '3D', label: 'Flatten 3D render to layer', run: () => { if (GF.scene3d && GF.scene3d.count()) GF.scene3dUI.flattenAndReturn(); else U.toast('Add a 3D object first'); } },
-      { group: '3D', label: 'Export GLB (3D scene)', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') },
-    );
-    // every ui-annotated engine command, straight from the catalog.
-    // needsDoc means "a document must be open" — NOT "active layer has pixels"
-    // (guarded() would wrongly block these while an adjustment layer is active)
-    const docGuarded = fn => D.doc.open ? fn() : U.toast('Open an image first');
-    GF.api.commands().forEach(c => cmds.push({
-      group: c.group, label: c.label, hint: c.hint,
-      run: () => c.needsDoc ? docGuarded(() => run(c.name, {})) : run(c.name, {}),
-    }));
-    ADJ_LAYER_TYPES.forEach(t => cmds.push({ group: 'Adjustment', label: 'Add ' + t.label + ' layer', run: () => addAdjustmentLayer(t.kind) }));
-    FILTERS.forEach(f => cmds.push({ group: 'Filters', label: 'Filter: ' + f.name, run: () => guarded(() => { GF.filters.applyToLayer(D.active(), f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name); }) }));
+
+    // dialogs + composite actions that live UI-side by nature
+    reg({ id: 'file.open', title: 'Open image…', group: 'File', run: pickFile });
+    reg({ id: 'file.new', title: 'New canvas…', group: 'File', run: openNewDialog });
+    reg({ id: 'file.imageSize', title: 'Image size…', group: 'File', when: 'docOpen', run: openImageSize });
+    reg({ id: 'file.export', title: 'Export…', group: 'File', hint: 'Ctrl+E', run: openExportDialog });
+    reg({ id: 'file.save', title: 'Save project', group: 'File', hint: 'Ctrl+S', run: () => GF.exporter.saveProject() });
+    reg({ id: 'edit.paste', title: 'Paste image', group: 'Edit', hint: 'Ctrl+V', run: () => U.toast('Press Ctrl/⌘V to paste an image') });
+    reg({ id: 'adjust.curves', title: 'Curves…', group: 'Adjust', hint: 'Ctrl+M', when: 'docOpen',
+          home: { surface: 'Inspector', section: 'Adjust', order: 1 }, run: openCurves });
+    reg({ id: 'retouch.removeBg', title: 'Remove background', group: 'Retouch', when: 'docOpen', run: () => guarded(ACTIONS.removeBg) });
+    reg({ id: 'retouch.colorReplace', title: 'Color replace…', group: 'Retouch', when: 'docOpen', run: () => guarded(openColorReplace) });
+    reg({ id: 'retouch.upscale2x', title: 'Smart upscale 2×', group: 'Retouch', when: 'docOpen', run: () => guarded(() => run('smartUpscale', { factor: 2, mode: 'photo' })) });
+    reg({ id: 'select.subject', title: 'Select subject', group: 'Select', when: 'docOpen', run: () => guarded(selectSubject) });
+    reg({ id: 'select.colorRange', title: 'Color range…', group: 'Select', when: 'docOpen', run: () => guarded(openColorRange) });
+    reg({ id: 'layer.style', title: 'Layer style (outline / glow / shadow)…', group: 'Layer', when: 'docOpen', run: () => guarded(openLayerStyle) });
+    reg({ id: 'view.zoomIn', title: 'Zoom in', group: 'View', hint: ']', run: () => zoomBtn(1.25) });
+    reg({ id: 'view.zoomOut', title: 'Zoom out', group: 'View', hint: '[', run: () => zoomBtn(0.8) });
+    reg({ id: 'view.fit', title: 'Fit to screen', group: 'View', run: () => GF.view.zoomFit() });
+    reg({ id: 'view.theme', title: 'Toggle light / dark theme', group: 'View', run: toggleTheme });
+    reg({ id: 'help.shortcuts', title: 'Keyboard shortcuts', group: 'Help', hint: '? / K', run: openCheatSheet });
+    reg({ id: 'scene3d.flatten2d', title: 'Flatten 3D render to layer', group: '3D', run: () => { if (GF.scene3d && GF.scene3d.count()) GF.scene3dUI.flattenAndReturn(); else U.toast('Add a 3D object first'); } });
+    reg({ id: 'scene3d.exportGlb', title: 'Export GLB (3D scene)', group: '3D', run: () => GF.scene3d && GF.scene3d.count() ? GF.scene3d.exportGLB({}) : U.toast('Add a 3D object first') });
+
+    // adjustment layers, filter presets, texture tools
+    ADJ_LAYER_TYPES.forEach(t => reg({ id: 'adjlayer.' + t.kind, title: 'Add ' + t.label + ' layer', group: 'Adjustment', when: 'docOpen', run: () => addAdjustmentLayer(t.kind) }));
+    FILTERS.forEach(f => reg({ id: 'filter.' + f.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), title: 'Filter: ' + f.name, group: 'Filters', when: 'docOpen', run: () => guarded(() => { GF.filters.applyToLayer(D.active(), f.name, f.fn); GF.view.requestRender(); refreshLayers(); U.toast(f.name); }) }));
     if (GF.texture) {
-      const map = { 'Normal map': makeNormalMap, 'Seamless tile': makeSeamless };
-      Object.keys(map).forEach(l => cmds.push({ group: 'Texture', label: l, run: () => guarded(map[l]) }));
+      reg({ id: 'texture.normalMap', title: 'Normal map', group: 'Texture', when: 'docOpen', run: () => guarded(makeNormalMap) });
+      reg({ id: 'texture.seamless', title: 'Seamless tile', group: 'Texture', when: 'docOpen', run: () => guarded(makeSeamless) });
     }
-    return cmds;
+
+    // keyboard bindings as data — 'mod' = Ctrl/⌘, dispatched by wireKeyboard
+    bind('mod+z', 'api.undo'); bind('mod+shift+z', 'api.redo'); bind('mod+y', 'api.redo');
+    bind('mod+shift+c', 'api.copyToClipboard');
+    bind('mod+s', 'file.save'); bind('mod+e', 'file.export'); bind('mod+m', 'adjust.curves');
+    bind('mod+a', 'api.selectAll'); bind('mod+i', 'api.invertSelection');
+    bind(']', 'view.zoomIn'); bind('[', 'view.zoomOut');
   }
+  function commandList() { return GF.commands.palette(); }
   function guarded(fn) { if (!D.active() || !D.active().canvas) return U.toast('Open an image first'); fn(); }
   /* Substring matches always outrank scattered-subsequence matches (typing
      "fill" must surface "Generative fill", not "FILter: cooL"), word-start
@@ -1076,7 +1084,7 @@ window.GF = window.GF || {};
         .sort((a, b) => a.s - b.s).slice(0, 50).map(m => m.c);
       palIdx = 0;
       list.innerHTML = palItems.length ? palItems.map((c, i) =>
-        `<li class="cmdk-item${i === 0 ? ' on' : ''}" data-i="${i}" role="option"><span class="cmdk-grp">${c.group}</span><span class="cmdk-label">${c.label}</span>${c.hint ? `<span class="kbd">${c.hint}</span>` : ''}</li>`).join('')
+        `<li class="cmdk-item${i === 0 ? ' on' : ''}" data-i="${i}" role="option"><span class="cmdk-grp">${c.group}</span><span class="cmdk-label">${c.label}</span>${c.home ? `<span class="cmdk-path">${c.home}</span>` : ''}${c.hint ? `<span class="kbd">${c.hint}</span>` : ''}</li>`).join('')
         : `<li class="cmdk-empty">No matching actions</li>`;
       list.querySelectorAll('.cmdk-item').forEach(li => {
         li.addEventListener('mousemove', () => setActive(+li.dataset.i));

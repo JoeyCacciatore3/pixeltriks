@@ -907,7 +907,7 @@ GF.scene3d = (function () {
     addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, duplicateObject, setVisible,
     listObjects, getObject, setObject, byId, count,
     // selection / interaction
-    select, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame,
+    select, selected, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame,
     rendererEl: () => renderer ? renderer.domElement : null,
     // gizmo (TransformControls)
     setGizmoMode: mode => { if (gizmo) gizmo.setMode(mode); },
