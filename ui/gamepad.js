@@ -23,8 +23,6 @@
 window.GF = window.GF || {};
 
 GF.gamepad = (function () {
-  const DZ = 0.18;            // scaled radial dead zone
-  const CURVE = 1.6;          // response exponent (slow start, fast finish)
   const MOVE_RATE_2D = 240;   // px/sec at full deflection
   const MOVE_RATE_3D = 2.4;   // world units/sec
   const ROT_RATE = 140;       // deg/sec
@@ -38,6 +36,29 @@ GF.gamepad = (function () {
   const B = { A: 0, B: 1, X: 2, Y: 3, L1: 4, R1: 5, L2: 6, R2: 7,
               SELECT: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 
+  /* ─── Discrete button layout: pure DATA (button → command id [+ args]).
+     User overrides persist in localStorage and win; ui/remap.js edits them. */
+  const PAD_DEFAULTS = {
+    LEFT:   { id: 'api.undo' },
+    RIGHT:  { id: 'api.redo' },
+    UP:     { id: 'transform.nudge', args: { dy: -1 } },
+    DOWN:   { id: 'transform.nudge', args: { dy: 1 } },
+    START:  { id: 'view.commandPalette' },
+    SELECT: { id: 'view.toggleMode' },
+    B:      { id: 'edit.back' },
+    X:      { id: 'hotbar.slot1' },
+    Y:      { id: 'hotbar.slot2' },
+    L1:     { id: 'cycle.prev' },
+    R1:     { id: 'cycle.next' },
+    L3:     { id: 'view.fit' },
+  };
+  const LS_PAD = 'pt-pad-overrides', LS_TUNE = 'pt-pad-tuning';
+  let padMap = {};
+
+  /* ─── Feel: user-tunable (Dreams a11y precedent — ui/remap.js sliders) ─── */
+  const TUNE_DEFAULTS = { sens: 1, dz: 0.18, curve: 1.6 };
+  let tune = Object.assign({}, TUNE_DEFAULTS);
+
   let raf = 0, last = 0, padIndex = null, prev = [], connected = false;
   let moveGesture = false;
 
@@ -45,9 +66,44 @@ GF.gamepad = (function () {
      small deflections give sub-pixel precision, full deflection is fast. */
   function shape(x, y) {
     const mag = Math.hypot(x, y);
-    if (mag < DZ) return { x: 0, y: 0, mag: 0 };
-    const curved = Math.pow(Math.min(1, (mag - DZ) / (1 - DZ)), CURVE);
+    if (mag < tune.dz) return { x: 0, y: 0, mag: 0 };
+    const curved = Math.pow(Math.min(1, (mag - tune.dz) / (1 - tune.dz)), tune.curve);
     return { x: x / mag * curved, y: y / mag * curved, mag: curved };
+  }
+
+  function loadPrefs() {
+    padMap = {};
+    for (const k in PAD_DEFAULTS) padMap[k] = Object.assign({}, PAD_DEFAULTS[k]);
+    try {
+      const o = JSON.parse(localStorage.getItem(LS_PAD) || '{}');
+      for (const k in o) if (padMap[k] && GF.commands.has(o[k])) padMap[k] = { id: o[k] };
+    } catch (e) {}
+    try { Object.assign(tune, JSON.parse(localStorage.getItem(LS_TUNE) || '{}')); } catch (e) {}
+  }
+
+  /* ─── Remap / tuning API (consumed by ui/remap.js) ─── */
+  function getBindings() { const out = {}; for (const k in padMap) out[k] = padMap[k].id; return out; }
+  function getDefaults() { const out = {}; for (const k in PAD_DEFAULTS) out[k] = PAD_DEFAULTS[k].id; return out; }
+  function setBinding(btn, id) {
+    if (!(btn in PAD_DEFAULTS)) throw new Error('unknown pad button: ' + btn);
+    if (!GF.commands.has(id)) throw new Error('unknown command: ' + id);
+    padMap[btn] = (id === PAD_DEFAULTS[btn].id) ? Object.assign({}, PAD_DEFAULTS[btn]) : { id };
+    const o = {};
+    for (const k in padMap) if (padMap[k].id !== PAD_DEFAULTS[k].id) o[k] = padMap[k].id;
+    try { localStorage.setItem(LS_PAD, JSON.stringify(o)); } catch (e) {}
+  }
+  function getTuning() { return Object.assign({}, tune); }
+  function setTuning(patch) {
+    Object.assign(tune, patch);
+    tune.sens = Math.min(3, Math.max(0.2, +tune.sens || 1));
+    tune.dz = Math.min(0.4, Math.max(0.05, +tune.dz || TUNE_DEFAULTS.dz));
+    tune.curve = Math.min(3, Math.max(1, +tune.curve || TUNE_DEFAULTS.curve));
+    try { localStorage.setItem(LS_TUNE, JSON.stringify(tune)); } catch (e) {}
+  }
+  function resetPrefs() {
+    try { localStorage.removeItem(LS_PAD); localStorage.removeItem(LS_TUNE); } catch (e) {}
+    tune = Object.assign({}, TUNE_DEFAULTS);
+    loadPrefs();
   }
 
   const exec = (id, args) => { try { GF.commands.execute(id, args); } catch (e) { GF.util.toast(e.message); } };
@@ -125,18 +181,12 @@ GF.gamepad = (function () {
       if (pressed(gp, B.B) || pressed(gp, B.START)) paletteKey('Escape');
     } else {
       /* ---- discrete: pure binding table → registry ---- */
-      if (pressed(gp, B.LEFT))  { exec('api.undo'); rumble(gp, 25); }
-      if (pressed(gp, B.RIGHT)) { exec('api.redo'); rumble(gp, 25); }
-      if (pressed(gp, B.UP))    exec('transform.nudge', { dy: -1 });
-      if (pressed(gp, B.DOWN))  exec('transform.nudge', { dy: 1 });
-      if (pressed(gp, B.START)) exec('view.commandPalette');
-      if (pressed(gp, B.SELECT)) exec('view.toggleMode');
-      if (pressed(gp, B.B)) back();
-      if (pressed(gp, B.X)) slot(0);
-      if (pressed(gp, B.Y)) slot(1);
-      if (pressed(gp, B.L1)) exec('cycle.prev');
-      if (pressed(gp, B.R1)) exec('cycle.next');
-      if (pressed(gp, B.L3)) exec('view.fit');
+      for (const btn in padMap) {
+        if (pressed(gp, B[btn])) {
+          exec(padMap[btn].id, padMap[btn].args);
+          if (padMap[btn].id === 'api.undo' || padMap[btn].id === 'api.redo') rumble(gp, 25);
+        }
+      }
 
       /* ---- analog: trigger clutches rebind the left stick ---- */
       const ls = shape(gp.axes[0] || 0, gp.axes[1] || 0);
@@ -148,11 +198,11 @@ GF.gamepad = (function () {
       if (ls.mag) {
         if (!moveGesture) { moveGesture = true; GF.transformPad.startGesture('gamepad transform'); }
         if (l2 > TRIGGER_ON) {
-          exec('transform.rotateStep', { deg: ls.x * ROT_RATE * dt * fine(l2) });
+          exec('transform.rotateStep', { deg: ls.x * ROT_RATE * tune.sens * dt * fine(l2) });
         } else if (r2 > TRIGGER_ON) {
-          exec('transform.scaleStep', { factor: Math.pow(1 + SCALE_RATE * dt * fine(r2), -ls.y) });  // stick up = grow
+          exec('transform.scaleStep', { factor: Math.pow(1 + SCALE_RATE * tune.sens * dt * fine(r2), -ls.y) });  // stick up = grow
         } else {
-          const rate = (GF.context.get('mode3d') ? MOVE_RATE_3D : MOVE_RATE_2D) * dt;
+          const rate = (GF.context.get('mode3d') ? MOVE_RATE_3D : MOVE_RATE_2D) * tune.sens * dt;
           exec('transform.nudge', { dx: ls.x * rate, dy: ls.y * rate });
         }
       } else if (moveGesture) {
@@ -162,10 +212,10 @@ GF.gamepad = (function () {
 
       if (rs.mag) {
         if (GF.context.get('mode3d') && GF.scene3d && GF.scene3d.orbitCamera) {
-          GF.scene3d.orbitCamera(rs.x * ORBIT_RATE * dt, rs.y * ORBIT_RATE * dt);
+          GF.scene3d.orbitCamera(rs.x * ORBIT_RATE * tune.sens * dt, rs.y * ORBIT_RATE * tune.sens * dt);
         } else if (GF.view && GF.view.view) {
-          GF.view.view.panX -= rs.x * PAN_RATE * dt;
-          GF.view.view.panY -= rs.y * PAN_RATE * dt;
+          GF.view.view.panX -= rs.x * PAN_RATE * tune.sens * dt;
+          GF.view.view.panY -= rs.y * PAN_RATE * tune.sens * dt;
           GF.view.requestRender();
         }
       }
@@ -177,6 +227,10 @@ GF.gamepad = (function () {
   function init() {
     GF.commands.register({ id: 'cycle.prev', title: 'Select previous layer / object', group: 'View', palette: false, run: () => cycle(-1) });
     GF.commands.register({ id: 'cycle.next', title: 'Select next layer / object', group: 'View', palette: false, run: () => cycle(1) });
+    GF.commands.register({ id: 'edit.back', title: 'Back — deselect / close', group: 'Edit', palette: false, run: back });
+    GF.commands.register({ id: 'hotbar.slot1', title: 'Run hotbar slot 1', group: 'View', palette: false, run: () => slot(0) });
+    GF.commands.register({ id: 'hotbar.slot2', title: 'Run hotbar slot 2', group: 'View', palette: false, run: () => slot(1) });
+    loadPrefs();
     window.addEventListener('gamepaddisconnected', e => {
       if (padIndex === e.gamepad.index) {
         padIndex = null; connected = false;
@@ -187,5 +241,6 @@ GF.gamepad = (function () {
     if (!raf) raf = requestAnimationFrame(frame);
   }
 
-  return { init, _shape: shape, isConnected: () => connected };
+  return { init, _shape: shape, isConnected: () => connected,
+           getBindings, getDefaults, setBinding, getTuning, setTuning, resetPrefs };
 })();

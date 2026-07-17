@@ -55,6 +55,14 @@ GF.commands = (function () {
     bindings[key] = id;
   }
   function lookup(key) { return bindings[key] || null; }
+  /* User remapping (ui/remap.js): rebind overwrites without the boot-time
+     collision check; unbindKey removes. Persistence lives in the remap UI. */
+  function rebind(key, id) {
+    if (!C.has(id)) throw new Error('commands.rebind: unknown command "' + id + '"');
+    bindings[key] = id;
+  }
+  function unbindKey(key) { delete bindings[key]; }
+  function allBindings() { return Object.assign({}, bindings); }
 
   /* --- surface feeds --- */
   /** Palette entries: every visible, palette-eligible command. */
@@ -93,5 +101,5 @@ GF.commands = (function () {
 
   function list() { return [...C.keys()]; }
 
-  return { register, get, has, execute, bind, lookup, palette, importApi, assertIds, list };
+  return { register, get, has, execute, bind, lookup, rebind, unbindKey, allBindings, palette, importApi, assertIds, list };
 })();

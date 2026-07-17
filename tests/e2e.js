@@ -108,6 +108,33 @@
       const first = document.querySelector('#actionbar .ab-btn');
       if (!first || first.dataset.pad !== 'X') throw new Error('first hotbar slot missing X badge');
     });
+    /* ---------- REMAP + PLUGINS (Phase E) ---------- */
+    await t('remap: rebind + unbind keyboard through registry API', () => {
+      if (!GF.remap || !GF.commands.has('help.controls')) throw new Error('remap module / command missing');
+      GF.commands.rebind('mod+9', 'file.export');
+      if (GF.commands.lookup('mod+9') !== 'file.export') throw new Error('rebind failed');
+      GF.commands.unbindKey('mod+9');
+      if (GF.commands.lookup('mod+9')) throw new Error('unbind failed');
+    });
+    await t('remap: gamepad bindings + tuning are data with persistence API', () => {
+      const before = GF.gamepad.getBindings();
+      if (before.LEFT !== 'api.undo') throw new Error('default LEFT should be undo, got ' + before.LEFT);
+      GF.gamepad.setBinding('LEFT', 'api.redo');
+      if (GF.gamepad.getBindings().LEFT !== 'api.redo') throw new Error('setBinding failed');
+      GF.gamepad.setTuning({ dz: 0.35 });
+      if (GF.gamepad._shape(0.3, 0).mag !== 0) throw new Error('tuned dead zone not applied');
+      GF.gamepad.resetPrefs();
+      if (GF.gamepad.getBindings().LEFT !== 'api.undo') throw new Error('resetPrefs failed');
+      if (GF.gamepad._shape(0.3, 0).mag === 0) throw new Error('tuning not reset');
+    });
+    await t('plugins: sample plugin loads and registers a command', async () => {
+      if (!GF.plugins) throw new Error('GF.plugins missing');
+      const ok = await GF.plugins.load('./plugins/hello.js');
+      if (!ok) throw new Error('plugin load failed');
+      if (!GF.commands.has('plugin.hello')) throw new Error('plugin command not registered');
+      if (GF.commands.lookup('mod+shift+h') !== 'plugin.hello') throw new Error('plugin binding missing');
+    });
+
     await t('gamepad: stick gesture = ONE history entry', () => {
       freshDoc(120, 120);
       GF.context.sync();

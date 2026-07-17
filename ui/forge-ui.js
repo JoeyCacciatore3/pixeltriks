@@ -144,6 +144,8 @@ window.GF = window.GF || {};
     if (GF.transformPad) GF.transformPad.init();
     if (GF.hotbar) GF.hotbar.init();
     if (GF.gamepad) GF.gamepad.init();
+    if (GF.remap) GF.remap.init();      // applies user key overrides — after ALL registrations
+    if (GF.plugins) GF.plugins.boot();  // last: plugins may add commands + bindings
     GF.history.onChange(updateUndoRedo);
     setTool('move');
     updateUndoRedo();
@@ -943,12 +945,13 @@ window.GF = window.GF || {};
         <button class="pro-btn" data-a="save">💾 Save project</button>
         <button class="pro-btn" data-a="export">⬇ Export</button>
         <button class="pro-btn" data-a="keys">⌨ Shortcuts</button>
+        <button class="pro-btn" data-a="controls">🎮 Controls</button>
         <button class="pro-btn" data-a="install">⤓ Install app</button>
       </div>`,
       ok: 'Close', noCancel: true,
       mount: m => m.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => {
         closeModal();
-        ({ open: pickFile, new: openNewDialog, size: openImageSize, save: () => GF.exporter.saveProject(), export: openExportDialog, keys: openCheatSheet, install: installApp })[b.dataset.a]();
+        ({ open: pickFile, new: openNewDialog, size: openImageSize, save: () => GF.exporter.saveProject(), export: openExportDialog, keys: openCheatSheet, controls: () => GF.remap.open(), install: installApp })[b.dataset.a]();
       }))
     });
   }

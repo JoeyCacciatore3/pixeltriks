@@ -1,16 +1,16 @@
 /* PixelTriks — service worker (offline app shell).
    Registers only over http(s); a no-op when the app is opened from file://. */
 'use strict';
-const CACHE = 'forge-v38';
+const CACHE = 'forge-v39';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './ui/forge.css', './ui/forge-ui.js', './ui/scene3d-ui.js', './ui/assets-ui.js',
   './ui/timeline-ui.js', './ui/polish.js', './ui/three-bundle.js',
-  './ui/hotbar.js', './ui/transform-pad.js', './ui/gamepad.js', './ui/selection-bar.js', './ui/tool-guides.js',
+  './ui/hotbar.js', './ui/transform-pad.js', './ui/gamepad.js', './ui/remap.js', './ui/selection-bar.js', './ui/tool-guides.js',
   './ai/forge-ai.js',
   './core/util.js', './core/history.js', './core/layers.js', './core/filters.js',
   './core/select.js', './core/retouch.js', './core/tools.js', './core/exporter.js',
-  './core/curves.js', './core/api.js', './core/context.js', './core/commands.js', './core/transform-manager.js', './core/texgen.js', './core/library.js',
+  './core/curves.js', './core/api.js', './core/context.js', './core/commands.js', './core/plugins.js', './core/transform-manager.js', './core/texgen.js', './core/library.js',
   './core/scene3d.js', './core/make3d.js', './core/animation.js', './core/publish.js', './core/paint3d.js', './core/assets.js',
   './vendor/imagetracer/imagetracer.js',
   './vendor/three/three.module.js',

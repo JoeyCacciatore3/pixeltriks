@@ -646,6 +646,15 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
   border-radius: 50%; font-size: 9px; line-height: 15px; text-align: center;
   background: var(--accent); color: #fff; font-weight: 700; pointer-events: none; }
 body.gamepad-on #actionbar .ab-btn[data-pad]::after { display: block; }
+
+/* Controls & plugins dialog (ui/remap.js) */
+.remap-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.remap-table td { padding: .25rem .4rem; border-bottom: 1px solid var(--game-border); }
+.remap-table td:first-child { width: 55%; }
+.remap-select { max-width: 100%; }
+.remap-slider { display: flex; align-items: center; gap: .5rem; margin: .3rem 0; font-size: .85rem; }
+.remap-slider input[type=range] { flex: 1; }
+.remap-slider span { min-width: 3.2em; text-align: right; color: var(--ink-3); }
 .cmdk-item.on .cmdk-label { color: var(--ink); }
 .cmdk-empty { padding: 1.4rem; text-align: center; color: var(--ink-3); }
 .cmdk-foot { display: flex; gap: 1rem; padding: .5rem .9rem;

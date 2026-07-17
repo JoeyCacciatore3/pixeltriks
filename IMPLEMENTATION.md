@@ -66,6 +66,22 @@
 - [x] Chromium rumble on connect/undo/redo (guarded — progressive enhancement);
       cheat sheet gains a gamepad row; sw v38 caches gamepad.js
 
+### Phase E: Future-proofing — COMPLETE ✅ (Jul 17)
+- [x] Registry remap API: `rebind` (user override, overwrites), `unbindKey`, `allBindings`
+- [x] Gamepad buttons became a DATA table (`PAD_DEFAULTS` + localStorage overrides);
+      `getBindings/setBinding/getTuning/setTuning/resetPrefs`
+- [x] `ui/remap.js` — "Controls & plugins" dialog (⌘K → Controls, or ☰ menu):
+      rebind any keyboard shortcut by pressing the new keys; remap every gamepad
+      button via grouped command dropdowns; live sliders for gamepad feel
+      (sensitivity ×, dead zone %, response curve — Dreams a11y precedent);
+      Reset-all. Key overrides persist and apply at boot after all registrations.
+- [x] `core/plugins.js` — buildless plugin loader: an ES module default-exporting
+      `function (GF) {…}`; persisted URLs re-load each boot AFTER built-ins register.
+      Managed from the Controls dialog. Sample: `plugins/hello.js` (7 lines).
+- [x] `docs/PLUGINS.md` — plugin surface reference (register/rebind/setBinding/
+      context keys/engine catalog) + security note
+- [x] sw v39 caches plugins.js + remap.js
+
 
 ## Phase 1: Layout Restructure — COMPLETE ✅
 - [x] Step 1: HTML Grid Shell

@@ -223,10 +223,13 @@ same `transform.nudge.*` commands the d-pad fires; both are clients of
 4. Controller-navigable palette + on-screen keyboard trigger (Steam Deck rules:
    everything reachable by pad alone; never lock out mouse ↔ pad — accumulate both).
 
-### Phase E — Future-proofing
-- Remap UI reading/writing the binding tables (they're already data).
-- Plugin doc: third-party ES module calling `GF.commands.register()`.
-- Per-axis sensitivity/curve sliders (Dreams a11y precedent).
+### Phase E — Future-proofing — ✅ DONE
+- Remap UI reading/writing the binding tables (they're already data) →
+  `ui/remap.js`, "Controls & plugins" dialog.
+- Plugin doc: third-party ES module calling `GF.commands.register()` →
+  `core/plugins.js` loader + `docs/PLUGINS.md` + `plugins/hello.js` sample.
+- Sensitivity/dead-zone/curve sliders (Dreams a11y precedent) → live in the
+  Controls dialog, persisted.
 
 ## Research sources (key)
 Dreams controls & modes: gamertweak.com/dreams-ps4-controls-guide, tapgiles.com/docs/modes,
