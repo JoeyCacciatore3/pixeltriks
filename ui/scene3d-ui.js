@@ -119,7 +119,10 @@ GF.scene3dUI = (function () {
 
     // Lighting controls
     const shadowCk = $('#s3-shadows');
-    if (shadowCk) shadowCk.addEventListener('change', () => S().setShadows(shadowCk.checked));
+    if (shadowCk) shadowCk.addEventListener('change', () => {
+      S().setShadows(shadowCk.checked);
+      U.toast(shadowCk.checked ? 'Shadows on' : 'Shadows off');
+    });
     const lightSlider = (sliderId, valId, lightName, scale) => {
       const el = $(sliderId), vel = $(valId); if (!el) return;
       el.addEventListener('input', () => {
@@ -228,6 +231,10 @@ GF.scene3dUI = (function () {
             <label class="mini">Repeat X<input type="number" id="s3-rep-x" step="0.5" min="0.1" value="${t.mat.mapRepeatX || 1}"></label>
             <label class="mini">Repeat Y<input type="number" id="s3-rep-y" step="0.5" min="0.1" value="${t.mat.mapRepeatY || 1}"></label>
           </div>
+          <div class="s3-row">
+            <label class="mini">Offset X<input type="number" id="s3-off-x" step="0.05" value="${t.mat.mapOffsetX || 0}"></label>
+            <label class="mini">Offset Y<input type="number" id="s3-off-y" step="0.05" value="${t.mat.mapOffsetY || 0}"></label>
+          </div>
         </details>
       </div>`;
 
@@ -272,6 +279,8 @@ GF.scene3dUI = (function () {
     liveCommit($('#s3-em'), $('#s3-em-v'), el => ({ emissiveIntensity: el.value / 100 }));
     const repX = $('#s3-rep-x'); if (repX) repX.addEventListener('change', () => S().setMaterial(id, { mapRepeatX: +repX.value || 1 }));
     const repY = $('#s3-rep-y'); if (repY) repY.addEventListener('change', () => S().setMaterial(id, { mapRepeatY: +repY.value || 1 }));
+    const offX = $('#s3-off-x'); if (offX) offX.addEventListener('change', () => S().setMaterial(id, { mapOffsetX: +offX.value || 0 }));
+    const offY = $('#s3-off-y'); if (offY) offY.addEventListener('change', () => S().setMaterial(id, { mapOffsetY: +offY.value || 0 }));
   }
 
   function importTextureImage(objId) {

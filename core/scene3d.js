@@ -296,10 +296,11 @@ GF.scene3d = (function () {
     const opa = o.mat.opacity != null ? o.mat.opacity : 1;
     m.transparent = opa < 1;
     m.opacity = opa;
-    if (m.map) {
-      m.map.repeat.set(o.mat.mapRepeatX || 1, o.mat.mapRepeatY || 1);
-      m.map.offset.set(o.mat.mapOffsetX || 0, o.mat.mapOffsetY || 0);
-      m.map.needsUpdate = true;
+    // Apply UV tiling/offset to all texture channels so they stay in sync
+    const uvRepeat = [o.mat.mapRepeatX || 1, o.mat.mapRepeatY || 1];
+    const uvOffset = [o.mat.mapOffsetX || 0, o.mat.mapOffsetY || 0];
+    for (const ch of [m.map, m.normalMap, m.roughnessMap]) {
+      if (ch) { ch.repeat.set(...uvRepeat); ch.offset.set(...uvOffset); ch.needsUpdate = true; }
     }
     m.side = o.mat.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
     m.needsUpdate = true;
