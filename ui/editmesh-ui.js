@@ -504,14 +504,17 @@ GF.editmeshUI = (function () {
         outline-offset: -2px;
       }
 
-      /* mobile — panel goes to bottom, slim height */
-      @media (max-width: 720px) {
+      /* mobile — panel slides up from bottom as a horizontal scroll strip.
+         Breakpoint matches the main forge.css mobile breakpoint (880px).
+         Bottom clears the actionbar: actionbar is at bottom:62px, height 44px
+         → its top edge is at 106px. Add 4px gap = 110px. */
+      @media (max-width: 880px) {
         #em-panel {
           left: 0; right: 0;
-          top: auto; bottom: var(--bar-h, 52px);
+          top: auto; bottom: 110px;
           width: auto;
           height: auto;
-          max-height: 44vh;
+          max-height: 36vh;
           border-right: none;
           border-top: 1px solid rgba(255,255,255,0.1);
           box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
@@ -519,11 +522,23 @@ GF.editmeshUI = (function () {
           flex-wrap: nowrap;
           overflow-x: auto;
           overflow-y: hidden;
+          overflow-y: hidden;
           align-items: stretch;
+          /* momentum scrolling on iOS */
+          -webkit-overflow-scrolling: touch;
         }
-        .em-header { flex-direction: column; gap: .3rem; padding: .5rem; min-width: 80px; }
-        .em-section { border-bottom: none; border-right: 1px solid rgba(255,255,255,0.06); padding: .45rem .5rem; min-width: 140px; }
+        .em-header {
+          flex-direction: column; gap: .3rem; padding: .5rem;
+          min-width: 76px; flex-shrink: 0;
+        }
+        .em-section {
+          border-bottom: none;
+          border-right: 1px solid rgba(255,255,255,0.06);
+          padding: .4rem .5rem;
+          min-width: 130px; flex-shrink: 0;
+        }
         .em-status { display: none; }
+        .em-zones  { min-width: 180px; flex-shrink: 0; }
         body.editing #scene3d-host { margin-left: 0; }
       }
     `;

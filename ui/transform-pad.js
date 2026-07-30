@@ -483,11 +483,11 @@ GF.transformPad = (function () {
       letter-spacing: .04em; padding-top: 2px;
     }
 
-    /* ── mobile ─────────────────────────────────────────── */
+    /* ── mobile — base adjustments (forge.css carries the rest) ─ */
     @media (max-width: 880px) {
-      #transform-pad { bottom: 118px; width: 172px; padding: 6px; }
-      .tp-cell { height: 40px; }
-      .tp-scale-btn { height: 46px; }
+      /* forge.css mobile block handles width/bottom/padding/cell sizes.
+         Only keep what's not in forge.css: the bottom offset. */
+      #transform-pad { bottom: 112px; }
     }
     `;
     const s = document.createElement('style');

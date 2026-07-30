@@ -1136,3 +1136,81 @@ body.no-doc .ptab[data-tab="adjust"] { opacity: .35; }
 
 /* environment / lighting groups — body padding for inner content */
 .s3-group-body { padding: .3rem 0 .1rem; }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE FIXES — consolidated responsive overrides
+   All at max-width: 880px (the primary mobile breakpoint)
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 880px) {
+
+  /* ── Safe-area bottom on actionbar ────────────────────── */
+  #actionbar {
+    padding-bottom: env(safe-area-inset-bottom);
+    height: auto; min-height: 44px;
+  }
+
+  /* ── Transform pad — compact on mobile ────────────────── */
+  #transform-pad {
+    width: 158px;
+    bottom: 112px;
+    padding: 6px;
+    gap: 4px;
+    font-size: 10px;
+  }
+  /* Shrink grid cells so the pad doesn't eat the viewport */
+  .tp-cell { height: 36px; border-radius: 7px; }
+  .tp-scale-btn { height: 40px; }
+  /* Hide per-axis scale row and utility row on mobile —
+     those are power-user features; undo lives in topbar & shake */
+  .tp-scale-axes { display: none; }
+  .tp-util { display: none; }
+  /* Compress the idle overlay text */
+  .tp-idle-msg { font-size: 10px; }
+
+  /* ── Hide transform pad while in mesh-edit mode ─────── */
+  /* Em-panel takes over — two overlapping control surfaces = chaos */
+  body.editing #transform-pad { display: none !important; }
+
+  /* ── Em-panel — clear the actionbar on mobile ────────── */
+  /* The actionbar is at bottom:62px, height 44px → top edge at 106px.
+     The em-panel must start above that. */
+  #em-panel {
+    bottom: 110px !important;
+    max-height: 36vh !important;
+  }
+
+  /* ── Panel bottom sheet — clear safe area ────────────── */
+  #panel {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .panel-body {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* ── Panel toggle FAB — keep clear of the transform pad ─ */
+  #panel-toggle {
+    /* Was: bottom: calc(108px + env(safe-area-inset-bottom) + 12px)
+       Move it right so it doesn't sit on top of the transform pad */
+    left: auto; right: 12px;
+    bottom: calc(112px + env(safe-area-inset-bottom) + 12px);
+  }
+
+  /* ── Prevent FAB + panel-open both showing ───────────── */
+  body.sheet-open #panel-toggle { display: none !important; }
+
+  /* ── Scene3d options bar — one row, no overflow on tiny screens */
+  #s3-pub-ob, .s3-hint { display: none; }
+}
+
+/* ── Extra-small phones (≤ 480px) ─────────────────────── */
+@media (max-width: 480px) {
+  #transform-pad {
+    width: 148px;
+    bottom: 108px;
+    padding: 5px;
+  }
+  .tp-cell { height: 32px; font-size: 9px; }
+  .tp-tab  { font-size: 10px; padding: .26rem 0; }
+  .tp-lbl  { font-size: 9px; }
+}
