@@ -1,7 +1,7 @@
 /* PixelTriks — service worker (offline app shell).
    Registers only over http(s); a no-op when the app is opened from file://. */
 'use strict';
-const CACHE = 'forge-v40';
+const CACHE = 'forge-v41';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './ui/forge.css', './ui/forge-ui.js', './ui/scene3d-ui.js', './ui/assets-ui.js',
@@ -27,6 +27,8 @@ const ASSETS = [
   './vendor/three/addons/utils/BufferGeometryUtils.js',
   './vendor/three/addons/utils/SkeletonUtils.js',
   './vendor/fonts/helvetiker_regular.typeface.json',
+  './demo-robot.html',
+  './assets/models/quaternius_Robot.glb',
 ];
 
 self.addEventListener('install', e => {

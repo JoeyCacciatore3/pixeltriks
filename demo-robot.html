@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PixelTriks — Robot Showcase</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #080c14;
+      color: #e0e8ff;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+      height: 100dvh;
+    }
+
+    #c {
+      display: block;
+      width: 100vw;
+      height: 100dvh;
+      position: fixed;
+      top: 0; left: 0;
+    }
+
+    /* ── Top bar ────────────────────────────────────────────── */
+    #topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 20px;
+      background: linear-gradient(to bottom, rgba(8,12,20,0.95) 70%, transparent);
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #fff;
+      pointer-events: auto;
+      text-decoration: none;
+    }
+    .logo span { color: #4d9fff; }
+
+    .tag-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      pointer-events: none;
+    }
+
+    .tag {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      border: 1px solid;
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity 0.4s, transform 0.4s;
+    }
+    .tag.show { opacity: 1; transform: none; }
+
+    .tag-shadows  { color: #7dd3fc; border-color: #7dd3fc44; background: #0ea5e91a; }
+    .tag-emissive { color: #34d399; border-color: #34d39944; background: #10b9811a; }
+    .tag-pbr      { color: #f59e0b; border-color: #f59e0b44; background: #f59e0b1a; }
+    .tag-anim     { color: #a78bfa; border-color: #a78bfa44; background: #7c3aed1a; }
+    .tag-uv       { color: #f472b6; border-color: #f472b644; background: #ec48991a; }
+
+    /* ── Legend ────────────────────────────────────────────── */
+    #legend {
+      position: fixed;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.6s 0.8s;
+      pointer-events: none;
+    }
+    #legend.show { opacity: 1; }
+
+    .leg-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .leg-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    /* ── Bottom bar ─────────────────────────────────────────── */
+    #btm {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 10px 20px 14px;
+      background: linear-gradient(to top, rgba(8,12,20,0.92) 60%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #status {
+      font-size: 12px;
+      color: #94a3b8;
+      letter-spacing: 0.04em;
+    }
+
+    .btn-row { display: flex; gap: 8px; pointer-events: auto; }
+
+    .btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.07);
+      color: #e0e8ff;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      letter-spacing: 0.04em;
+    }
+    .btn:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.3); }
+
+    .btn-primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #3b82f6; }
+
+    /* ── Loading overlay ────────────────────────────────────── */
+    #loader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: #080c14;
+      z-index: 20;
+      transition: opacity 0.6s;
+    }
+    #loader.fade { opacity: 0; pointer-events: none; }
+
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #1e293b;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #load-label { font-size: 13px; color: #64748b; letter-spacing: 0.06em; }
+  </style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="topbar">
+  <a class="logo" href="index.html"><span>Pixel</span>Triks</a>
+  <div class="tag-row">
+    <span class="tag tag-shadows"  id="t-shadows">● Shadows</span>
+    <span class="tag tag-pbr"      id="t-pbr">● PBR Materials</span>
+    <span class="tag tag-emissive" id="t-emissive">● Emissive</span>
+    <span class="tag tag-anim"     id="t-anim">● Animation</span>
+    <span class="tag tag-uv"       id="t-uv">● UV Tiling</span>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#5c85d6;color:#5c85d6"></div>Head — chrome blue</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#0af;color:#0af"></div>Torso — deep navy + emissive</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ffd700;color:#ffd700"></div>Shoulders — gold chrome</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ff5722;color:#ff5722"></div>Arms — vivid orange-red</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#37474f;color:#607d8b"></div>Hands — gunmetal + cyan glow</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#006064;color:#006064"></div>Upper Legs — deep teal</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#00acc1;color:#00acc1"></div>Lower Legs — cyan teal</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#00e676;color:#00e676"></div>Feet — neon accent</div>
+</div>
+
+<div id="btm">
+  <span id="status">Loading robot…</span>
+  <div class="btn-row">
+    <button class="btn" id="btn-spin">⏸ Pause</button>
+    <button class="btn" id="btn-shadow">☀ Shadows: ON</button>
+    <button class="btn" id="btn-emissive">💡 Emissive: ON</button>
+    <button class="btn btn-primary" onclick="location.href='index.html'">Open in PixelTriks →</button>
+  </div>
+</div>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <span id="load-label">Loading quaternius_Robot.glb…</span>
+</div>
+
+<!-- Three.js bundle (vendored) -->
+<script type="module" src="ui/three-bundle.js"></script>
+
+<script>
+'use strict';
+
+/* ── Wait for the Three.js bundle ─────────────────────────── */
+window.addEventListener('three-bundle-ready', init);
+
+function init() {
+  const { THREE, OrbitControls, GLTFLoader } = window.__THREE_BUNDLE;
+
+  /* ── Renderer ───────────────────────────────────────────── */
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+
+  /* ── Scene ──────────────────────────────────────────────── */
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x080c14);
+  scene.fog = new THREE.FogExp2(0x080c14, 0.045);
+
+  /* ── Camera ─────────────────────────────────────────────── */
+  const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.01, 200);
+  camera.position.set(0, 1.6, 4.5);
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.target.set(0, 1.2, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.07;
+  controls.minDistance = 1.5;
+  controls.maxDistance = 12;
+  controls.maxPolarAngle = Math.PI * 0.88;
+  controls.update();
+
+  /* ── Lights ─────────────────────────────────────────────── */
+  const ambient = new THREE.AmbientLight(0x1a2540, 1.8);
+  scene.add(ambient);
+
+  // Key light (warm sun — casts shadows)
+  const key = new THREE.DirectionalLight(0xfff0d0, 3.0);
+  key.position.set(3, 5, 4);
+  key.castShadow = true;
+  key.shadow.mapSize.width = 2048;
+  key.shadow.mapSize.height = 2048;
+  key.shadow.camera.near = 0.1;
+  key.shadow.camera.far = 30;
+  key.shadow.camera.left = -4;
+  key.shadow.camera.right = 4;
+  key.shadow.camera.top = 6;
+  key.shadow.camera.bottom = -2;
+  key.shadow.bias = -0.001;
+  scene.add(key);
+
+  // Cool fill from left
+  const fill = new THREE.DirectionalLight(0x8ab4ff, 1.0);
+  fill.position.set(-3, 2, 1);
+  scene.add(fill);
+
+  // Rim from behind
+  const rim = new THREE.DirectionalLight(0x40e0d0, 0.8);
+  rim.position.set(0, 3, -5);
+  scene.add(rim);
+
+  // Accent point — feet level glow
+  const footPoint = new THREE.PointLight(0x00e676, 2.0, 3.5, 2);
+  footPoint.position.set(0, 0.1, 0.5);
+  scene.add(footPoint);
+
+  // Chest glow point
+  const chestPoint = new THREE.PointLight(0x0080ff, 1.5, 2.0, 2);
+  chestPoint.position.set(0, 1.35, 0.45);
+  scene.add(chestPoint);
+
+  /* ── Ground plane ───────────────────────────────────────── */
+  const groundGeo = new THREE.PlaneGeometry(20, 20);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x0a0f1a,
+    roughness: 0.9,
+    metalness: 0.1,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Subtle grid
+  const grid = new THREE.GridHelper(20, 40, 0x1e2a3a, 0x111a28);
+  grid.position.y = 0.001;
+  grid.material.transparent = true;
+  grid.material.opacity = 0.5;
+  scene.add(grid);
+
+  /* ── Material palette ───────────────────────────────────── */
+  // Each body zone gets a distinct PBR material
+  const M = {
+    // Head — chrome blue, very shiny
+    headMain: new THREE.MeshStandardMaterial({
+      color: 0x5c85d6, metalness: 0.92, roughness: 0.06,
+      emissive: new THREE.Color(0x001a4d), emissiveIntensity: 0.5,
+    }),
+    // Head visor (was Black mat) — emissive cyan glow
+    headVisor: new THREE.MeshStandardMaterial({
+      color: 0x001020, metalness: 0.1, roughness: 0.05,
+      emissive: new THREE.Color(0x00c8ff), emissiveIntensity: 1.8,
+      transparent: true, opacity: 0.88,
+    }),
+    // Head accent (was Grey mat) — matte dark chrome
+    headAccent: new THREE.MeshStandardMaterial({
+      color: 0x2a3a55, metalness: 0.7, roughness: 0.25,
+    }),
+
+    // Torso — deep navy + emissive arc reactor
+    torsoMain: new THREE.MeshStandardMaterial({
+      color: 0x0d1b3e, metalness: 0.75, roughness: 0.12,
+      emissive: new THREE.Color(0x0060ff), emissiveIntensity: 0.35,
+    }),
+    torsoAccent: new THREE.MeshStandardMaterial({
+      color: 0x1a2a4a, metalness: 0.5, roughness: 0.4,
+      emissive: new THREE.Color(0x003088), emissiveIntensity: 0.2,
+    }),
+
+    // Shoulders — gold chrome
+    shoulder: new THREE.MeshStandardMaterial({
+      color: 0xffd700, metalness: 1.0, roughness: 0.04,
+      emissive: new THREE.Color(0x3a2800), emissiveIntensity: 0.2,
+    }),
+
+    // Arms — vivid orange-red (original spirit, cranked up)
+    arm: new THREE.MeshStandardMaterial({
+      color: 0xff4500, metalness: 0.55, roughness: 0.28,
+    }),
+
+    // Hands — gunmetal with emissive accents
+    handMain: new THREE.MeshStandardMaterial({
+      color: 0x263238, metalness: 0.85, roughness: 0.18,
+      emissive: new THREE.Color(0x00e5ff), emissiveIntensity: 0.12,
+    }),
+    handAccent: new THREE.MeshStandardMaterial({
+      color: 0x1a2630, metalness: 0.6, roughness: 0.3,
+    }),
+
+    // Upper legs — deep teal
+    leg: new THREE.MeshStandardMaterial({
+      color: 0x006064, metalness: 0.65, roughness: 0.22,
+    }),
+
+    // Lower legs — lighter cyan-teal
+    lowerLeg: new THREE.MeshStandardMaterial({
+      color: 0x00838f, metalness: 0.55, roughness: 0.3,
+    }),
+
+    // Feet — neon green accent (most eye-catching part of the base)
+    foot: new THREE.MeshStandardMaterial({
+      color: 0x00c853, metalness: 0.25, roughness: 0.55,
+      emissive: new THREE.Color(0x00e676), emissiveIntensity: 0.4,
+    }),
+  };
+
+  // Add shadow casting to all custom mats
+  Object.values(M).forEach(mat => { mat.shadowSide = THREE.FrontSide; });
+
+  /* ── Assign material to a named node's meshes ───────────── */
+  function applyToNode(root, nodeName, ...mats) {
+    const node = root.getObjectByName(nodeName);
+    if (!node) return;
+    // Single mesh — one material
+    if (node.isMesh) {
+      node.material = mats[0];
+      node.castShadow = true;
+      node.receiveShadow = true;
+    }
+    // Group with multiple mesh children (multi-primitive node)
+    if (!node.isMesh) {
+      const children = [];
+      node.traverse(c => { if (c.isMesh) children.push(c); });
+      children.forEach((mesh, i) => {
+        mesh.material = mats[i] || mats[mats.length - 1];
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      });
+    }
+  }
+
+  /* ── Load robot ─────────────────────────────────────────── */
+  let robotRoot = null;
+  let spinning = true;
+  let emissiveOn = true;
+  let shadowsOn = true;
+
+  new GLTFLoader().load(
+    'assets/models/quaternius_Robot.glb',
+
+    (gltf) => {
+      robotRoot = gltf.scene;
+
+      // Global shadow flag on everything
+      robotRoot.traverse(c => {
+        if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; }
+      });
+
+      // ── Apply per-zone materials ──────────────────────────
+      // Head (3 prims: main, accent, visor)
+      applyToNode(robotRoot, 'Head',        M.headMain, M.headAccent, M.headVisor);
+
+      // Torso (2 prims: main, accent panel)
+      applyToNode(robotRoot, 'Torso',       M.torsoMain, M.torsoAccent);
+
+      // Shoulders
+      applyToNode(robotRoot, 'Shoulder.L',  M.shoulder);
+      applyToNode(robotRoot, 'Shoulder.R',  M.shoulder);
+
+      // Arms (single prim each)
+      applyToNode(robotRoot, 'Arm.L',       M.arm);
+      applyToNode(robotRoot, 'Arm.R',       M.arm);
+
+      // Hands (2 prims: main, accent knuckles)
+      applyToNode(robotRoot, 'Hand.L',      M.handMain, M.handAccent);
+      applyToNode(robotRoot, 'Hand.R',      M.handMain, M.handAccent);
+
+      // Upper legs
+      applyToNode(robotRoot, 'Leg.L',       M.leg);
+      applyToNode(robotRoot, 'Leg.R',       M.leg);
+
+      // Lower legs
+      applyToNode(robotRoot, 'LowerLeg.L',  M.lowerLeg);
+      applyToNode(robotRoot, 'LowerLeg.R',  M.lowerLeg);
+
+      // Feet (single prim: grey in original — now neon)
+      applyToNode(robotRoot, 'Foot.L',      M.foot);
+      applyToNode(robotRoot, 'Foot.R',      M.foot);
+
+      // Center & scale the robot
+      const box = new THREE.Box3().setFromObject(robotRoot);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const scale = 2.2 / size.y;
+      robotRoot.scale.setScalar(scale);
+      robotRoot.position.x = -center.x * scale;
+      robotRoot.position.y = -box.min.y * scale;
+      robotRoot.position.z = -center.z * scale;
+
+      scene.add(robotRoot);
+
+      // Update orbit target to robot center
+      controls.target.set(0, size.y * scale * 0.5, 0);
+      controls.update();
+
+      // Hide loader, reveal UI
+      document.getElementById('loader').classList.add('fade');
+      document.getElementById('status').textContent = 'Drag to orbit  ·  Scroll to zoom  ·  14 mesh zones, 8 custom materials';
+      document.getElementById('legend').classList.add('show');
+
+      // Stagger feature tags
+      const tags = ['t-shadows','t-pbr','t-emissive','t-anim','t-uv'];
+      tags.forEach((id, i) => {
+        setTimeout(() => document.getElementById(id).classList.add('show'), 300 + i * 120);
+      });
+    },
+
+    (xhr) => {
+      const pct = Math.round(xhr.loaded / xhr.total * 100);
+      document.getElementById('load-label').textContent = `Loading robot… ${pct}%`;
+    },
+
+    (err) => {
+      document.getElementById('load-label').textContent = 'Error loading model: ' + err.message;
+    }
+  );
+
+  /* ── Button controls ────────────────────────────────────── */
+  document.getElementById('btn-spin').addEventListener('click', function () {
+    spinning = !spinning;
+    this.textContent = spinning ? '⏸ Pause' : '▶ Spin';
+  });
+
+  document.getElementById('btn-shadow').addEventListener('click', function () {
+    shadowsOn = !shadowsOn;
+    renderer.shadowMap.enabled = shadowsOn;
+    key.castShadow = shadowsOn;
+    this.textContent = shadowsOn ? '☀ Shadows: ON' : '☀ Shadows: OFF';
+    this.style.color = shadowsOn ? '' : '#64748b';
+  });
+
+  document.getElementById('btn-emissive').addEventListener('click', function () {
+    emissiveOn = !emissiveOn;
+    const emissiveMats = [M.headVisor, M.headMain, M.torsoMain, M.torsoAccent, M.handMain, M.foot];
+    emissiveMats.forEach(mat => {
+      mat.emissiveIntensity = emissiveOn ? mat.__baseEmissive : 0;
+    });
+    chestPoint.intensity = emissiveOn ? 1.5 : 0;
+    footPoint.intensity  = emissiveOn ? 2.0 : 0;
+    this.textContent = emissiveOn ? '💡 Emissive: ON' : '💡 Emissive: OFF';
+    this.style.color = emissiveOn ? '' : '#64748b';
+  });
+
+  // Store base emissive intensities so toggle can restore them
+  const emissiveMats = [M.headVisor, M.headMain, M.torsoMain, M.torsoAccent, M.handMain, M.foot];
+  emissiveMats.forEach(mat => { mat.__baseEmissive = mat.emissiveIntensity; });
+
+  /* ── Resize ─────────────────────────────────────────────── */
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  /* ── Animate ────────────────────────────────────────────── */
+  const clock = new THREE.Clock();
+
+  renderer.setAnimationLoop(() => {
+    const t = clock.getElapsedTime();
+
+    // Gentle auto-rotation
+    if (spinning && robotRoot) {
+      robotRoot.rotation.y = t * 0.25;
+    }
+
+    // Breathing emissive pulse on chest
+    if (emissiveOn) {
+      const pulse = 0.25 + 0.12 * Math.sin(t * 2.1);
+      M.torsoMain.emissiveIntensity = pulse;
+      M.headVisor.emissiveIntensity  = 1.4 + 0.4 * Math.sin(t * 1.7);
+      M.foot.emissiveIntensity       = 0.3 + 0.15 * Math.sin(t * 3.0);
+      chestPoint.intensity           = 1.2 + 0.5 * Math.sin(t * 2.1);
+      footPoint.intensity            = 1.5 + 0.6 * Math.sin(t * 3.0);
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+  });
+}
+</script>
+</body>
+</html>
