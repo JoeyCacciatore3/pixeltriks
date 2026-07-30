@@ -80,7 +80,10 @@ GF.paint3d = (function () {
     if (!hit || hit.objectId !== targetId) return false;
 
     painting = true;
-    strokeSnapshot = paintCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
+    strokeSnapshot = {
+      color: paintCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE),
+      rough: roughCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE)
+    };
     lastUV = hit.uv;
     stamp(hit.uv);
     S().refreshAll();
@@ -105,10 +108,13 @@ GF.paint3d = (function () {
     lastUV = null;
     if (strokeSnapshot && S()) {
       const before = strokeSnapshot;
-      const after = paintCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
+      const after = {
+        color: paintCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE),
+        rough: roughCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE)
+      };
       S().hist.push('paint 3D',
-        () => { paintCtx.putImageData(before, 0, 0); S().refreshAll(); },
-        () => { paintCtx.putImageData(after, 0, 0); S().refreshAll(); });
+        () => { paintCtx.putImageData(before.color, 0, 0); roughCtx.putImageData(before.rough, 0, 0); S().refreshAll(); },
+        () => { paintCtx.putImageData(after.color, 0, 0); roughCtx.putImageData(after.rough, 0, 0); S().refreshAll(); });
     }
     strokeSnapshot = null;
     return true;

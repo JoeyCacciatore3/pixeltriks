@@ -65,9 +65,9 @@ GF.animation = (function () {
     if (playing) rafId = requestAnimationFrame(tick);
   }
 
-  function addKeyframe(objectId, time, property, value) {
+  function addKeyframe(objectId, time, property, value, easing) {
     const id = nextKfId++;
-    keyframes.push({ id, objectId, time: Math.max(0, Math.min(time, duration)), property, value });
+    keyframes.push({ id, objectId, time: Math.max(0, Math.min(time, duration)), property, value, easing: easing || 'linear' });
     keyframes.sort((a, b) => a.time - b.time);
     emit();
     return id;
@@ -119,6 +119,16 @@ GF.animation = (function () {
     }
   }
 
+  function applyEasing(f, easing) {
+    switch (easing) {
+      case 'ease-in':     return f * f;
+      case 'ease-out':    return f * (2 - f);
+      case 'ease-in-out': return f < 0.5 ? 2 * f * f : -1 + (4 - 2 * f) * f;
+      case 'bounce':      return 1 - Math.abs(Math.cos(f * Math.PI * 2.5)) * (1 - f);
+      default:            return f;   // linear
+    }
+  }
+
   function interpolate(kfs, t) {
     if (kfs.length === 0) return null;
     if (kfs.length === 1) return kfs[0].value;
@@ -130,7 +140,8 @@ GF.animation = (function () {
       if (kfs[i].time >= t) { a = kfs[i - 1]; b = kfs[i]; break; }
     }
 
-    const f = (t - a.time) / Math.max(0.001, b.time - a.time);
+    const raw = (t - a.time) / Math.max(0.001, b.time - a.time);
+    const f = applyEasing(raw, a.easing || 'linear');
     if (Array.isArray(a.value)) {
       return a.value.map((v, i) => v + (b.value[i] - v) * f);
     }
@@ -202,6 +213,6 @@ if (GF.api && GF.api.register) {
   GF.api.register('animation.setTime', 'time(seconds)', 'Scrub to a specific time', a => GF.animation.setTime(a.time || 0));
   GF.api.register('animation.setDuration', 'seconds', 'Set animation duration', a => GF.animation.setDuration(a.seconds || 2));
   GF.api.register('animation.recordKeyframe', 'objectId', 'Record position/rotation/scale at current time', a => GF.animation.recordKeyframe(a.objectId));
-  GF.api.register('animation.addKeyframe', 'objectId, time, property("position"|"rotation"|"scale"), value([x,y,z])', 'Add a keyframe', a => GF.animation.addKeyframe(a.objectId, a.time, a.property, a.value));
+  GF.api.register('animation.addKeyframe', 'objectId, time, property("position"|"rotation"|"scale"), value([x,y,z]), easing?("linear"|"ease-in"|"ease-out"|"ease-in-out"|"bounce")', 'Add a keyframe with optional easing', a => GF.animation.addKeyframe(a.objectId, a.time, a.property, a.value, a.easing));
   GF.api.register('animation.getKeyframes', 'objectId?', 'List keyframes', a => GF.animation.getKeyframes(a && a.objectId));
 }

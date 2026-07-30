@@ -73,6 +73,22 @@ GF.scene3dUI = (function () {
         </select></label>
         <input type="color" id="s3-bg-color" value="#0c0e11" title="Background color">
       </div>
+      <h3 class="panel-h">Lighting</h3>
+      <label class="ck"><input type="checkbox" id="s3-shadows" checked> Cast shadows</label>
+      <details class="s3-group"><summary>Studio lights</summary>
+        <label class="mini"><span class="s3-top">Ambient<span class="s3-val" id="s3-amb-v">0.45</span></span>
+          <input type="range" id="s3-amb" min="0" max="200" value="45"></label>
+        <div class="s3-row">
+          <label class="mini">Key color<input type="color" id="s3-key-color" value="#ffffff"></label>
+          <label class="mini"><span class="s3-top">Key intensity<span class="s3-val" id="s3-key-v">1.60</span></span>
+            <input type="range" id="s3-key" min="0" max="500" value="160"></label>
+        </div>
+        <div class="s3-row">
+          <label class="mini">Rim color<input type="color" id="s3-rim-color" value="#e8a33d"></label>
+          <label class="mini"><span class="s3-top">Rim intensity<span class="s3-val" id="s3-rim-v">0.50</span></span>
+            <input type="range" id="s3-rim" min="0" max="200" value="50"></label>
+        </div>
+      </details>
       <p class="s3-hint-line">Export &amp; publish live in the <b>Export</b> button (top-right).</p>
       <p class="s3-status" id="s3-status"></p>`;
 
@@ -100,6 +116,26 @@ GF.scene3dUI = (function () {
 
     S().setStatusCallback(msg => { const el = $('#s3-status'); if (el) el.textContent = msg; });
     S().onChange(() => { refresh(); });
+
+    // Lighting controls
+    const shadowCk = $('#s3-shadows');
+    if (shadowCk) shadowCk.addEventListener('change', () => S().setShadows(shadowCk.checked));
+    const lightSlider = (sliderId, valId, lightName, scale) => {
+      const el = $(sliderId), vel = $(valId); if (!el) return;
+      el.addEventListener('input', () => {
+        const v = el.value / scale;
+        if (vel) vel.textContent = v.toFixed(2);
+        S().setStudioLight(lightName, { intensity: v });
+      });
+    };
+    lightSlider('#s3-amb', '#s3-amb-v', 'ambient', 100);
+    lightSlider('#s3-key', '#s3-key-v', 'key', 100);
+    lightSlider('#s3-rim', '#s3-rim-v', 'rim', 100);
+    const keyColor = $('#s3-key-color');
+    if (keyColor) keyColor.addEventListener('input', () => S().setStudioLight('key', { color: keyColor.value }));
+    const rimColor = $('#s3-rim-color');
+    if (rimColor) rimColor.addEventListener('input', () => S().setStudioLight('rim', { color: rimColor.value }));
+
     wireKeys();
   }
 
@@ -178,9 +214,20 @@ GF.scene3dUI = (function () {
           <input type="range" id="s3-rough" min="0" max="100" value="${Math.round(t.mat.roughness * 100)}"></label>
         <label class="mini"><span class="s3-top">Metalness<span class="s3-val" id="s3-metal-v">${t.mat.metalness.toFixed(2)}</span></span>
           <input type="range" id="s3-metal" min="0" max="100" value="${Math.round(t.mat.metalness * 100)}"></label>
+        <label class="mini"><span class="s3-top">Opacity<span class="s3-val" id="s3-opac-v">${(t.mat.opacity != null ? t.mat.opacity : 1).toFixed(2)}</span></span>
+          <input type="range" id="s3-opac" min="0" max="100" value="${Math.round((t.mat.opacity != null ? t.mat.opacity : 1) * 100)}"></label>
+        <div class="s3-row">
+          <label class="mini">Emissive<input type="color" id="s3-emissive" value="${t.mat.emissive || '#000000'}"></label>
+          <label class="mini"><span class="s3-top">Em. strength<span class="s3-val" id="s3-em-v">${(t.mat.emissiveIntensity || 0).toFixed(2)}</span></span>
+            <input type="range" id="s3-em" min="0" max="300" value="${Math.round((t.mat.emissiveIntensity || 0) * 100)}"></label>
+        </div>
         <details class="s3-group"><summary>Advanced maps</summary>
           <label class="mini">Normal map<select id="s3-normal">${mapOpts(t.mat.normalSource)}</select></label>
           <label class="mini">Roughness map<select id="s3-roughmap">${mapOpts(t.mat.roughSource)}</select></label>
+          <div class="s3-row">
+            <label class="mini">Repeat X<input type="number" id="s3-rep-x" step="0.5" min="0.1" value="${t.mat.mapRepeatX || 1}"></label>
+            <label class="mini">Repeat Y<input type="number" id="s3-rep-y" step="0.5" min="0.1" value="${t.mat.mapRepeatY || 1}"></label>
+          </div>
         </details>
       </div>`;
 
@@ -220,6 +267,11 @@ GF.scene3dUI = (function () {
     const ts = $('#s3-2side'); if (ts) ts.addEventListener('change', () => S().setMaterial(id, { doubleSided: ts.checked }));
     const nrm = $('#s3-normal'); if (nrm) nrm.addEventListener('change', () => S().setMaterial(id, { normalSource: nrm.value || null }));
     const rm = $('#s3-roughmap'); if (rm) rm.addEventListener('change', () => S().setMaterial(id, { roughSource: rm.value || null }));
+    liveCommit($('#s3-opac'), $('#s3-opac-v'), el => ({ opacity: el.value / 100 }));
+    liveCommit($('#s3-emissive'), null, el => ({ emissive: el.value }));
+    liveCommit($('#s3-em'), $('#s3-em-v'), el => ({ emissiveIntensity: el.value / 100 }));
+    const repX = $('#s3-rep-x'); if (repX) repX.addEventListener('change', () => S().setMaterial(id, { mapRepeatX: +repX.value || 1 }));
+    const repY = $('#s3-rep-y'); if (repY) repY.addEventListener('change', () => S().setMaterial(id, { mapRepeatY: +repY.value || 1 }));
   }
 
   function importTextureImage(objId) {

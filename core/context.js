@@ -53,8 +53,16 @@ GF.context = (function () {
     set('selectionActive', false);
     set('has3dSelection', S && S.selected && !!S.selected());
     set('animPlaying', GF.animation && GF.animation.isPlaying && GF.animation.isPlaying());
-    set('painting', false);
+    set('paint3dActive', GF.paint3d && GF.paint3d.isActive && GF.paint3d.isActive());
+    set('painting', GF.paint3d && GF.paint3d.isActive && GF.paint3d.isActive()); // keep 2D alias alive
     set('textTool', false);
+  }
+
+  // Wire paint3d onChange so context stays reactive — not just pull-based
+  if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+      if (GF.paint3d && GF.paint3d.onChange) GF.paint3d.onChange(() => sync());
+    });
   }
 
   return { set, get, onChange, evaluate, sync };

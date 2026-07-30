@@ -38,6 +38,8 @@ GF.scene3d = (function () {
   let nextImageId = 1;
   let clock = null;
   const mixers = new Map();
+  let ambientLight = null, keyLight = null, rimLight = null;
+  let shadowsEnabled = true;
 
   function setStatus(msg) { try { statusCb(msg || ''); } catch (e) {} }
   function onChange(fn) { changeCbs.push(fn); }
@@ -102,15 +104,24 @@ GF.scene3d = (function () {
     renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.shadowMap.enabled = shadowsEnabled;
+    renderer.shadowMap.type = T.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
 
     scene = new T.Scene();
     scene.background = new T.Color(bg.color);
     camera = new T.PerspectiveCamera(40, 1, 0.05, 200);
     camera.position.set(2.2, 1.6, 3.2);
-    scene.add(new T.AmbientLight(0xffffff, 0.45));
-    const key = new T.DirectionalLight(0xffffff, 1.6); key.position.set(2.5, 2.5, 3); scene.add(key);
-    const rim = new T.DirectionalLight(0xe8a33d, 0.5); rim.position.set(-3, -1, -2); scene.add(rim);
+    ambientLight = new T.AmbientLight(0xffffff, 0.45); scene.add(ambientLight);
+    keyLight = new T.DirectionalLight(0xffffff, 1.6); keyLight.position.set(2.5, 2.5, 3);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 1024; keyLight.shadow.mapSize.height = 1024;
+    keyLight.shadow.camera.near = 0.5; keyLight.shadow.camera.far = 50;
+    keyLight.shadow.camera.left = -8; keyLight.shadow.camera.right = 8;
+    keyLight.shadow.camera.top = 8; keyLight.shadow.camera.bottom = -8;
+    keyLight.shadow.bias = -0.001;
+    scene.add(keyLight);
+    rimLight = new T.DirectionalLight(0xe8a33d, 0.5); rimLight.position.set(-3, -1, -2); scene.add(rimLight);
 
     sceneRoot = new T.Group(); scene.add(sceneRoot);
     helpers = new T.Group(); scene.add(helpers);
@@ -263,6 +274,9 @@ GF.scene3d = (function () {
     return {
       mapSource: null, normalSource: null, roughSource: null,
       color: '#cccccc', roughness: 0.65, metalness: 0.05,
+      emissive: '#000000', emissiveIntensity: 0,
+      opacity: 1,
+      mapRepeatX: 1, mapRepeatY: 1, mapOffsetX: 0, mapOffsetY: 0,
       doubleSided: flat, keepOriginal: (kind === 'model')
     };
   }
@@ -277,6 +291,16 @@ GF.scene3d = (function () {
     m.color.set(m.map ? '#ffffff' : o.mat.color);
     m.roughness = o.mat.roughnessMap ? 1.0 : o.mat.roughness;
     m.metalness = o.mat.metalness;
+    m.emissive.set(o.mat.emissive || '#000000');
+    m.emissiveIntensity = o.mat.emissiveIntensity || 0;
+    const opa = o.mat.opacity != null ? o.mat.opacity : 1;
+    m.transparent = opa < 1;
+    m.opacity = opa;
+    if (m.map) {
+      m.map.repeat.set(o.mat.mapRepeatX || 1, o.mat.mapRepeatY || 1);
+      m.map.offset.set(o.mat.mapOffsetX || 0, o.mat.mapOffsetY || 0);
+      m.map.needsUpdate = true;
+    }
     m.side = o.mat.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
     m.needsUpdate = true;
     if (o.kind === 'model') o.node.traverse(ch => {
@@ -299,6 +323,29 @@ GF.scene3d = (function () {
     const after = Object.assign({}, o.mat);
     hist.push('material', () => { o.mat = Object.assign({}, before); applyMaterial(o); },
                           () => { o.mat = Object.assign({}, after); applyMaterial(o); });
+  }
+
+  /* =================================================================
+     Studio lights — intensity / color / shadow controls
+     ================================================================= */
+  function setStudioLight(name, patch) {
+    const lights = { ambient: ambientLight, key: keyLight, rim: rimLight };
+    const light = lights[name]; if (!light) return;
+    if (patch.intensity !== undefined) light.intensity = patch.intensity;
+    if (patch.color !== undefined) light.color.set(patch.color);
+  }
+  function setShadows(enabled) {
+    shadowsEnabled = !!enabled;
+    if (renderer) { renderer.shadowMap.enabled = shadowsEnabled; renderer.shadowMap.needsUpdate = true; }
+    if (keyLight) keyLight.castShadow = shadowsEnabled;
+  }
+  function getStudioLights() {
+    return {
+      ambient: ambientLight ? { intensity: ambientLight.intensity, color: '#' + ambientLight.color.getHexString() } : null,
+      key: keyLight ? { intensity: keyLight.intensity, color: '#' + keyLight.color.getHexString() } : null,
+      rim: rimLight ? { intensity: rimLight.intensity, color: '#' + rimLight.color.getHexString() } : null,
+      shadows: shadowsEnabled,
+    };
   }
 
   /* =================================================================
@@ -410,6 +457,8 @@ GF.scene3d = (function () {
     };
     o.material = new THREE.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
     o.node = new THREE.Mesh(primGeo(o.prim), o.material);
+    o.node.castShadow = true;
+    o.node.receiveShadow = true;
     // stagger so stacked adds don't z-fight
     o.node.position.x = (objects.length % 3) * 0.4 - 0.4;
     attach(o); applyMaterial(o); select(o.id);
@@ -431,6 +480,7 @@ GF.scene3d = (function () {
       });
       new GLTFLoader(mgr).load(url, g => {
         const node = g.scene;
+        node.traverse(ch => { if (ch.isMesh) { ch.castShadow = true; ch.receiveShadow = true; } });
         const box = new T.Box3().setFromObject(node);
         const size = box.getSize(new T.Vector3()), center = box.getCenter(new T.Vector3());
         const scl = 2 / (Math.max(size.x, size.y, size.z) || 1);
@@ -483,6 +533,7 @@ GF.scene3d = (function () {
     o.mat.doubleSided = !!opts.doubleSided;
     o.material = new THREE.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
     o.node = input.isObject3D ? input : new THREE.Mesh(input, o.material);
+    o.node.traverse(ch => { if (ch.isMesh) { ch.castShadow = true; ch.receiveShadow = true; } });
     o.mat.mapSource = opts.textureCanvas ? addImageSource(opts.textureCanvas, o.name) : null;
     attach(o); applyMaterial(o); select(o.id);
     hist.push('make ' + (name || '3D'), () => detach(o), () => { attach(o); applyMaterial(o); });
@@ -891,6 +942,8 @@ GF.scene3d = (function () {
     rendererEl: () => renderer ? renderer.domElement : null,
     // materials / textures
     setMaterial, addImageSource, listImageSources, refreshAll,
+    // lighting
+    setStudioLight, setShadows, getStudioLights,
     // environment
     setEnvironment, clearEnvironment, setBackground, background: () => Object.assign({}, bg),
     // output

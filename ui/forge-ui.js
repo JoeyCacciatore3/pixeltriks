@@ -125,7 +125,7 @@ window.GF = window.GF || {};
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
       if (typing) return;
       if (!e.ctrlKey && !e.metaKey && (e.key === '?' || k === 'k')) { e.preventDefault(); openCheatSheet(); return; }
-      const sig = ((e.ctrlKey || e.metaKey) ? 'mod+' : '') + (e.shiftKey ? 'shift+' : '') + k;
+      const sig = ((e.ctrlKey || e.metaKey) ? 'mod+' : '') + (e.altKey ? 'alt+' : '') + (e.shiftKey ? 'shift+' : '') + k;
       const id = GF.commands.lookup(sig) || (!e.ctrlKey && !e.metaKey ? GF.commands.lookup(k) : null);
       if (!id) return;
       e.preventDefault();
@@ -177,7 +177,7 @@ window.GF = window.GF || {};
     bind(']', 'view.zoomIn'); bind('[', 'view.zoomOut');
     // Blender-style camera views — 1/3/7 (works on numpad and regular keys)
     bind('1', 'scene3d.viewFront'); bind('3', 'scene3d.viewRight'); bind('7', 'scene3d.viewTop');
-    bind('mod+1', 'scene3d.viewBack'); bind('mod+3', 'scene3d.viewLeft'); bind('mod+7', 'scene3d.viewBottom');
+    bind('alt+1', 'scene3d.viewBack'); bind('alt+3', 'scene3d.viewLeft'); bind('alt+7', 'scene3d.viewBottom');
     bind('f', 'scene3d.frameSelected');
   }
   function commandList() { return GF.commands.palette(); }
@@ -328,7 +328,7 @@ window.GF = window.GF || {};
       ['3D: translate / rotate / scale', 'W / E / R'], ['3D: world / local space', 'Q'],
       ['3D: remove / frame object', 'Del / F'],
       ['3D: Front / Right / Top view', '1 / 3 / 7'],
-      ['3D: Back / Left / Bottom view', '⌘1 / ⌘3 / ⌘7'],
+      ['3D: Back / Left / Bottom view', 'Alt+1 / Alt+3 / Alt+7'],
       ['🎮 Gamepad', 'Stick = move · L2/R2+stick = rotate/scale · ◄► = undo/redo · X/Y = hotbar · Start = palette'],
       ['Frame scene', 'click zoom %'], ['Shortcuts', '? / K'],
     ];
