@@ -53,48 +53,14 @@ GF.polish = (function () {
   }
 
   /* =================================================================
-     Visual undo — current-state snapshot thumbnail in history panel
-     ================================================================= */
-  function enhanceHistory() {
-    if (!GF.history) return;
-    GF.history.onChange(() => setTimeout(addHistoryThumbnail, 50));
-  }
-
-  function addHistoryThumbnail() {
-    const list = $('#history-list');
-    if (!list || !GF.doc.doc.open) return;
-    const current = list.querySelector('.hist-item.on');
-    if (!current) return;
-    const existing = current.querySelector('.hist-thumb');
-    if (existing) return;
-
-    try {
-      const comp = GF.doc.composite();
-      const thumb = document.createElement('canvas');
-      thumb.className = 'hist-thumb';
-      thumb.width = 36; thumb.height = 36;
-      const tc = thumb.getContext('2d');
-      const s = Math.min(36 / comp.width, 36 / comp.height);
-      const w = comp.width * s, h = comp.height * s;
-      tc.drawImage(comp, (36 - w) / 2, (36 - h) / 2, w, h);
-      current.prepend(thumb);
-    } catch (e) {}
-  }
-
-  /* =================================================================
-     Init
+     Init — show the 3D workspace tip once
      ================================================================= */
   function init() {
     loadDismissed();
-
-    if (GF.ui && GF.ui.setTool) {
-      const origSetTool = GF.ui.setTool;
-      GF.ui.setTool = function (name) {
-        origSetTool.call(GF.ui, name);
-        showTip(name);
-      };
-    }
-    enhanceHistory();
+    // Nudge the 3D workspace tip on first object selection.
+    if (GF.scene3d && GF.scene3d.onChange) GF.scene3d.onChange(() => {
+      if (GF.scene3d.count() > 0) showTip('scene3d');
+    });
   }
 
   if (typeof window !== 'undefined') {

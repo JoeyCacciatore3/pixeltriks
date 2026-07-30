@@ -44,7 +44,6 @@ GF.gamepad = (function () {
     UP:     { id: 'transform.nudge', args: { dy: -1 } },
     DOWN:   { id: 'transform.nudge', args: { dy: 1 } },
     START:  { id: 'view.commandPalette' },
-    SELECT: { id: 'view.toggleMode' },
     B:      { id: 'edit.back' },
     X:      { id: 'hotbar.slot1' },
     Y:      { id: 'hotbar.slot2' },
@@ -115,27 +114,17 @@ GF.gamepad = (function () {
     }
   }
 
-  /* ---- cycle selection: layers in 2D, objects in 3D ---- */
+  /* ---- cycle selection: 3D objects ---- */
   function cycle(dir) {
-    GF.context.sync();
-    if (GF.context.get('mode3d')) {
-      const S = GF.scene3d; if (!S) return;
-      const list = S.listObjects(); if (!list.length) return;
-      const idx = list.findIndex(o => o.id === S.selectedId());
-      S.select(list[(idx + dir + list.length) % list.length].id);
-    } else {
-      const D = GF.doc, layers = D.doc.layers; if (!layers.length) return;
-      const idx = layers.findIndex(l => l.id === D.doc.activeId);
-      D.doc.activeId = layers[(idx + dir + layers.length) % layers.length].id;
-      GF.ui.refreshLayers(); GF.view.requestRender();
-    }
+    const S = GF.scene3d; if (!S) return;
+    const list = S.listObjects(); if (!list.length) return;
+    const idx = list.findIndex(o => o.id === S.selectedId());
+    S.select(list[(idx + dir + list.length) % list.length].id);
   }
 
-  /* B = back: deselect object (3D) / clear selection (2D) */
+  /* B = back: deselect the 3D object */
   function back() {
-    GF.context.sync();
-    if (GF.context.get('mode3d')) { if (GF.scene3d) GF.scene3d.select(null); }
-    else exec('api.deselect');
+    if (GF.scene3d) GF.scene3d.select(null);
   }
 
   /* X/Y run the first two hotbar slots — the hotbar is the button legend */
@@ -202,7 +191,7 @@ GF.gamepad = (function () {
         } else if (r2 > TRIGGER_ON) {
           exec('transform.scaleStep', { factor: Math.pow(1 + SCALE_RATE * tune.sens * dt * fine(r2), -ls.y) });  // stick up = grow
         } else {
-          const rate = (GF.context.get('mode3d') ? MOVE_RATE_3D : MOVE_RATE_2D) * tune.sens * dt;
+          const rate = MOVE_RATE_3D * tune.sens * dt;
           exec('transform.nudge', { dx: ls.x * rate, dy: ls.y * rate });
         }
       } else if (moveGesture) {
@@ -211,12 +200,8 @@ GF.gamepad = (function () {
       }
 
       if (rs.mag) {
-        if (GF.context.get('mode3d') && GF.scene3d && GF.scene3d.orbitCamera) {
+        if (GF.scene3d && GF.scene3d.orbitCamera) {
           GF.scene3d.orbitCamera(rs.x * ORBIT_RATE * tune.sens * dt, rs.y * ORBIT_RATE * tune.sens * dt);
-        } else if (GF.view && GF.view.view) {
-          GF.view.view.panX -= rs.x * PAN_RATE * tune.sens * dt;
-          GF.view.view.panY -= rs.y * PAN_RATE * tune.sens * dt;
-          GF.view.requestRender();
         }
       }
     }

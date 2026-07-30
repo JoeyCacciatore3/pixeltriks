@@ -1,8 +1,8 @@
 /* PixelTriks — scene3d.js
    The 3D workspace engine (GF.scene3d). Import GLB/GLTF models, add
-   primitives, move/rotate/scale each object, texture them with the
-   document, any layer, or an imported image, light with an HDRI, then
-   export a .glb or flatten a doc-resolution render onto the 2D canvas.
+   primitives, move/rotate/scale each object, texture them with imported
+   images or procedural textures, light with an HDRI, then export a .glb
+   or the current view as a PNG.
 
    Three.js r185 vendored in vendor/three/, loaded via ui/three-bundle.js
    (static ES module → window.__THREE_BUNDLE). Static imports because
@@ -10,26 +10,25 @@
 
    Color space: base-color maps tagged sRGB, normal/roughness stay linear.
 
-   3D edits keep their own command-stack undo (GF.scene3d.hist) — scene
-   graphs don't fit bitmap snapshots; api.js routes here while active. */
+   3D edits keep their own command-stack undo (GF.scene3d.hist); api.js
+   routes undo/redo here. */
 'use strict';
 window.GF = window.GF || {};
 
 GF.scene3d = (function () {
-  const U = GF.util, D = GF.doc;
+  const U = GF.util;
 
   let THREE = null, LIB = null, renderer = null, scene, camera, controls, raf = null;
   let sceneRoot = null;          // all user objects live under this group
   let helpers = null;            // selection highlight etc. — never exported
-  let boxHelper = null;
+  let boxHelper = null, selFill = null;
   let envMap = null;
   let statusCb = () => {};       // scene3d-ui injects a status-line callback
   let changeCbs = [];            // fired on any scene mutation (UI refresh)
 
   const objects = [];            // [{id, name, kind, prim, node, visible, mat, material, _origMats}]
   let selectedId = null, nextId = 1;
-  let interact = 'orbit';        // orbit | move | rotate | scale
-  let gizmo = null, gizmoBefore = null;
+  let interact = 'orbit';        // camera control mode (only orbit now)
   const bg = { mode: 'default', color: '#0c0e11' };   // default = dark; snapshot renders transparent unless 'color'
 
   const texCache = new Map();    // source-string -> { tex, srcCanvas }
@@ -67,13 +66,13 @@ GF.scene3d = (function () {
     });
   }
   function offline(e) {
-    setStatus('Could not load the 3D engine (vendor/three missing or blocked). 2D editing is unaffected.');
-    U.toast('3D engine could not load — 2D editing still works');
+    setStatus('Could not load the 3D engine (vendor/three missing or blocked).');
+    U.toast('3D engine could not load');
     throw e;
   }
 
   /* =================================================================
-     Undo — command stack (closures), separate from bitmap GF.history
+     Undo — command stack (closures) for scene-graph mutations
      ================================================================= */
   const hist = (function () {
     const un = [], re = [];
@@ -119,29 +118,12 @@ GF.scene3d = (function () {
     controls = new LIB.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
     clock = new T.Clock();
-
-    if (LIB.TransformControls) {
-      gizmo = new LIB.TransformControls(camera, renderer.domElement);
-      scene.add(gizmo.getHelper());
-      gizmo.addEventListener('dragging-changed', e => { controls.enabled = !e.value; });
-      gizmo.addEventListener('mouseDown', () => {
-        const o = selected(); if (o) gizmoBefore = snapTransform(o);
-      });
-      gizmo.addEventListener('mouseUp', () => {
-        const o = selected();
-        if (o && gizmoBefore) {
-          const after = snapTransform(o);
-          const before = gizmoBefore;
-          hist.push('transform', () => writeTransform(o, before), () => writeTransform(o, after));
-          gizmoBefore = null; emit();
-        }
-      });
-    }
+    // No transform gizmo: object movement is owned solely by the bottom-left
+    // transform pad (GF.transformPad) + physical gamepad. Left-drag orbits.
 
     new ResizeObserver(resize).observe(U.$('#viewport'));
     resize();
     wirePointer(renderer.domElement, host);
-    GF.history.onChange(() => { texDirty = true; });
     U.$('#viewport').addEventListener('pointerup', () => { texDirty = true; }, { passive: true });
 
     const vp = U.$('#viewport');
@@ -166,7 +148,18 @@ GF.scene3d = (function () {
     const dt = clock ? clock.getDelta() : 0;
     for (const [, entry] of mixers) entry.mixer.update(dt);
     if (texDirty && performance.now() - lastTexAt > 250) { lastTexAt = performance.now(); texDirty = false; refreshTextures(); }
-    if (boxHelper) { const o = byId(selectedId); if (o) boxHelper.box.setFromObject(o.node); }
+    if (boxHelper) {
+      const o = byId(selectedId);
+      if (o) {
+        boxHelper.box.setFromObject(o.node);
+        if (selFill) {
+          const sz = boxHelper.box.getSize(new THREE.Vector3());
+          const ct = boxHelper.box.getCenter(new THREE.Vector3());
+          selFill.position.copy(ct);
+          selFill.scale.set(sz.x || 0.01, sz.y || 0.01, sz.z || 0.01);
+        }
+      }
+    }
     renderer.render(scene, camera);
   }
 
@@ -200,46 +193,12 @@ GF.scene3d = (function () {
 
   /* =================================================================
      Textures — resolve a material source onto a (cached) CanvasTexture
-     source: 'composite' | 'layer:<id>' | 'image:<id>' | 'auto:normal' |
-             'auto:roughness' | null
+     3D-only: sources are imported images + procedural textures, both
+     registered as 'image:<id>' via addImageSource. (The 2D-document
+     'composite' / 'layer:' / 'auto:*' sources went away with the 2D editor.)
      ================================================================= */
-  const MAP_NAMES = ['normal', 'roughness', 'height', 'ao'];
-  // token match, not substring — "Chaos"/"Normalize" must not count as ao/normal maps
-  const mapTokenRe = name => new RegExp('(^|[^a-z])' + name + '([^a-z]|$)');
-  function isMapLayerName(layerName) {
-    const n = layerName.toLowerCase();
-    return MAP_NAMES.some(m => mapTokenRe(m).test(n));
-  }
-  function findLayer(mapName) {
-    const re = mapTokenRe(mapName.toLowerCase());
-    return (D.doc.layers || []).find(L => re.test(L.name.toLowerCase())) || null;
-  }
-  function compositeCanvas() {
-    if (!D.doc.open) return null;
-    // hide map-convention layers so they don't pollute the base color
-    const hidden = [];
-    for (const L of D.doc.layers) {
-      if (L.visible && isMapLayerName(L.name)) { L.visible = false; hidden.push(L); }
-    }
-    const flat = D.composite();
-    hidden.forEach(L => { L.visible = true; });
-    if (!compCanvas || compCanvas.width !== flat.width || compCanvas.height !== flat.height)
-      compCanvas = U.makeCanvas(flat.width, flat.height);
-    const c = U.ctx2d(compCanvas);
-    c.clearRect(0, 0, compCanvas.width, compCanvas.height);
-    c.drawImage(flat, 0, 0);
-    return compCanvas;
-  }
   function resolveSourceCanvas(source) {
     if (!source) return null;
-    if (source === 'composite') return compositeCanvas();
-    if (source === 'auto:normal') { const L = findLayer('normal'); return L && L.canvas; }
-    if (source === 'auto:roughness') { const L = findLayer('roughness'); return L && L.canvas; }
-    if (source.startsWith('layer:')) {
-      const id = source.slice(6);
-      const L = (D.doc.layers || []).find(l => String(l.id) === id);
-      return (L && L.canvas) || null;
-    }
     if (source.startsWith('image:')) return images.get(source) || null;
     return null;
   }
@@ -302,8 +261,7 @@ GF.scene3d = (function () {
   function defaultMat(kind, prim) {
     const flat = TWO_SIDED_PRIMS.includes(prim);
     return {
-      mapSource: (kind === 'model') ? null : (D.doc.open ? 'composite' : null),
-      normalSource: 'auto:normal', roughSource: 'auto:roughness',
+      mapSource: null, normalSource: null, roughSource: null,
       color: '#cccccc', roughness: 0.65, metalness: 0.05,
       doubleSided: flat, keepOriginal: (kind === 'model')
     };
@@ -455,6 +413,7 @@ GF.scene3d = (function () {
     // stagger so stacked adds don't z-fight
     o.node.position.x = (objects.length % 3) * 0.4 - 0.4;
     attach(o); applyMaterial(o); select(o.id);
+    if (objects.length === 1) frame();      // first shape → frame it so the user sees it appear
     hist.push('add ' + o.prim, () => detach(o), () => { attach(o); applyMaterial(o); });
     setStatus(objects.length + (objects.length === 1 ? ' object' : ' objects'));
     return o.id;
@@ -484,21 +443,24 @@ GF.scene3d = (function () {
         o.material = new T.MeshStandardMaterial({ roughness: o.mat.roughness, metalness: o.mat.metalness });
         attach(o); select(o.id);
         if (g.animations && g.animations.length) {
+          // Load STATIC: build the actions but do NOT auto-play — the model
+          // starts in its rest pose. The user starts playback from the anim
+          // controls (▶ Play). Auto-playing looped forever with no way to stop.
           const mixer = new T.AnimationMixer(node);
-          g.animations.forEach(clip => mixer.clipAction(clip).play());
-          mixers.set(o.id, { mixer, clips: g.animations });
+          const actions = g.animations.map(clip => mixer.clipAction(clip));   // built but NOT played → model stays in its bind pose
+          mixers.set(o.id, { mixer, clips: g.animations, actions, playing: false });
           if (GF.animation) GF.animation.importClips(g.animations);
+          setStatus(o.name + ' — ' + g.animations.length + ' animation(s), paused. Press ▶ to play.');
         }
         hist.push('import ' + o.name, () => detach(o), () => attach(o));
         setStatus('Model loaded — ' + o.name);
         U.toast('Model loaded: ' + o.name);
-        if (!isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');   // dropping a model is an unambiguous intent
         resolve(o.id);
       }, undefined, () => { setStatus('Could not load that model.'); U.toast('Could not load that model'); resolve(null); });
     });
   }
 
-  /** Engine access for generators (GF.make3d): boots the renderer if needed
+  /** Engine access for generated-geometry callers: boots the renderer if needed
       and hands back the shared THREE instance + addon bundle. */
   async function engine() {
     await ensureRenderer();
@@ -510,7 +472,7 @@ GF.scene3d = (function () {
       keeps its look even if the 2D document changes afterwards.
       keepOriginal: the node manages its own materials (e.g. layer stacks). */
   function addGenerated(input, name, opts) {
-    if (!THREE) return null;   // callers go through make3d.run, which boots the engine first
+    if (!THREE) return null;   // callers boot the engine (ensureRenderer) first
     opts = opts || {};
     const id = nextId++;
     const o = {
@@ -524,7 +486,6 @@ GF.scene3d = (function () {
     o.mat.mapSource = opts.textureCanvas ? addImageSource(opts.textureCanvas, o.name) : null;
     attach(o); applyMaterial(o); select(o.id);
     hist.push('make ' + (name || '3D'), () => detach(o), () => { attach(o); applyMaterial(o); });
-    if (!isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');
     return o.id;
   }
 
@@ -541,7 +502,7 @@ GF.scene3d = (function () {
           const includeMap = {};
           if (hasGltf) files.forEach(s => { if (s !== f) includeMap[s.name] = urls.get(s.name); });
           await importModel(urls.get(f.name), f.name.replace(/\.(glb|gltf)$/i, ''), includeMap);
-        } else if (f.type && f.type.startsWith('image/') && !hasGltf) GF.exporter.importImage(f);
+        } else if (f.type && f.type.startsWith('image/') && !hasGltf) await importImageAsTexture(f);
       }
     } finally {
       for (const u of urls.values()) URL.revokeObjectURL(u);
@@ -588,6 +549,19 @@ GF.scene3d = (function () {
     }
   }
   function _blobToCanvas(blob) { return U.blobToCanvas(blob); }
+
+  /** Import an image file as a reusable texture source; apply it to the
+      selected object if there is one, otherwise just register it. */
+  async function importImageAsTexture(file) {
+    try {
+      const canvas = await U.blobToCanvas(file);
+      const key = addImageSource(canvas, (file.name || 'image').replace(/\.[^.]+$/, ''));
+      const o = selected();
+      if (o) { setMaterial(o.id, { mapSource: key }); U.toast('Texture applied: ' + file.name); }
+      else U.toast('Texture imported — select an object to apply it');
+      return key;
+    } catch (e) { U.toast('Could not load that image'); return null; }
+  }
 
   function removeObject(id) {
     const o = byId(id); if (!o) return;
@@ -670,19 +644,35 @@ GF.scene3d = (function () {
     selectedId = id;
     if (!THREE) return;
     if (boxHelper) { helpers.remove(boxHelper); boxHelper.dispose(); boxHelper = null; }
+    if (selFill) { helpers.remove(selFill); selFill.geometry.dispose(); selFill.material.dispose(); selFill = null; }
     const o = byId(id);
     if (o) {
-      boxHelper = new THREE.Box3Helper(new THREE.Box3().setFromObject(o.node), new THREE.Color(0xe8a33d));
+      const box = new THREE.Box3().setFromObject(o.node);
+      boxHelper = new THREE.Box3Helper(box, new THREE.Color(0xe8a33d));
       helpers.add(boxHelper);
-      if (gizmo) gizmo.attach(o.node);
-    } else {
-      if (gizmo) gizmo.detach();
+      /* translucent amber fill — makes selection obvious even on small/dark objects */
+      const sz = box.getSize(new THREE.Vector3());
+      const ct = box.getCenter(new THREE.Vector3());
+      selFill = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshBasicMaterial({ color: 0xe8a33d, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide })
+      );
+      selFill.position.copy(ct);
+      selFill.scale.set(sz.x || 0.01, sz.y || 0.01, sz.z || 0.01);
+      selFill.renderOrder = 999;
+      helpers.add(selFill);
     }
     emit();
   }
   function selected() { return byId(selectedId); }
-  function setInteract(mode) { interact = mode; if (controls) controls.enabled = (mode === 'orbit'); }
-  function getInteract() { return interact; }
+  function setInteract(mode) { interact = mode; if (controls) controls.enabled = true; }   // camera orbit always on
+
+  /* Imported-model animation playback (mixers). Models load paused; these drive
+     the actions when the user hits ▶ / ⏸ / ⏹. */
+  function playAnimations() { mixers.forEach(m => { if (m.actions) m.actions.forEach(a => { if (!a.isRunning()) a.play(); a.paused = false; }); m.playing = true; }); }
+  function pauseAnimations() { mixers.forEach(m => { if (m.actions) m.actions.forEach(a => { a.paused = true; }); m.playing = false; }); }
+  function stopAnimations() { mixers.forEach(m => { if (m.actions) m.actions.forEach(a => a.stop()); m.mixer.update(0); m.playing = false; }); }
+  function hasModelAnimations() { return mixers.size > 0; }
 
   function pick(clientX, clientY) {
     if (!THREE || !renderer) return null;
@@ -716,67 +706,26 @@ GF.scene3d = (function () {
       host.addEventListener(t, e => e.stopPropagation()));
     host.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
 
-    let drag = null;   // {id, startX, startY, start, plane, grab, moved}
+    // Object movement lives in the transform pad only. Here the viewport just
+    // does: left-drag = orbit (OrbitControls), click (no drag) = select/deselect.
+    let down = null;
     el.addEventListener('pointerdown', e => {
+      if (GF.editmesh && GF.editmesh.isActive()) { GF.editmesh.onPointerDown(e); return; }
       if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.onPointerDown(e)) return;
-      const o = selected();
-      drag = { x0: e.clientX, y0: e.clientY, moved: false, id: null };
-      if (interact !== 'orbit' && o) {
-        drag.id = o.id;
-        drag.start = snapTransform(o);
-        if (interact === 'move') {
-          const T = THREE;
-          const dir = camera.getWorldDirection(new T.Vector3());
-          drag.plane = new T.Plane().setFromNormalAndCoplanarPoint(dir, o.node.position.clone());
-          const pt = planePoint(e, drag.plane);
-          drag.grab = pt ? o.node.position.clone().sub(pt) : new T.Vector3();
-        }
-        el.setPointerCapture(e.pointerId);
-      }
+      down = { x: e.clientX, y: e.clientY };
     });
     el.addEventListener('pointermove', e => {
+      if (GF.editmesh && GF.editmesh.isActive()) { GF.editmesh.onPointerMove(e); return; }
       if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.onPointerMove(e)) return;
-      if (!drag) return;
-      const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-      const o = drag.id != null && byId(drag.id);
-      if (!o || interact === 'orbit') return;
-      if (interact === 'move') {
-        const pt = planePoint(e, drag.plane);
-        if (pt) o.node.position.copy(pt.add(drag.grab));
-      } else if (interact === 'rotate') {
-        o.node.rotation.y = drag.start.ry * D2R + dx * 0.01;
-        o.node.rotation.x = drag.start.rx * D2R + dy * 0.01;
-      } else if (interact === 'scale') {
-        const f = Math.exp(-dy * 0.005);
-        o.node.scale.set(drag.start.sx * f, drag.start.sy * f, drag.start.sz * f);
-      }
     });
-    const up = e => {
+    el.addEventListener('pointerup', e => {
+      if (GF.editmesh && GF.editmesh.isActive()) { GF.editmesh.onPointerUp(e); return; }
       if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.onPointerUp(e)) return;
-      if (!drag) return;
-      const d = drag; drag = null;
-      const o = d.id != null && byId(d.id);
-      if (o && d.moved && interact !== 'orbit') {
-        const before = d.start, after = snapTransform(o);
-        hist.push(interact, () => writeTransform(o, before), () => writeTransform(o, after));
-        emit();
-      } else if (!d.moved) {
-        select(pick(e.clientX, e.clientY));     // plain click (any mode) = pick / deselect
-      }
-    };
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', () => {
-      // commit the transform so far — a lost pointer must still be undoable
-      if (!drag) return;
-      const d = drag; drag = null;
-      const o = d.id != null && byId(d.id);
-      if (o && d.moved && interact !== 'orbit') {
-        const before = d.start, after = snapTransform(o);
-        hist.push(interact, () => writeTransform(o, before), () => writeTransform(o, after));
-        emit();
-      }
+      if (down && Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) < 4)
+        select(pick(e.clientX, e.clientY));      // a click (not an orbit-drag) selects / deselects
+      down = null;
     });
+    el.addEventListener('pointercancel', () => { down = null; });
   }
   function planePoint(e, plane) {
     const T = THREE, r = renderer.domElement.getBoundingClientRect();
@@ -807,6 +756,23 @@ GF.scene3d = (function () {
     controls.target.copy(center);
     const dir = camera.position.clone().sub(controls.target).normalize();
     camera.position.copy(center.clone().add(dir.multiplyScalar(size * 1.4)));
+  }
+
+  /** Snap camera to a preset view direction at a comfortable distance. */
+  function viewPreset(direction) {
+    if (!THREE || !camera || !controls) return;
+    const target = selected() ? selected().node : sceneRoot;
+    const box = new THREE.Box3().setFromObject(target);
+    const center = box.isEmpty() ? controls.target.clone() : box.getCenter(new THREE.Vector3());
+    const dist = (box.isEmpty() ? 2 : box.getSize(new THREE.Vector3()).length()) * 1.6;
+    const offsets = {
+      front: [0, 0, 1], back: [0, 0, -1], right: [1, 0, 0], left: [-1, 0, 0],
+      top: [0, 1, 0.001], bottom: [0, -1, 0.001],   // tiny Z offset avoids gimbal lock
+    };
+    const off = offsets[direction] || offsets.front;
+    controls.target.copy(center);
+    camera.position.set(center.x + off[0] * dist, center.y + off[1] * dist, center.z + off[2] * dist);
+    camera.lookAt(center);
   }
 
   /* =================================================================
@@ -855,17 +821,16 @@ GF.scene3d = (function () {
   }
 
   /* =================================================================
-     Output — flatten to a 2D layer, export GLB
+     Output — export view as PNG, export GLB
      ================================================================= */
-  /** Render the scene once at DOCUMENT resolution (transparent unless a solid
-      background color is chosen) and place it as a new layer. This is the
-      "one canvas is the ops center" handoff back to 2D editing. */
-  function snapshotToLayer() {
-    if (!renderer || !objects.length) { U.toast('Add a 3D object first'); return null; }
-    refreshTextures(true);   // may be invoked from 2D mode (palette) — don't bake stale textures
-    if (!D.doc.open) { D.newDocument(1024, 1024, null, '3d-render'); GF.ui.onDocumentOpened(); }
-    else GF.history.push(D.doc, '3D render');
-    const W = D.doc.width, H = D.doc.height;
+  /** Render the current 3D view to a PNG blob and trigger a download.
+      (Was "flatten to a 2D layer" — there is no 2D layer target anymore.)
+      Returns the Blob so callers/tests can inspect it. */
+  function exportViewPng(size) {
+    if (!renderer || !objects.length) { U.toast('Add a 3D object first'); return Promise.resolve(null); }
+    refreshTextures(true);
+    const W = Math.max(1, Math.round(size || renderer.domElement.width || 1024));
+    const H = Math.max(1, Math.round(size || renderer.domElement.height || 1024));
     const pr = renderer.getPixelRatio(), oldAspect = camera.aspect, oldBg = scene.background;
     renderer.setPixelRatio(1);
     renderer.setSize(W, H, false);
@@ -873,16 +838,19 @@ GF.scene3d = (function () {
     if (bg.mode !== 'color') scene.background = null;
     helpers.visible = false;
     renderer.render(scene, camera);
-    const L = D.addLayer('3D render');
-    U.ctx2d(L.canvas).drawImage(renderer.domElement, 0, 0);
+    const out = U.makeCanvas(W, H);
+    U.ctx2d(out).drawImage(renderer.domElement, 0, 0);
     // restore the live viewport
     helpers.visible = true;
     scene.background = oldBg;
     camera.aspect = oldAspect; camera.updateProjectionMatrix();
     renderer.setPixelRatio(pr); resize();
-    GF.ui.refreshLayers(); GF.view.requestRender();
-    U.toast('3D render placed on a new layer');
-    return L.id;
+    return new Promise(resolve => {
+      out.toBlob(blob => {
+        if (blob) { U.downloadBlob(blob, 'render.png'); U.toast('View exported as PNG'); }
+        resolve(blob);
+      }, 'image/png');
+    });
   }
 
   /** Raw binary-GLB ArrayBuffer of the scene (or selected object) — shared by
@@ -905,7 +873,7 @@ GF.scene3d = (function () {
     try {
       const buf = await exportGLBBuffer(opts);
       if (!buf) return false;
-      U.downloadBlob(new Blob([buf], { type: 'model/gltf-binary' }), (D.doc.name || 'scene') + '.glb');
+      U.downloadBlob(new Blob([buf], { type: 'model/gltf-binary' }), 'scene.glb');
       U.toast('GLB exported');
       return true;
     } catch (e) { U.toast('Export failed: ' + e.message); return false; }
@@ -918,21 +886,28 @@ GF.scene3d = (function () {
     addPrimitive, importModel, addGenerated, engine, handleFiles, removeObject, duplicateObject, setVisible,
     listObjects, getObject, setObject, byId, count,
     // selection / interaction
-    select, selected, selectedId: () => selectedId, setInteract, getInteract, pick, raycastUV, frame, orbitCamera,
+    select, selected, selectedId: () => selectedId, setInteract, pick, raycastUV, frame, viewPreset, orbitCamera,
+    playAnimations, pauseAnimations, stopAnimations, hasModelAnimations,
     rendererEl: () => renderer ? renderer.domElement : null,
-    // gizmo (TransformControls)
-    setGizmoMode: mode => { if (gizmo) gizmo.setMode(mode); },
-    setGizmoSpace: space => { if (gizmo) gizmo.setSpace(space); },
-    gizmoMode: () => gizmo ? gizmo.mode : null,
-    gizmoSpace: () => gizmo ? gizmo.space : null,
     // materials / textures
     setMaterial, addImageSource, listImageSources, refreshAll,
     // environment
     setEnvironment, clearEnvironment, setBackground, background: () => Object.assign({}, bg),
     // output
-    snapshotToLayer, exportGLB, exportGLBBuffer,
+    exportViewPng, exportGLB, exportGLBBuffer,
     // undo
-    hist
+    hist,
+    // mesh edit-mode support (ui/editmesh.js) — live engine refs + selection-helper control
+    editRefs: () => ({
+      THREE, camera, renderer, scene, sceneRoot, hist, emit,
+      screenRect: () => renderer ? renderer.domElement.getBoundingClientRect() : null,
+      setControlsEnabled: v => { if (controls) controls.enabled = v; },
+      hideObjectHandles: () => {
+        if (boxHelper) { helpers.remove(boxHelper); boxHelper.dispose(); boxHelper = null; }
+        if (selFill) { helpers.remove(selFill); selFill.geometry.dispose(); selFill.material.dispose(); selFill = null; }
+      },
+      restoreSelection: () => select(selectedId),
+    }),
   };
 })();
 
@@ -940,19 +915,19 @@ GF.scene3d = (function () {
    catalog like everything else (GF.api.run('scene3d.addPrimitive', …)). */
 if (GF.api && GF.api.register) {
   const R = GF.api.register;
-  R('scene3d.enter', '', 'Open the 3D workspace', () => GF.ui.setTool('scene3d'));
-  R('scene3d.exit', '', 'Leave the 3D workspace (back to image editing)', () => GF.ui.setTool('move'));
+  R('scene3d.enter', '', 'Ensure the 3D workspace is active', () => { if (GF.scene3dUI) GF.scene3dUI.enter(); });
   R('scene3d.addPrimitive', 'kind(sphere|box|roundedbox|cylinder|cone|pyramid|prism|capsule|hemisphere|torus|torusknot|pipe|tetrahedron|octahedron|dodecahedron|icosahedron|gem|plane|panel|disc|ring|tile|hex|curved|star|heart|arrow|steps)', 'Add a primitive to the 3D scene', a => GF.scene3d.addPrimitive(a.kind || 'box'));
   R('scene3d.importModel', 'url, name?', 'Import a GLB/GLTF model into the 3D scene', a => GF.scene3d.importModel(a.url, a.name));
   R('scene3d.list', '', 'List the 3D scene objects', () => GF.scene3d.listObjects());
   R('scene3d.setObject', 'id, px?, py?, pz?, rx?(deg), ry?, rz?, sx?, sy?, sz?, scale?', 'Transform a 3D object', a => GF.scene3d.setObject(a.id, a));
-  R('scene3d.setMaterial', 'id, mapSource?("composite"|"layer:<id>"|null), color?, roughness?(0-1), metalness?(0-1)', "Set a 3D object's material / texture source", a => {
+  R('scene3d.setMaterial', 'id, mapSource?("image:<id>"|null), color?, roughness?(0-1), metalness?(0-1)', "Set a 3D object's material / texture source", a => {
     const p = {};
     ['mapSource', 'normalSource', 'roughSource', 'color', 'roughness', 'metalness', 'doubleSided', 'keepOriginal']
       .forEach(k => { if (a[k] !== undefined) p[k] = a[k]; });
     return GF.scene3d.setMaterial(a.id, p);
   });
-  R('scene3d.snapshotToLayer', '', 'Render the 3D scene at document resolution onto a new 2D layer', () => GF.scene3d.snapshotToLayer());
+  R('scene3d.exportPng', '', 'Export view as PNG', () => GF.scene3d.exportViewPng(),
+    { group: '3D', label: 'Export view as PNG' });
   R('scene3d.deleteSelected', 'id?', 'Remove a 3D object (default: the selected one)', a => {
     const id = (a && a.id != null) ? a.id : GF.scene3d.selectedId();
     if (id == null) throw new Error('no 3D object selected');
@@ -965,9 +940,4 @@ if (GF.api && GF.api.register) {
   });
   R('scene3d.frameSelected', '', 'Frame the selected object (or whole scene) in view', () => GF.scene3d.frame());
   R('scene3d.exportGLB', 'selection?("scene"|"selected")', 'Export the 3D scene as a .glb file', a => GF.scene3d.exportGLB(a || {}));
-  R('scene3d.gizmo', 'mode?("translate"|"rotate"|"scale"), space?("world"|"local")', 'Set the transform gizmo mode and/or coordinate space', a => {
-    if (a.mode) GF.scene3d.setGizmoMode(a.mode);
-    if (a.space) GF.scene3d.setGizmoSpace(a.space);
-    return { mode: GF.scene3d.gizmoMode(), space: GF.scene3d.gizmoSpace() };
-  });
 }

@@ -42,17 +42,19 @@ GF.context = (function () {
     return (parsed[expr] || (parsed[expr] = compile(expr)))();
   }
 
-  /* --- app-state sync: the one place UI state becomes context keys --- */
+  /* --- app-state sync: the one place UI state becomes context keys ---
+     3D-only: the app is always in 3D mode. The 2D-editor keys (docOpen,
+     selectionActive, painting, textTool) are retained as always-false so
+     existing when-clauses still evaluate without referencing removed modules. */
   function sync() {
-    const D = GF.doc, S = GF.scene3d, V = GF.view;
-    set('docOpen', D && D.doc.open);
-    set('mode3d', document.body.dataset.mode === '3d');
-    set('selectionActive', GF.select && GF.select.has && GF.select.has());
+    const S = GF.scene3d;
+    set('docOpen', S && S.count && S.count() > 0);   // "something to act on" — 3D objects
+    set('mode3d', true);
+    set('selectionActive', false);
     set('has3dSelection', S && S.selected && !!S.selected());
     set('animPlaying', GF.animation && GF.animation.isPlaying && GF.animation.isPlaying());
-    const tool = V && V.view ? V.view.tool : null;
-    set('painting', tool === 'brush' || tool === 'fill' || tool === 'gradient');
-    set('textTool', tool === 'text');
+    set('painting', false);
+    set('textTool', false);
   }
 
   return { set, get, onChange, evaluate, sync };

@@ -37,14 +37,15 @@ GF.animation = (function () {
   function getLoop() { return loopMode; }
 
   function play() {
+    if (GF.scene3d && GF.scene3d.playAnimations) GF.scene3d.playAnimations();   // resume imported-model clips
     if (playing) return;
     playing = true;
     lastTick = performance.now();
     tick();
     emit();
   }
-  function pause() { playing = false; if (rafId) { cancelAnimationFrame(rafId); rafId = null; } emit(); }
-  function stop() { pause(); currentTime = 0; applyAtTime(0); emit(); }
+  function pause() { playing = false; if (rafId) { cancelAnimationFrame(rafId); rafId = null; } if (GF.scene3d && GF.scene3d.pauseAnimations) GF.scene3d.pauseAnimations(); emit(); }
+  function stop() { pause(); currentTime = 0; applyAtTime(0); if (GF.scene3d && GF.scene3d.stopAnimations) GF.scene3d.stopAnimations(); emit(); }
 
   function tick() {
     if (!playing) return;

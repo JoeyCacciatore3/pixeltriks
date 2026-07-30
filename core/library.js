@@ -14,7 +14,6 @@ window.GF = window.GF || {};
 
 GF.library = (function () {
   const U = GF.util;
-  const D = GF.doc;
   const API = 'https://api.polyhaven.com';
   const thumbUrl = id => `https://cdn.polyhaven.com/asset_img/thumbs/${id}.png?width=256&height=256`;
 
@@ -54,50 +53,7 @@ GF.library = (function () {
     return null;
   }
 
-  /* ============== document helpers (internal) ============== */
-  function newDocFromImage(img, name) {
-    D.newDocument(img.naturalWidth, img.naturalHeight, null, name);
-    GF.ui.onDocumentOpened();
-    U.ctx2d(D.active().canvas).drawImage(img, 0, 0);
-    GF.ui.refreshLayers();
-    GF.view.requestRender();
-  }
-  function addImageLayer(img, name) {
-    GF.history.push(D.doc, 'import asset');
-    const L = D.addLayer(name);
-    const c = U.ctx2d(L.canvas);
-    const s = Math.min(1, D.doc.width / img.naturalWidth, D.doc.height / img.naturalHeight);
-    c.drawImage(img, 0, 0, img.naturalWidth * s, img.naturalHeight * s);
-    GF.ui.refreshLayers();
-    GF.view.requestRender();
-  }
-  function addMapLayer(img, name) {
-    const L = D.addLayer(name);
-    U.ctx2d(L.canvas).drawImage(img, 0, 0, D.doc.width, D.doc.height);
-    L.visible = false; // map layers ride along hidden; the 3D workspace reads them by name
-    return L;
-  }
-
   /* ============== imports ============== */
-  async function importTexture(id, name, res, mode) {
-    const f = await apiFiles(id);
-    const diff = pickUrl(f, ['Diffuse', 'diff', 'col', 'Color'], res);
-    if (!diff) throw new Error('No diffuse map for this asset');
-    const dimg = await loadImage(diff);
-    if (mode === 'layer' && D.doc.open) addImageLayer(dimg, name);
-    else newDocFromImage(dimg, name);
-
-    if (mode === 'pbr') {
-      const maps = [[['nor_gl', 'nor_dx'], 'normal'], [['Rough', 'rough'], 'roughness'], [['AO', 'ao'], 'ao']];
-      for (const [keys, suffix] of maps) {
-        const url = pickUrl(f, keys, res);
-        if (!url) continue;
-        try { addMapLayer(await loadImage(url), name + ' ' + suffix); } catch (e) { /* skip a missing map */ }
-      }
-      GF.ui.refreshLayers();
-    }
-  }
-
   /** HDRI url for a Poly Haven asset id (for GF.scene3d.setEnvironment). */
   async function hdriUrl(id, res) {
     const f = await apiFiles(id);
@@ -105,15 +61,6 @@ GF.library = (function () {
     const url = node && node.hdr && node.hdr.url;
     if (!url) throw new Error('No HDRI file for this asset');
     return url;
-  }
-  async function importBackground(id, name, res, mode) {
-    if (mode === 'env') { await GF.scene3d.setEnvironment(await hdriUrl(id, res)); return; }
-    const f = await apiFiles(id);
-    const tone = (f.tonemapped && f.tonemapped.url) || pickUrl(f, ['hdri'], res);
-    if (!tone) throw new Error('No preview image');
-    const img = await loadImage(tone);
-    if (mode === 'layer' && D.doc.open) addImageLayer(img, name);
-    else newDocFromImage(img, name);
   }
 
   async function importModel(id, name, res) {
@@ -188,24 +135,13 @@ GF.library = (function () {
       return c;
     };
   }
-  function generateProcedural(key, w, h, asLayer) {
-    const g = GENERATORS[key]; if (!g) return;
+  /** Render a procedural texture to a canvas (used as a 3D material source). */
+  function generateProcedural(key, w, h) {
+    const g = GENERATORS[key]; if (!g) return null;
     const seed = (Date.now() & 0xffff) || 1;
-    const cnv = g.fn(w, h, seed);
-    if (asLayer && D.doc.open) {
-      GF.history.push(D.doc, 'procedural ' + key);
-      const L = D.addLayer(g.label);
-      U.ctx2d(L.canvas).drawImage(cnv, 0, 0, D.doc.width, D.doc.height);
-      GF.ui.refreshLayers(); GF.view.requestRender();
-    } else {
-      D.newDocument(w, h, null, g.label);
-      GF.ui.onDocumentOpened();
-      U.ctx2d(D.active().canvas).drawImage(cnv, 0, 0);
-      GF.ui.refreshLayers(); GF.view.requestRender();
-    }
+    return g.fn(w || 512, h || 512, seed);
   }
 
   return { generateProcedural, GENERATORS,
-           apiList, apiFiles, thumbUrl, hdriUrl,
-           importTexture, importBackground, importModel };
+           apiList, apiFiles, thumbUrl, hdriUrl, importModel };
 })();

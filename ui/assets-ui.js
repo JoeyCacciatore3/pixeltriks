@@ -136,16 +136,15 @@ GF.assetsUI = (function () {
     } else if (asset.type === 'material') {
       await applyMaterial(asset);
     } else if (asset.type === 'texture') {
-      if (asset.data) {
+      if (asset.data && S()) {
+        if (S().selectedId() == null) { GF.util.toast('Select a 3D object first'); return; }
         try {
           const blob = asset.data instanceof Blob ? asset.data : new Blob([asset.data]);
-          const img = await loadImg(blob);
-          GF.doc.newDocument(img.naturalWidth, img.naturalHeight, null, asset.name);
-          if (GF.ui) GF.ui.onDocumentOpened();
-          GF.util.ctx2d(GF.doc.active().canvas).drawImage(img, 0, 0);
-          if (GF.ui) { GF.ui.refreshLayers(); GF.view.requestRender(); }
-          GF.util.toast('Texture opened: ' + asset.name);
-        } catch (e) { GF.util.toast('Could not open texture'); }
+          const canvas = await canvasFromBlob(blob);
+          const key = S().addImageSource(canvas, asset.name);
+          S().setMaterial(S().selectedId(), { mapSource: key });
+          GF.util.toast('Texture applied: ' + asset.name);
+        } catch (e) { GF.util.toast('Could not apply texture'); }
       }
     } else if (asset.type === 'hdri' && S()) {
       const url = A().blobUrl(asset);

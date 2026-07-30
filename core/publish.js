@@ -11,7 +11,7 @@
 window.GF = window.GF || {};
 
 GF.publish = (function () {
-  const U = GF.util, D = GF.doc;
+  const U = GF.util;
   const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.185.0';   // keep in lockstep with vendor/three
 
   function b64(buf) {
@@ -34,7 +34,7 @@ GF.publish = (function () {
     const bg = GF.scene3d.background();
     const bgMode = opts.background || bg.mode;                     // default | transparent | color
     const bgColor = opts.color || (bgMode === 'color' ? bg.color : '#0c0e11');
-    const title = esc(opts.title || D.doc.name || 'PixelTriks scene');
+    const title = esc(opts.title || 'PixelTriks scene');
     const autoRotate = opts.autoRotate !== false;
     const transparent = bgMode === 'transparent';
 
@@ -120,7 +120,7 @@ renderer.setAnimationLoop(() => { if (mixer && clock) mixer.update(clock.getDelt
   async function downloadPage(opts) {
     const html = await buildPage(opts);
     if (!html) return false;
-    const name = ((opts && opts.title) || D.doc.name || 'scene').replace(/[^\w-]+/g, '-').toLowerCase();
+    const name = ((opts && opts.title) || 'scene').replace(/[^\w-]+/g, '-').toLowerCase();
     U.downloadBlob(new Blob([html], { type: 'text/html' }), name + '.html');
     U.toast('Interactive page saved — upload it to any static host');
     return true;

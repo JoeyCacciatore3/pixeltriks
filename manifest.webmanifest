@@ -1,7 +1,7 @@
 {
   "name": "PixelTriks",
   "short_name": "PixelTriks",
-  "description": "3D scene studio — build, texture, animate, and publish interactive Three.js scenes and GLB models in the browser.",
+  "description": "3D game-asset studio — model, edit meshes, texture zones, and export GLB models in the browser.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

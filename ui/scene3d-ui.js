@@ -1,13 +1,13 @@
 /* PixelTriks — scene3d-ui.js
    UI for the 3D workspace (GF.scene3dUI). Owns the "3D" panel tab (objects,
    transform, material, environment, actions), the 3D options bar, and the
-   mode enter/exit handshake with GF.ui.setTool. All scene mutations go
-   through GF.scene3d — this file is DOM only. */
+   the 3D workspace is always active. All scene mutations go through
+   GF.scene3d — this file is DOM only. */
 'use strict';
 window.GF = window.GF || {};
 
 GF.scene3dUI = (function () {
-  const U = GF.util, D = GF.doc;
+  const U = GF.util;
   const $ = s => document.querySelector(s);
   const S = () => GF.scene3d;
 
@@ -30,46 +30,17 @@ GF.scene3dUI = (function () {
       ['star', 'Star'], ['heart', 'Heart'], ['arrow', 'Arrow'], ['steps', 'Steps'],
     ]],
   ];
-  const SAMPLES = ['cube', 'sphere', 'cylinder', 'cone', 'plane'];
 
   let built = false;
 
-  /* ================= mode handshake (called by setTool) ================= */
+  /* ================= workspace activation ================= */
   function enter() {
     ensurePane();
     S().enter().then(ok => { if (!ok) return; refresh(); });
     const tab = $('.ptab[data-tab="scene"]'); if (tab) tab.click();
   }
-  function exit() {
-    S().exit();
-    const tab = $('.ptab[data-tab="adjust"]'); if (tab) tab.click();
-    updateUndoButtons();
-  }
+  function exit() { /* 3D-only: the workspace is always active */ updateUndoButtons(); }
 
-  /* ================= options bar ================= */
-  function optbarHtml() {
-    const cur = S().getInteract();
-    const seg = [['orbit', 'Orbit'], ['move', 'Move'], ['rotate', 'Rotate'], ['scale', 'Scale']]
-      .map(([v, l]) => `<button data-v="${v}" class="${v === cur ? 'on' : ''}">${l}</button>`).join('');
-    return `<span class="seg" id="s3-interact">${seg}</span>`
-      + `<span class="opt s3-hint">Click an object to select it</span>`
-      + `<button class="text-btn primary" id="s3-flatten-ob">⬇ Flatten to layer</button>`
-      + `<button class="text-btn ghost" id="s3-publish-ob">🌐 Publish…</button>`;
-  }
-  function wireOptbar() {
-    const seg = $('#s3-interact');
-    if (seg) seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-      seg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
-      b.classList.add('on');
-      S().setInteract(b.dataset.v);
-    }));
-    const fl = $('#s3-flatten-ob'); if (fl) fl.addEventListener('click', flattenAndReturn);
-    const pb = $('#s3-publish-ob'); if (pb) pb.addEventListener('click', publishDialog);
-  }
-  function flattenAndReturn() {
-    const id = S().snapshotToLayer();
-    if (id != null && GF.ui.setTool) GF.ui.setTool('move');   // land on the new layer in 2D
-  }
 
   /* ================= panel pane ================= */
   function ensurePane() {
@@ -77,13 +48,7 @@ GF.scene3dUI = (function () {
     built = true;
     const pane = $('.ptab-pane[data-pane="scene"]'); if (!pane) return;
     pane.innerHTML = `
-      <h3 class="panel-h first">Make 3D — from your image</h3>
-      <label class="mini">Converter<select id="m3-kind"></select></label>
-      <div id="m3-opts"></div>
-      <p class="s3-status" id="m3-src"></p>
-      <div class="s3-row"><button class="text-btn primary" id="m3-run">✨ Create 3D</button></div>
-
-      <h3 class="panel-h">Objects</h3>
+      <h3 class="panel-h first">Objects</h3>
       ${PRIM_GROUPS.map(([label, prims], gi) =>
         `<details class="s3-group"${gi === 0 ? ' open' : ''}><summary>${label} <span class="s3-count">${prims.length}</span></summary>
          <div class="pro-grid s3-prims">${prims.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div></details>`
@@ -91,9 +56,6 @@ GF.scene3dUI = (function () {
       <div class="s3-row">
         <button class="text-btn ghost" id="s3-import">Import model…</button>
         <button class="text-btn ghost" id="s3-ph-model">Poly Haven…</button>
-      </div>
-      <div class="s3-row">
-        <label class="mini">Sample<select id="s3-sample"><option value="">Add a sample model…</option>${SAMPLES.map(s => `<option value="${s}">${s}</option>`).join('')}</select></label>
       </div>
       <ul id="s3-objects" class="layer-list"></ul>
       <div id="s3-inspector"></div>
@@ -111,30 +73,14 @@ GF.scene3dUI = (function () {
         </select></label>
         <input type="color" id="s3-bg-color" value="#0c0e11" title="Background color">
       </div>
-      <h3 class="panel-h">Actions</h3>
-      <div class="s3-row">
-        <button class="text-btn primary" id="s3-flatten">⬇ Flatten to layer</button>
-        <button class="text-btn primary" id="s3-publish">🌐 Publish page…</button>
-      </div>
-      <div class="s3-row">
-        <button class="text-btn ghost" id="s3-glb">Export GLB</button>
-        <button class="text-btn ghost" id="s3-glb-sel">Export selected</button>
-      </div>
-      <div class="s3-row">
-        <button class="text-btn ghost" id="s3-refresh">↻ Refresh textures</button>
-      </div>
+      <p class="s3-hint-line">Export &amp; publish live in the <b>Export</b> button (top-right).</p>
       <p class="s3-status" id="s3-status"></p>`;
 
     pane.querySelectorAll('[data-prim]').forEach(b => b.addEventListener('click', () => {
-      if (!S().isActive() && GF.ui && GF.ui.setTool) GF.ui.setTool('scene3d');   // pane is reachable before the 3D tool
       S().addPrimitive(b.dataset.prim);
     }));
-    $('#s3-import').addEventListener('click', () => $('#file-input').click());   // exporter routes .glb/.gltf/.hdr back to scene3d
+    $('#s3-import').addEventListener('click', () => $('#file-input').click());   // routes .glb/.gltf/.hdr back to scene3d
     $('#s3-hdr-file').addEventListener('click', () => $('#file-input').click());
-    $('#s3-sample').addEventListener('change', e => {
-      const v = e.target.value; e.target.value = '';
-      if (v) S().importModel('assets/models/' + v + '.glb', v);
-    });
     $('#s3-ph-model').addEventListener('click', () => phPicker('models', async (id, name) => {
       U.toast('Importing ' + name + '…', 60000);
       try { await GF.library.importModel(id, name, '1k'); U.toast('Imported ' + name); }
@@ -148,54 +94,13 @@ GF.scene3dUI = (function () {
     $('#s3-env-clear').addEventListener('click', () => S().clearEnvironment());
     $('#s3-bg').addEventListener('change', e => S().setBackground(e.target.value, $('#s3-bg-color').value));
     $('#s3-bg-color').addEventListener('input', e => S().setBackground('color', e.target.value));
-    $('#s3-flatten').addEventListener('click', flattenAndReturn);
-    $('#s3-publish').addEventListener('click', publishDialog);
-    $('#s3-glb').addEventListener('click', () => S().exportGLB({}));
-    $('#s3-glb-sel').addEventListener('click', () => S().exportGLB({ selection: 'selected' }));
-    $('#s3-refresh').addEventListener('click', () => { S().refreshAll(); U.toast('Textures refreshed'); });
+    // Export / Publish now live only in the topbar Export menu; Refresh textures moves to the palette.
+    if (GF.commands && !GF.commands.has('scene.refreshTex'))
+      GF.commands.register({ id: 'scene.refreshTex', title: 'Refresh textures', group: '3D', run: () => { S().refreshAll(); U.toast('Textures refreshed'); } });
 
     S().setStatusCallback(msg => { const el = $('#s3-status'); if (el) el.textContent = msg; });
-    S().onChange(() => {
-      refresh();
-      const es = $('#empty-state');
-      if (es && S().count() > 0) es.hidden = true;
-    });
-    wireMake3d();
+    S().onChange(() => { refresh(); });
     wireKeys();
-  }
-
-  /* ---- Make 3D (renders whatever GF.make3d has registered) ---- */
-  function wireMake3d() {
-    const kind = $('#m3-kind'), optsHost = $('#m3-opts'), runBtn = $('#m3-run');
-    if (!kind || !GF.make3d) return;
-    const items = GF.make3d.list();
-    kind.innerHTML = items.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
-    const renderOpts = () => {
-      const def = items.find(c => c.key === kind.value);
-      const hint = def ? `<p class="s3-status" style="margin:.2rem 0 .4rem">${def.desc}</p>` : '';
-      optsHost.innerHTML = hint + (def ? def.options.map(o =>
-        `<label class="mini"><span class="s3-top">${o.label}<span class="s3-val" id="m3v-${o.key}">${o.def}</span></span>
-         <input type="range" id="m3o-${o.key}" min="${o.min}" max="${o.max}" step="${o.step}" value="${o.def}"></label>`).join('') : '');
-      if (def) def.options.forEach(o => {
-        const el = $('#m3o-' + o.key);
-        el.addEventListener('input', () => { $('#m3v-' + o.key).textContent = el.value; });
-      });
-    };
-    kind.addEventListener('change', renderOpts);
-    renderOpts();
-    runBtn.addEventListener('click', async () => {
-      const def = items.find(c => c.key === kind.value); if (!def) return;
-      const opts = {};
-      def.options.forEach(o => { const el = $('#m3o-' + o.key); if (el) opts[o.key] = +el.value; });
-      runBtn.disabled = true;
-      try { await GF.make3d.run(kind.value, opts); }
-      catch (e) { U.toast(e.message); }
-      finally { runBtn.disabled = false; }
-    });
-  }
-  function refreshMakeSource() {
-    const el = $('#m3-src');
-    if (el && GF.make3d) el.textContent = 'Converts ' + GF.make3d.sourceLabel() + '.';
   }
 
   /* ---- object list (renders into panel #s3-objects) ---- */
@@ -237,18 +142,14 @@ GF.scene3dUI = (function () {
     if (host.contains(document.activeElement)) return;
     const t = S().getObject(S().selectedId());
     if (!t) { host.innerHTML = `<p class="s3-status">Select an object — or add one above.</p>`; return; }
-    const layers = (D.doc.layers || []);
     const imgs = S().listImageSources();
     const srcOpts = (cur) =>
       `<option value=""${!cur ? ' selected' : ''}>None (flat color)</option>` +
-      `<option value="composite"${cur === 'composite' ? ' selected' : ''}>Document (all layers)</option>` +
-      layers.map(L => `<option value="layer:${L.id}"${cur === 'layer:' + L.id ? ' selected' : ''}>Layer: ${L.name}</option>`).join('') +
       imgs.map(i => `<option value="${i.key}"${cur === i.key ? ' selected' : ''}>Image: ${i.name}</option>`).join('') +
       `<option value="__import">+ Import image…</option>`;
-    const mapOpts = (cur, kind) =>
-      `<option value="auto:${kind}"${cur === 'auto:' + kind ? ' selected' : ''}>Auto ("${kind}" layer)</option>` +
+    const mapOpts = (cur) =>
       `<option value=""${!cur ? ' selected' : ''}>None</option>` +
-      layers.map(L => `<option value="layer:${L.id}"${cur === 'layer:' + L.id ? ' selected' : ''}>Layer: ${L.name}</option>`).join('');
+      imgs.map(i => `<option value="${i.key}"${cur === i.key ? ' selected' : ''}>Image: ${i.name}</option>`).join('');
 
     host.innerHTML = `
       <h3 class="panel-h">Transform — ${t.name}</h3>
@@ -257,6 +158,14 @@ GF.scene3dUI = (function () {
         ${num('s3-rx', 'RX°', t.rx, 5)}${num('s3-ry', 'RY°', t.ry, 5)}${num('s3-rz', 'RZ°', t.rz, 5)}
         ${num('s3-sx', 'SX', t.sx, 0.1)}${num('s3-sy', 'SY', t.sy, 0.1)}${num('s3-sz', 'SZ', t.sz, 0.1)}
       </div>
+      ${S().hasModelAnimations && S().hasModelAnimations() ? `
+      <h3 class="panel-h">Animation</h3>
+      <p class="s3-hint-line">Model loaded paused (rest pose).</p>
+      <div class="s3-row">
+        <button class="text-btn ghost" id="s3-anim-play">▶ Play</button>
+        <button class="text-btn ghost" id="s3-anim-pause">⏸ Pause</button>
+        <button class="text-btn ghost" id="s3-anim-stop">⏹ Reset</button>
+      </div>` : ''}
       <h3 class="panel-h">Material</h3>
       ${t.kind === 'model' ? `<label class="ck"><input type="checkbox" id="s3-keep" ${t.mat.keepOriginal ? 'checked' : ''}> Keep the model's own materials</label>` : ''}
       <div id="s3-mat" ${t.kind === 'model' && t.mat.keepOriginal ? 'hidden' : ''}>
@@ -270,8 +179,8 @@ GF.scene3dUI = (function () {
         <label class="mini"><span class="s3-top">Metalness<span class="s3-val" id="s3-metal-v">${t.mat.metalness.toFixed(2)}</span></span>
           <input type="range" id="s3-metal" min="0" max="100" value="${Math.round(t.mat.metalness * 100)}"></label>
         <details class="s3-group"><summary>Advanced maps</summary>
-          <label class="mini">Normal map<select id="s3-normal">${mapOpts(t.mat.normalSource, 'normal')}</select></label>
-          <label class="mini">Roughness map<select id="s3-roughmap">${mapOpts(t.mat.roughSource, 'roughness')}</select></label>
+          <label class="mini">Normal map<select id="s3-normal">${mapOpts(t.mat.normalSource)}</select></label>
+          <label class="mini">Roughness map<select id="s3-roughmap">${mapOpts(t.mat.roughSource)}</select></label>
         </details>
       </div>`;
 
@@ -284,6 +193,9 @@ GF.scene3dUI = (function () {
     ['px', 'py', 'pz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'].forEach(k => {
       const el = $('#s3-' + k); if (el) el.addEventListener('change', commitTransform);
     });
+    const ap = $('#s3-anim-play'); if (ap) ap.addEventListener('click', () => { GF.animation ? GF.animation.play() : S().playAnimations(); });
+    const apa = $('#s3-anim-pause'); if (apa) apa.addEventListener('click', () => { GF.animation ? GF.animation.pause() : S().pauseAnimations(); });
+    const ast = $('#s3-anim-stop'); if (ast) ast.addEventListener('click', () => { GF.animation ? GF.animation.stop() : S().stopAnimations(); });
     const keep = $('#s3-keep');
     if (keep) keep.addEventListener('change', () => S().setMaterial(id, { keepOriginal: keep.checked }));
     const map = $('#s3-map');
@@ -330,13 +242,31 @@ GF.scene3dUI = (function () {
   }
 
   function updateUndoButtons() {
-    const three = S().isActive();
     const u = $('#btn-undo'), r = $('#btn-redo');
-    if (u) u.disabled = three ? !S().hist.canUndo() : !GF.history.canUndo();
-    if (r) r.disabled = three ? !S().hist.canRedo() : !GF.history.canRedo();
+    if (u) u.disabled = !S().hist.canUndo();
+    if (r) r.disabled = !S().hist.canRedo();
   }
 
-  function refresh() { renderObjects(); renderInspector(); updateUndoButtons(); refreshMakeSource(); }
+  function refresh() { renderObjects(); renderInspector(); updateUndoButtons(); updateEmptyHint(); }
+  function updateEmptyHint() {
+    let el = document.getElementById('scene-empty-hint');
+    const empty = !S() || !S().count();
+    if (empty && !el) {
+      el = document.createElement('div'); el.id = 'scene-empty-hint';
+      el.innerHTML = `<div class="seh-card"><div class="seh-title">Add a shape to begin</div>` +
+        `<div class="seh-sub">Pick a shape from the <b>Objects</b> panel on the right.<br>` +
+        `Then <b>drag to move</b> · <b>Edit Mesh</b> to model · assign <b>material zones</b> to faces.</div></div>`;
+      const vp = document.getElementById('viewport'); if (vp) vp.appendChild(el);
+      if (!document.getElementById('seh-style')) {
+        const s = document.createElement('style'); s.id = 'seh-style';
+        s.textContent = `#scene-empty-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:3}
+          #scene-empty-hint .seh-card{text-align:center;color:#aeb6c2;max-width:340px;padding:1.2rem 1.5rem;border-radius:14px;background:rgba(20,22,28,.6);border:1px solid rgba(255,255,255,.06)}
+          #scene-empty-hint .seh-title{font-size:16px;font-weight:700;color:#e8a33d;margin-bottom:.4rem}
+          #scene-empty-hint .seh-sub{font-size:12.5px;line-height:1.6}`;
+        document.head.appendChild(s);
+      }
+    } else if (!empty && el) { el.remove(); }
+  }
 
   /* ---- keyboard (only while the workspace is active) ---- */
   let keysWired = false;
@@ -348,10 +278,6 @@ GF.scene3dUI = (function () {
       const k = e.key.toLowerCase();
       if (k === 'delete' || k === 'backspace') { const id = S().selectedId(); if (id != null) { e.preventDefault(); S().removeObject(id); } }
       else if (k === 'f') { e.preventDefault(); S().frame(); }
-      else if (k === 'w') { e.preventDefault(); S().setGizmoMode('translate'); }
-      else if (k === 'e') { e.preventDefault(); S().setGizmoMode('rotate'); }
-      else if (k === 'r') { e.preventDefault(); S().setGizmoMode('scale'); }
-      else if (k === 'q') { e.preventDefault(); S().setGizmoSpace(S().gizmoSpace() === 'world' ? 'local' : 'world'); }
     });
   }
 
@@ -363,7 +289,7 @@ GF.scene3dUI = (function () {
     wrap.innerHTML = `<div class="card">
       <h2>🌐 Publish web page</h2>
       <p class="sub">One self-contained .html — your scene + an interactive viewer. Host it anywhere.</p>
-      <label>Page title<input id="pb-title" value="${(D.doc.name || 'My 3D scene').replace(/"/g, '&quot;')}"></label>
+      <label>Page title<input id="pb-title" value="My 3D scene"></label>
       <div class="s3-row">
         <label class="mini">Background<select id="pb-bg">
           <option value="default"${bg.mode === 'default' ? ' selected' : ''}>Studio (dark)</option>
@@ -436,5 +362,5 @@ GF.scene3dUI = (function () {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensurePane(); refresh(); });
   else { ensurePane(); refresh(); }
 
-  return { enter, exit, optbarHtml, wireOptbar, refresh, publishDialog, flattenAndReturn };
+  return { enter, exit, refresh, publishDialog };
 })();
