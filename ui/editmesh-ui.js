@@ -1,10 +1,8 @@
 /* ============================================================
    PixelTriks — editmesh-ui.js  (GF.editmeshUI)
-   The Edit-Mode surface: registers the mesh commands (Tab toggle,
-   vertex/edge/face modes, operators, material zones), renders a
-   floating edit toolbar while GF.editmesh is active, and shows live
-   counts + a material-zones strip. Thin — all logic lives in
-   core/editmesh.js.
+   Left-side edit panel: mode tabs, context-sensitive ops with
+   descriptions, zones strip (face mode only), status line.
+   Replaces the old bottom-floating bar that overlapped the viewport.
    ============================================================ */
 'use strict';
 window.GF = window.GF || {};
@@ -12,154 +10,526 @@ window.GF = window.GF || {};
 GF.editmeshUI = (function () {
   const U = GF.util;
   const EM = () => GF.editmesh;
-  let bar = null, zonesRow = null;
+  let panel = null, zonesSection = null;
 
-  const MODES = [['vertex', 'Verts', '1'], ['edge', 'Edges', '2'], ['face', 'Faces', '3']];
-  const OPS = [
-    ['grab', 'Grab', 'G', () => EM().grab()],
-    ['rotate', 'Rotate', 'R', () => EM().rotate()],
-    ['scale', 'Scale', 'S', () => EM().scale()],
-    ['extrude', 'Extrude', 'E', () => EM().extrude()],
-    ['inset', 'Inset', 'I', () => EM().inset()],
-    ['bevel', 'Bevel', '⌃B', () => EM().bevel()],
-    ['loopcut', 'Loop cut', '⌃R', () => EM().loopcut()],
-    ['subdivide', 'Subdivide', '', () => EM().subdivide()],
-    ['merge', 'Merge', 'M', () => EM().merge()],
-    ['dissolve', 'Dissolve', '⌃X', () => EM().dissolve()],
-    ['delete', 'Delete', '⌫', () => EM().deleteSelection()],
+  /* ── per-mode operation sets ─────────────────────────────── */
+  const OP_DEFS = {
+    vertex: [
+      { id: 'grab',     label: 'Grab',     key: 'G',    desc: 'Move selected vertices',       run: () => EM().grab() },
+      { id: 'rotate',   label: 'Rotate',   key: 'R',    desc: 'Rotate around selection',      run: () => EM().rotate() },
+      { id: 'scale',    label: 'Scale',    key: 'S',    desc: 'Resize selection',             run: () => EM().scale() },
+      { id: 'merge',    label: 'Merge',    key: 'M',    desc: 'Collapse verts to center',     run: () => EM().merge() },
+      { id: 'dissolve', label: 'Dissolve', key: '⌃X',   desc: 'Remove without leaving hole',  run: () => EM().dissolve() },
+      { id: 'delete',   label: 'Delete',   key: '⌫',    desc: 'Delete and leave a hole',      run: () => EM().deleteSelection() },
+    ],
+    edge: [
+      { id: 'grab',     label: 'Grab',     key: 'G',    desc: 'Move selected edges',          run: () => EM().grab() },
+      { id: 'rotate',   label: 'Rotate',   key: 'R',    desc: 'Rotate selection',             run: () => EM().rotate() },
+      { id: 'scale',    label: 'Scale',    key: 'S',    desc: 'Resize selection',             run: () => EM().scale() },
+      { id: 'bevel',    label: 'Bevel',    key: '⌃B',   desc: 'Chamfer / round edge',         run: () => EM().bevel() },
+      { id: 'loopcut',  label: 'Loop Cut', key: '⌃R',   desc: 'Slice a new edge ring',        run: () => EM().loopcut() },
+      { id: 'dissolve', label: 'Dissolve', key: '⌃X',   desc: 'Remove edge, merge faces',     run: () => EM().dissolve() },
+      { id: 'delete',   label: 'Delete',   key: '⌫',    desc: 'Delete and leave a hole',      run: () => EM().deleteSelection() },
+    ],
+    face: [
+      { id: 'grab',      label: 'Grab',      key: 'G',   desc: 'Move selected faces',          run: () => EM().grab() },
+      { id: 'rotate',    label: 'Rotate',    key: 'R',   desc: 'Rotate selection',             run: () => EM().rotate() },
+      { id: 'scale',     label: 'Scale',     key: 'S',   desc: 'Resize selection',             run: () => EM().scale() },
+      { id: 'extrude',   label: 'Extrude',   key: 'E',   desc: 'Push / pull faces outward',    run: () => EM().extrude() },
+      { id: 'inset',     label: 'Inset',     key: 'I',   desc: 'Shrink face inward',           run: () => EM().inset() },
+      { id: 'subdivide', label: 'Subdivide', key: '',    desc: 'Split faces into smaller ones', run: () => EM().subdivide() },
+      { id: 'delete',    label: 'Delete',    key: '⌫',   desc: 'Remove faces',                 run: () => EM().deleteSelection() },
+    ],
+  };
+
+  const MODES = [
+    { id: 'vertex', label: 'Verts', key: '1', tip: 'Select and move individual vertices' },
+    { id: 'edge',   label: 'Edges', key: '2', tip: 'Select and cut edges' },
+    { id: 'face',   label: 'Faces', key: '3', tip: 'Select and extrude faces' },
   ];
 
+  /* ── init ───────────────────────────────────────────────── */
   function init() {
     injectStyle();
     registerCommands();
-    buildBar();
+    buildPanel();
     window.addEventListener('pt:editmode', e => show(e.detail.active));
   }
 
+  /* ── command registration (unchanged public API) ─────────── */
   function registerCommands() {
     const reg = GF.commands.register, bind = GF.commands.bind;
     reg({ id: 'mesh.editToggle', title: 'Edit mesh (enter / exit)', group: 'Mesh', hint: 'Tab', run: () => EM() && EM().toggle() });
     bind('tab', 'mesh.editToggle');
-    MODES.forEach(([m, label]) => reg({ id: 'mesh.mode.' + m, title: 'Edit: ' + label, group: 'Mesh', palette: false, run: () => EM() && EM().setMode(m) }));
-    reg({ id: 'mesh.grab', title: 'Grab (move) selection', group: 'Mesh', hint: 'G', run: () => EM() && EM().grab() });
-    reg({ id: 'mesh.rotate', title: 'Rotate selection', group: 'Mesh', hint: 'R', run: () => EM() && EM().rotate() });
-    reg({ id: 'mesh.scale', title: 'Scale selection', group: 'Mesh', hint: 'S', run: () => EM() && EM().scale() });
-    reg({ id: 'mesh.extrude', title: 'Extrude faces', group: 'Mesh', hint: 'E', run: () => EM() && EM().extrude() });
-    reg({ id: 'mesh.inset', title: 'Inset faces', group: 'Mesh', hint: 'I', run: () => EM() && EM().inset() });
-    reg({ id: 'mesh.bevel', title: 'Bevel (chamfer edges)', group: 'Mesh', hint: 'Ctrl+B', run: () => EM() && EM().bevel() });
-    reg({ id: 'mesh.loopcut', title: 'Loop cut', group: 'Mesh', hint: 'Ctrl+R', run: () => EM() && EM().loopcut() });
-    reg({ id: 'mesh.subdivide', title: 'Subdivide', group: 'Mesh', run: () => EM() && EM().subdivide() });
-    reg({ id: 'mesh.merge', title: 'Merge vertices', group: 'Mesh', hint: 'M', run: () => EM() && EM().merge() });
-    reg({ id: 'mesh.dissolve', title: 'Dissolve selection', group: 'Mesh', hint: 'Ctrl+X', run: () => EM() && EM().dissolve() });
-    reg({ id: 'mesh.delete', title: 'Delete selection', group: 'Mesh', run: () => EM() && EM().deleteSelection() });
-    reg({ id: 'mesh.newZone', title: 'New material zone from selected faces', group: 'Mesh', run: () => EM() && EM().addZone() });
+    MODES.forEach(m => reg({ id: 'mesh.mode.' + m.id, title: 'Edit: ' + m.label, group: 'Mesh', palette: false, run: () => EM() && EM().setMode(m.id) }));
+    reg({ id: 'mesh.grab',      title: 'Grab (move) selection',        group: 'Mesh', hint: 'G',      run: () => EM() && EM().grab() });
+    reg({ id: 'mesh.rotate',    title: 'Rotate selection',             group: 'Mesh', hint: 'R',      run: () => EM() && EM().rotate() });
+    reg({ id: 'mesh.scale',     title: 'Scale selection',              group: 'Mesh', hint: 'S',      run: () => EM() && EM().scale() });
+    reg({ id: 'mesh.extrude',   title: 'Extrude faces',                group: 'Mesh', hint: 'E',      run: () => EM() && EM().extrude() });
+    reg({ id: 'mesh.inset',     title: 'Inset faces',                  group: 'Mesh', hint: 'I',      run: () => EM() && EM().inset() });
+    reg({ id: 'mesh.bevel',     title: 'Bevel (chamfer edges)',        group: 'Mesh', hint: 'Ctrl+B', run: () => EM() && EM().bevel() });
+    reg({ id: 'mesh.loopcut',   title: 'Loop cut',                     group: 'Mesh', hint: 'Ctrl+R', run: () => EM() && EM().loopcut() });
+    reg({ id: 'mesh.subdivide', title: 'Subdivide',                    group: 'Mesh',                run: () => EM() && EM().subdivide() });
+    reg({ id: 'mesh.merge',     title: 'Merge vertices',               group: 'Mesh', hint: 'M',      run: () => EM() && EM().merge() });
+    reg({ id: 'mesh.dissolve',  title: 'Dissolve selection',           group: 'Mesh', hint: 'Ctrl+X', run: () => EM() && EM().dissolve() });
+    reg({ id: 'mesh.delete',    title: 'Delete selection',             group: 'Mesh',                run: () => EM() && EM().deleteSelection() });
+    reg({ id: 'mesh.newZone',   title: 'New material zone from faces', group: 'Mesh',                run: () => EM() && EM().addZone() });
   }
 
-  function buildBar() {
-    bar = document.createElement('div');
-    bar.id = 'editbar'; bar.hidden = true;
-    bar.innerHTML =
-      `<div class="eb-main">` +
-        `<div class="eb-grp eb-modes">` +
-          MODES.map(([m, l, k]) => `<button class="eb-btn" data-mode="${m}" title="${l} (${k})"><span>${l}</span><span class="eb-k">${k}</span></button>`).join('') +
-        `</div><div class="eb-sep"></div><div class="eb-grp eb-ops">` +
-          OPS.map(([id, l, k]) => `<button class="eb-btn" data-op="${id}" title="${l}${k ? ' (' + k + ')' : ''}"><span>${l}</span>${k ? `<span class="eb-k">${k}</span>` : ''}</button>`).join('') +
-        `</div><div class="eb-sep"></div><span class="eb-stat" id="eb-stat"></span>` +
-        `<button class="eb-btn eb-exit" data-exit title="Exit edit mode (Tab)">Done</button>` +
-      `</div>` +
-      `<div class="eb-zones" id="eb-zones" hidden>` +
-        `<span class="eb-zlabel">Zones</span>` +
-        `<div class="eb-swatches" id="eb-swatches"></div>` +
-        `<button class="eb-btn eb-accent" id="eb-newzone" title="Make the selected faces a new material zone">＋ New from faces</button>` +
-        `<button class="eb-btn" id="eb-assign" title="Assign the selected faces to the active zone">Assign →</button>` +
-        `<label class="eb-zctl">Colour <input type="color" id="eb-zcolor" value="#e8a33d"></label>` +
-        `<label class="eb-zctl">Texture <select id="eb-ztex"></select></label>` +
-        `<button class="eb-btn eb-del" id="eb-delzone" title="Delete the active zone">🗑</button>` +
-      `</div>`;
-    document.body.appendChild(bar);
-    bar.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => EM().setMode(b.dataset.mode)));
-    bar.querySelectorAll('[data-op]').forEach(b => { const o = OPS.find(x => x[0] === b.dataset.op); b.addEventListener('click', o[3]); });
-    bar.querySelector('[data-exit]').addEventListener('click', () => EM().exit());
-    zonesRow = bar.querySelector('#eb-zones');
-    bar.querySelector('#eb-newzone').addEventListener('click', () => EM().addZone());
-    bar.querySelector('#eb-assign').addEventListener('click', () => EM().assignSelection());
-    bar.querySelector('#eb-zcolor').addEventListener('input', e => EM().setZone(EM().activeZone(), { color: e.target.value }));
-    bar.querySelector('#eb-ztex').addEventListener('change', e => EM().setZone(EM().activeZone(), { tex: e.target.value || null }));
-    bar.querySelector('#eb-delzone').addEventListener('click', () => EM().deleteZone(EM().activeZone()));
+  /* ── DOM build ───────────────────────────────────────────── */
+  function buildPanel() {
+    panel = document.createElement('div');
+    panel.id = 'em-panel';
+    panel.hidden = true;
+    panel.innerHTML = `
+      <!-- header -->
+      <div class="em-header">
+        <span class="em-title">Edit Mode</span>
+        <button class="em-exit-btn" id="em-exit" title="Exit edit mode (Tab)">Done ↩</button>
+      </div>
+
+      <!-- mode tabs -->
+      <div class="em-section">
+        <div class="em-section-label">SELECT</div>
+        <div class="em-mode-row" id="em-modes">
+          ${MODES.map(m => `
+            <button class="em-mode-btn" data-mode="${m.id}" title="${m.tip}">
+              <span class="em-mode-key">${m.key}</span>
+              <span class="em-mode-label">${m.label}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div class="em-tip" id="em-mode-tip">Click to select · A = select all · Click+drag box select</div>
+      </div>
+
+      <!-- ops (rebuilt per mode) -->
+      <div class="em-section">
+        <div class="em-section-label">OPERATIONS</div>
+        <div class="em-ops" id="em-ops"></div>
+      </div>
+
+      <!-- zones (face mode only) -->
+      <div class="em-section" id="em-zones-section" hidden>
+        <div class="em-section-label">MATERIAL ZONES</div>
+        <div class="em-swatches" id="em-swatches"></div>
+        <div class="em-zone-actions">
+          <button class="em-action-btn em-accent" id="em-newzone" title="Create a new material zone from the selected faces">＋ New zone</button>
+          <button class="em-action-btn" id="em-assign" title="Assign selected faces to the active zone">Assign →</button>
+        </div>
+        <div class="em-zone-props" id="em-zone-props" hidden>
+          <label class="em-prop-row">
+            <span class="em-prop-label">Colour</span>
+            <input type="color" id="em-zcolor" value="#e8a33d">
+          </label>
+          <label class="em-prop-row">
+            <span class="em-prop-label">Texture</span>
+            <select id="em-ztex"></select>
+          </label>
+          <button class="em-action-btn em-danger" id="em-delzone" title="Delete this zone">🗑 Delete zone</button>
+        </div>
+      </div>
+
+      <!-- status line -->
+      <div class="em-status" id="em-status">Tab to enter · click a mesh · Tab again to edit</div>
+    `;
+
+    document.body.appendChild(panel);
+
+    /* exit */
+    panel.querySelector('#em-exit').addEventListener('click', () => EM() && EM().exit());
+
+    /* mode buttons */
+    panel.querySelectorAll('[data-mode]').forEach(b =>
+      b.addEventListener('click', () => EM() && EM().setMode(b.dataset.mode)));
+
+    /* zones */
+    zonesSection = panel.querySelector('#em-zones-section');
+    panel.querySelector('#em-newzone').addEventListener('click', () => EM() && EM().addZone());
+    panel.querySelector('#em-assign').addEventListener('click', () => EM() && EM().assignSelection());
+    panel.querySelector('#em-zcolor').addEventListener('input', e => EM() && EM().setZone(EM().activeZone(), { color: e.target.value }));
+    panel.querySelector('#em-ztex').addEventListener('change', e => EM() && EM().setZone(EM().activeZone(), { tex: e.target.value || null }));
+    panel.querySelector('#em-delzone').addEventListener('click', () => EM() && EM().deleteZone(EM().activeZone()));
   }
 
-  function show(on) { if (bar) bar.hidden = !on; document.body.classList.toggle('editing', !!on); }
+  /* ── show / hide ─────────────────────────────────────────── */
+  function show(on) {
+    if (panel) panel.hidden = !on;
+    document.body.classList.toggle('editing', !!on);
+  }
 
+  /* ── ops list render ─────────────────────────────────────── */
+  let currentMode = null;
   let texFilled = false;
-  function status(s) {
-    if (!bar) return;
-    bar.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === s.mode));
-    const stat = bar.querySelector('#eb-stat');
-    if (stat) {
-      const key = s.mode[0], selN = s.sel[key], totN = s.counts[key];
-      stat.textContent = s.modal
-        ? `${s.modal}${s.axis ? ' · axis' : ''} — move mouse, click to confirm, Esc cancel`
-        : `${selN}/${totN} ${s.mode === 'vertex' ? 'verts' : s.mode + 's'} · ${s.counts.f} faces`;
-    }
-    // zones strip — only meaningful when selecting faces
-    zonesRow.hidden = s.mode !== 'face';
-    if (s.mode === 'face') renderZones(s);
-  }
 
-  function renderZones(s) {
-    const wrap = bar.querySelector('#eb-swatches');
-    wrap.innerHTML = (s.zones || []).map(z =>
-      `<button class="eb-sw${z.active ? ' on' : ''}" data-z="${z.index}" title="${z.name} — ${z.faceCount} face(s). Click to select its faces.">` +
-      `<span class="eb-dot" style="background:${z.color}"></span>${z.index === 0 ? 'Base' : z.name.replace('Zone ', 'Z')}<span class="eb-ct">${z.faceCount}</span></button>`).join('');
-    wrap.querySelectorAll('[data-z]').forEach(b => {
-      b.addEventListener('click', () => EM().selectZoneFaces(+b.dataset.z));
+  function renderOps(mode) {
+    if (mode === currentMode) return;
+    currentMode = mode;
+    const ops = OP_DEFS[mode] || [];
+    const el = panel.querySelector('#em-ops');
+    el.innerHTML = ops.map(op => `
+      <button class="em-op-btn" data-op="${op.id}" title="${op.desc}">
+        <span class="em-op-row">
+          <span class="em-op-label">${op.label}</span>
+          ${op.key ? `<span class="em-op-key">${op.key}</span>` : ''}
+        </span>
+        <span class="em-op-desc">${op.desc}</span>
+      </button>
+    `).join('');
+    el.querySelectorAll('[data-op]').forEach(b => {
+      const op = ops.find(o => o.id === b.dataset.op);
+      if (op) b.addEventListener('click', op.run);
     });
-    const active = (s.zones || [])[s.activeZone];
-    const col = bar.querySelector('#eb-zcolor'); if (active && col) col.value = active.color || '#cccccc';
-    const del = bar.querySelector('#eb-delzone'); if (del) del.disabled = s.activeZone === 0;
-    const sel = bar.querySelector('#eb-ztex');
-    if (sel && !texFilled) {
-      sel.innerHTML = `<option value="">None (flat colour)</option>` + (s.presets || []).map(p => `<option value="${p.id}">${p.label}</option>`).join('');
-      texFilled = true;
-    }
-    if (sel && active) sel.value = active.tex || '';
+
+    /* update mode tip */
+    const tipEl = panel.querySelector('#em-mode-tip');
+    const mdef = MODES.find(m => m.id === mode);
+    if (tipEl && mdef) tipEl.textContent = mdef.tip + ' · Click+drag to box-select';
   }
 
+  /* ── main status update (called by core/editmesh.js) ────── */
+  function status(s) {
+    if (!panel) return;
+
+    /* mode buttons highlight */
+    panel.querySelectorAll('[data-mode]').forEach(b =>
+      b.classList.toggle('on', b.dataset.mode === s.mode));
+
+    /* rebuild ops if mode changed */
+    renderOps(s.mode);
+
+    /* status line */
+    const stat = panel.querySelector('#em-status');
+    if (stat) {
+      if (s.modal) {
+        stat.textContent = `${s.modal}${s.axis ? ' · axis locked' : ''} — move mouse · click to confirm · Esc to cancel`;
+        stat.classList.add('active');
+      } else {
+        const key = s.mode[0];
+        const selN = s.sel[key], totN = s.counts[key];
+        const noun = s.mode === 'vertex' ? 'verts' : s.mode + 's';
+        stat.textContent = selN > 0
+          ? `${selN} of ${totN} ${noun} selected`
+          : `${totN} ${noun} — click to select`;
+        stat.classList.remove('active');
+      }
+    }
+
+    /* zones strip — face mode only */
+    const showZones = s.mode === 'face';
+    if (zonesSection) zonesSection.hidden = !showZones;
+    if (showZones) renderZones(s);
+  }
+
+  let _texFilled = false;
+  function renderZones(s) {
+    const wrap = panel.querySelector('#em-swatches');
+    wrap.innerHTML = (s.zones || []).map(z =>
+      `<button class="em-sw${z.active ? ' on' : ''}" data-z="${z.index}" title="${z.name} — ${z.faceCount} face(s)">
+        <span class="em-dot" style="background:${z.color}"></span>
+        <span>${z.index === 0 ? 'Base' : z.name.replace('Zone ', 'Z')}</span>
+        <span class="em-ct">${z.faceCount}</span>
+      </button>`).join('');
+
+    wrap.querySelectorAll('[data-z]').forEach(b =>
+      b.addEventListener('click', () => EM() && EM().selectZoneFaces(+b.dataset.z)));
+
+    const active = (s.zones || [])[s.activeZone];
+    const propsEl = panel.querySelector('#em-zone-props');
+    if (propsEl) propsEl.hidden = !active;
+
+    if (active) {
+      const col = panel.querySelector('#em-zcolor');
+      if (col) col.value = active.color || '#cccccc';
+      const del = panel.querySelector('#em-delzone');
+      if (del) del.disabled = s.activeZone === 0;
+
+      if (!_texFilled) {
+        const sel = panel.querySelector('#em-ztex');
+        if (sel) {
+          sel.innerHTML = `<option value="">None (flat colour)</option>` +
+            (s.presets || []).map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+          _texFilled = true;
+        }
+      }
+      const sel = panel.querySelector('#em-ztex');
+      if (sel && active) sel.value = active.tex || '';
+    }
+  }
+
+  /* ── styles ──────────────────────────────────────────────── */
   function injectStyle() {
-    if (document.getElementById('editbar-style')) return;
+    if (document.getElementById('em-panel-style')) return;
     const css = `
-    #editbar{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:60;
-      display:flex;flex-direction:column;gap:.4rem;padding:.45rem .55rem;border-radius:12px;
-      background:rgba(18,20,26,.95);border:1px solid rgba(255,255,255,.09);
-      box-shadow:0 8px 30px rgba(0,0,0,.45);backdrop-filter:blur(8px);font-size:12px;
-      max-width:calc(100vw - 24px)}
-    #editbar .eb-main{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:center}
-    #editbar .eb-grp{display:flex;gap:.25rem;flex-wrap:wrap}
-    #editbar .eb-sep{width:1px;align-self:stretch;background:rgba(255,255,255,.1);margin:2px 0}
-    #editbar .eb-btn{display:inline-flex;align-items:center;gap:.35rem;padding:.34rem .5rem;
-      border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
-      color:#d7dbe2;cursor:pointer;font-weight:600;line-height:1;white-space:nowrap}
-    #editbar .eb-btn:hover{background:rgba(255,255,255,.09);color:#fff}
-    #editbar .eb-btn:disabled{opacity:.4;cursor:default}
-    #editbar .eb-btn.on{background:#e8a33d;border-color:#e8a33d;color:#1a1400}
-    #editbar .eb-accent{background:rgba(232,163,61,.16);border-color:rgba(232,163,61,.45);color:#e8a33d}
-    #editbar .eb-k{font-size:10px;opacity:.6;border:1px solid currentColor;border-radius:4px;padding:0 .25rem;line-height:1.3}
-    #editbar .eb-exit{background:rgba(232,163,61,.14);border-color:rgba(232,163,61,.4);color:#e8a33d}
-    #editbar .eb-stat{color:#96a0ad;padding:0 .3rem;min-width:120px;text-align:center}
-    #editbar .eb-zones{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:center;
-      border-top:1px solid rgba(255,255,255,.08);padding-top:.4rem}
-    #editbar .eb-zlabel{color:#e8a33d;font-weight:700;letter-spacing:.03em;text-transform:uppercase;font-size:10px}
-    #editbar .eb-swatches{display:flex;gap:.25rem;flex-wrap:wrap}
-    #editbar .eb-sw{display:inline-flex;align-items:center;gap:.3rem;padding:.28rem .45rem;border-radius:8px;
-      border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#d7dbe2;cursor:pointer;font-weight:600}
-    #editbar .eb-sw.on{border-color:#e8a33d;background:rgba(232,163,61,.12)}
-    #editbar .eb-dot{width:12px;height:12px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset}
-    #editbar .eb-ct{font-size:10px;opacity:.6}
-    #editbar .eb-zctl{display:inline-flex;align-items:center;gap:.3rem;color:#96a0ad}
-    #editbar .eb-zctl input[type=color]{width:26px;height:22px;border:none;background:none;padding:0;border-radius:5px;cursor:pointer}
-    #editbar .eb-zctl select{background:#181b22;color:#d7dbe2;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:.2rem .3rem}
-    @media (max-width:720px){#editbar .eb-stat{display:none}#editbar{bottom:64px}}`;
-    const el = document.createElement('style'); el.id = 'editbar-style'; el.textContent = css;
+      /* ── Edit Mode panel — left side, never overlaps viewport ─ */
+      #em-panel {
+        position: fixed;
+        left: 0; top: var(--bar-h, 52px); bottom: 0;
+        width: 200px;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        background: rgba(14,16,22,0.97);
+        border-right: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+        backdrop-filter: blur(10px);
+        font-size: 12px;
+        color: #c8cdd6;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      #em-panel[hidden] { display: none; }
+
+      /* header */
+      .em-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: .55rem .7rem .45rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        flex-shrink: 0;
+      }
+      .em-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #4db8c7;
+      }
+      .em-exit-btn {
+        font-size: 11px;
+        font-weight: 600;
+        color: #e8a33d;
+        background: rgba(232,163,61,.12);
+        border: 1px solid rgba(232,163,61,.35);
+        border-radius: 6px;
+        padding: .22rem .5rem;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .em-exit-btn:hover { background: rgba(232,163,61,.22); }
+
+      /* sections */
+      .em-section {
+        padding: .55rem .7rem;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        flex-shrink: 0;
+      }
+      .em-section-label {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: .1em;
+        color: rgba(255,255,255,.3);
+        margin-bottom: .45rem;
+      }
+
+      /* mode tabs */
+      .em-mode-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: .3rem;
+        margin-bottom: .4rem;
+      }
+      .em-mode-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .15rem;
+        padding: .45rem .2rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,.1);
+        background: rgba(255,255,255,.03);
+        color: #c8cdd6;
+        cursor: pointer;
+      }
+      .em-mode-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
+      .em-mode-btn.on {
+        background: rgba(77,184,199,.18);
+        border-color: #4db8c7;
+        color: #4db8c7;
+      }
+      .em-mode-key {
+        font-size: 10px;
+        font-weight: 700;
+        opacity: .55;
+        border: 1px solid currentColor;
+        border-radius: 3px;
+        padding: 0 .3rem;
+        line-height: 1.4;
+      }
+      .em-mode-label { font-size: 11px; font-weight: 600; }
+
+      .em-tip {
+        font-size: 10px;
+        color: rgba(255,255,255,.3);
+        line-height: 1.5;
+      }
+
+      /* ops list */
+      .em-ops {
+        display: flex;
+        flex-direction: column;
+        gap: .25rem;
+      }
+      .em-op-btn {
+        display: flex;
+        flex-direction: column;
+        gap: .1rem;
+        padding: .4rem .55rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,.07);
+        background: rgba(255,255,255,.025);
+        color: #c8cdd6;
+        cursor: pointer;
+        text-align: left;
+        width: 100%;
+      }
+      .em-op-btn:hover {
+        background: rgba(255,255,255,.08);
+        border-color: rgba(255,255,255,.18);
+        color: #fff;
+      }
+      .em-op-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .3rem;
+      }
+      .em-op-label { font-weight: 600; font-size: 12px; }
+      .em-op-key {
+        font-size: 10px;
+        opacity: .55;
+        border: 1px solid currentColor;
+        border-radius: 3px;
+        padding: 0 .28rem;
+        line-height: 1.4;
+        flex-shrink: 0;
+      }
+      .em-op-desc {
+        font-size: 10px;
+        color: rgba(255,255,255,.35);
+        line-height: 1.3;
+      }
+
+      /* zones */
+      .em-swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .25rem;
+        margin-bottom: .4rem;
+      }
+      .em-sw {
+        display: inline-flex;
+        align-items: center;
+        gap: .3rem;
+        padding: .28rem .45rem;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,.1);
+        background: rgba(255,255,255,.03);
+        color: #c8cdd6;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .em-sw.on { border-color: #e8a33d; background: rgba(232,163,61,.12); color: #e8a33d; }
+      .em-sw:hover { background: rgba(255,255,255,.08); }
+      .em-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+      .em-ct { font-size: 10px; opacity: .5; }
+
+      .em-zone-actions {
+        display: flex;
+        gap: .3rem;
+        margin-bottom: .4rem;
+        flex-wrap: wrap;
+      }
+      .em-action-btn {
+        flex: 1;
+        padding: .35rem .4rem;
+        border-radius: 7px;
+        border: 1px solid rgba(255,255,255,.1);
+        background: rgba(255,255,255,.04);
+        color: #c8cdd6;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .em-action-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
+      .em-action-btn:disabled { opacity: .35; cursor: default; }
+      .em-accent {
+        background: rgba(232,163,61,.12);
+        border-color: rgba(232,163,61,.4);
+        color: #e8a33d;
+      }
+      .em-accent:hover { background: rgba(232,163,61,.22); }
+      .em-danger {
+        background: rgba(239,68,68,.1);
+        border-color: rgba(239,68,68,.35);
+        color: #f87171;
+        width: 100%;
+        margin-top: .3rem;
+      }
+      .em-danger:hover { background: rgba(239,68,68,.2); }
+
+      .em-zone-props { display: flex; flex-direction: column; gap: .35rem; }
+      .em-prop-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .4rem;
+        font-size: 11px;
+        color: #96a0ad;
+      }
+      .em-prop-label { flex-shrink: 0; }
+      .em-prop-row input[type=color] { width: 32px; height: 24px; border: none; background: none; padding: 0; border-radius: 5px; cursor: pointer; }
+      .em-prop-row select { flex: 1; background: #181b22; color: #d7dbe2; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: .2rem .3rem; font-size: 11px; }
+
+      /* status line */
+      .em-status {
+        margin-top: auto;
+        padding: .55rem .7rem;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        font-size: 11px;
+        color: rgba(255,255,255,.35);
+        line-height: 1.5;
+        flex-shrink: 0;
+      }
+      .em-status.active {
+        color: #4db8c7;
+        background: rgba(77,184,199,.06);
+      }
+
+      /* outline the 3D host to show edit mode is active */
+      body.editing #scene3d-host {
+        outline: 2px solid rgba(77,184,199,0.4);
+        outline-offset: -2px;
+      }
+
+      /* mobile — panel goes to bottom, slim height */
+      @media (max-width: 720px) {
+        #em-panel {
+          left: 0; right: 0;
+          top: auto; bottom: var(--bar-h, 52px);
+          width: auto;
+          height: auto;
+          max-height: 44vh;
+          border-right: none;
+          border-top: 1px solid rgba(255,255,255,0.1);
+          box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+          flex-direction: row;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          overflow-y: hidden;
+          align-items: stretch;
+        }
+        .em-header { flex-direction: column; gap: .3rem; padding: .5rem; min-width: 80px; }
+        .em-section { border-bottom: none; border-right: 1px solid rgba(255,255,255,0.06); padding: .45rem .5rem; min-width: 140px; }
+        .em-status { display: none; }
+        body.editing #scene3d-host { margin-left: 0; }
+      }
+    `;
+    const el = document.createElement('style');
+    el.id = 'em-panel-style';
+    el.textContent = css;
     document.head.appendChild(el);
   }
 
