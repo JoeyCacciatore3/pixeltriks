@@ -1072,3 +1072,67 @@ body.no-doc .ptab[data-tab="adjust"] { opacity: .35; }
 
 .hist-item { display: flex; align-items: center; gap: 6px; }
 .hist-thumb { border-radius: 4px; flex-shrink: 0; background: var(--bg-2); }
+
+/* ── Panel drill-down navigation (scene3d-ui.js) ─────────── */
+.s3-view[hidden] { display: none; }
+
+/* Add Shape button — prominent CTA at top of main view */
+.s3-toolbar {
+  display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; margin-bottom: .4rem;
+}
+.s3-add-btn {
+  flex: 1; min-width: 100%; padding: .48rem .7rem;
+  background: var(--accent); color: var(--accent-ink);
+  border: none; border-radius: var(--game-r);
+  font-weight: 700; font-size: .85em; cursor: pointer;
+  text-align: center; transition: .12s;
+}
+.s3-add-btn:hover { filter: brightness(1.1); }
+.s3-add-btn:active { transform: scale(.97); }
+.s3-import-btn { font-size: .78em; padding: .3em .55em; }
+
+/* empty-objects hint */
+.s3-empty-obj {
+  font-size: .75em; color: var(--ink-3); text-align: center;
+  padding: .6rem .3rem; line-height: 1.6;
+}
+
+/* shape picker groupings */
+.s3-shape-cat { margin: .5rem 0; }
+.s3-cat-label {
+  display: block; font-size: .72em; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: .3rem;
+}
+
+/* sub-panel navigation header */
+.s3-subnav {
+  display: flex; align-items: center; gap: .5rem;
+  margin-bottom: .5rem; padding-bottom: .5rem;
+  border-bottom: 1px solid var(--line);
+}
+.s3-back-btn {
+  padding: .28rem .55rem; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--bg-2);
+  color: var(--accent); font-size: .78em; font-weight: 700;
+  cursor: pointer; flex-shrink: 0; transition: .12s;
+}
+.s3-back-btn:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg-2)); }
+.s3-subnav-title {
+  font-size: .8em; font-weight: 700; color: var(--ink); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.s3-subnav-hint {
+  font-size: .72em; color: var(--ink-3); margin: -.25rem 0 .55rem;
+}
+
+/* inspector section labels */
+.s3-insp-section { margin-bottom: .4rem; }
+.s3-insp-label {
+  font-size: .72em; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3);
+  margin: .55rem 0 .3rem;
+}
+
+/* environment / lighting groups — body padding for inner content */
+.s3-group-body { padding: .3rem 0 .1rem; }

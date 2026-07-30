@@ -32,6 +32,7 @@ GF.scene3dUI = (function () {
   ];
 
   let built = false;
+  let showView = null;   // set by ensurePane — navigates between main/shapes/inspector
 
   /* ================= workspace activation ================= */
   function enter() {
@@ -47,77 +48,122 @@ GF.scene3dUI = (function () {
     if (built) return;
     built = true;
     const pane = $('.ptab-pane[data-pane="scene"]'); if (!pane) return;
-    pane.innerHTML = `
-      <h3 class="panel-h first">Objects</h3>
-      ${PRIM_GROUPS.map(([label, prims], gi) =>
-        `<details class="s3-group"${gi === 0 ? ' open' : ''}><summary>${label} <span class="s3-count">${prims.length}</span></summary>
-         <div class="pro-grid s3-prims">${prims.map(([v, l]) => `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div></details>`
-      ).join('')}
-      <div class="s3-row">
-        <button class="text-btn ghost" id="s3-import">Import model…</button>
-        <button class="text-btn ghost" id="s3-ph-model">Poly Haven…</button>
-      </div>
-      <ul id="s3-objects" class="layer-list"></ul>
-      <div id="s3-inspector"></div>
-      <h3 class="panel-h">Environment</h3>
-      <div class="s3-row">
-        <button class="text-btn ghost" id="s3-hdr-file">HDRI file…</button>
-        <button class="text-btn ghost" id="s3-ph-hdri">Poly Haven…</button>
-        <button class="text-btn ghost" id="s3-env-clear">Clear</button>
-      </div>
-      <div class="s3-row">
-        <label class="mini">Background<select id="s3-bg">
-          <option value="default">Studio (dark / HDRI)</option>
-          <option value="transparent">Transparent</option>
-          <option value="color">Solid color</option>
-        </select></label>
-        <input type="color" id="s3-bg-color" value="#0c0e11" title="Background color">
-      </div>
-      <h3 class="panel-h">Lighting</h3>
-      <label class="ck"><input type="checkbox" id="s3-shadows" checked> Cast shadows</label>
-      <details class="s3-group"><summary>Studio lights</summary>
-        <label class="mini"><span class="s3-top">Ambient<span class="s3-val" id="s3-amb-v">0.45</span></span>
-          <input type="range" id="s3-amb" min="0" max="200" value="45"></label>
-        <div class="s3-row">
-          <label class="mini">Key color<input type="color" id="s3-key-color" value="#ffffff"></label>
-          <label class="mini"><span class="s3-top">Key intensity<span class="s3-val" id="s3-key-v">1.60</span></span>
-            <input type="range" id="s3-key" min="0" max="500" value="160"></label>
-        </div>
-        <div class="s3-row">
-          <label class="mini">Rim color<input type="color" id="s3-rim-color" value="#e8a33d"></label>
-          <label class="mini"><span class="s3-top">Rim intensity<span class="s3-val" id="s3-rim-v">0.50</span></span>
-            <input type="range" id="s3-rim" min="0" max="200" value="50"></label>
-        </div>
-      </details>
-      <p class="s3-hint-line">Export &amp; publish live in the <b>Export</b> button (top-right).</p>
-      <p class="s3-status" id="s3-status"></p>`;
 
+    pane.innerHTML = `
+      <!-- ── VIEW: main ───────────────────────────────────── -->
+      <div class="s3-view" id="s3-view-main">
+        <div class="s3-toolbar">
+          <button class="s3-add-btn" id="s3-add-shape">＋ Add Shape</button>
+          <button class="text-btn ghost s3-import-btn" id="s3-import">Import…</button>
+          <button class="text-btn ghost s3-import-btn" id="s3-ph-model">Poly Haven…</button>
+        </div>
+        <ul id="s3-objects" class="layer-list"></ul>
+        <p class="s3-empty-obj" id="s3-empty-obj">Click <b>+ Add Shape</b> to start.</p>
+        <details class="s3-group" id="s3-env-group">
+          <summary>Environment</summary>
+          <div class="s3-group-body">
+            <div class="s3-row">
+              <button class="text-btn ghost" id="s3-hdr-file">HDRI file…</button>
+              <button class="text-btn ghost" id="s3-ph-hdri">Poly Haven…</button>
+              <button class="text-btn ghost" id="s3-env-clear">Clear</button>
+            </div>
+            <label class="mini">Background<select id="s3-bg">
+              <option value="default">Studio (dark / HDRI)</option>
+              <option value="transparent">Transparent</option>
+              <option value="color">Solid color</option>
+            </select></label>
+            <input type="color" id="s3-bg-color" value="#0c0e11" title="Background color" style="margin-top:.3rem">
+          </div>
+        </details>
+        <details class="s3-group" id="s3-light-group">
+          <summary>Lighting</summary>
+          <div class="s3-group-body">
+            <label class="ck"><input type="checkbox" id="s3-shadows" checked> Cast shadows</label>
+            <label class="mini"><span class="s3-top">Ambient<span class="s3-val" id="s3-amb-v">0.45</span></span>
+              <input type="range" id="s3-amb" min="0" max="200" value="45"></label>
+            <div class="s3-row">
+              <label class="mini">Key color<input type="color" id="s3-key-color" value="#ffffff"></label>
+              <label class="mini"><span class="s3-top">Key intensity<span class="s3-val" id="s3-key-v">1.60</span></span>
+                <input type="range" id="s3-key" min="0" max="500" value="160"></label>
+            </div>
+            <div class="s3-row">
+              <label class="mini">Rim color<input type="color" id="s3-rim-color" value="#e8a33d"></label>
+              <label class="mini"><span class="s3-top">Rim intensity<span class="s3-val" id="s3-rim-v">0.50</span></span>
+                <input type="range" id="s3-rim" min="0" max="200" value="50"></label>
+            </div>
+          </div>
+        </details>
+        <p class="s3-status" id="s3-status"></p>
+      </div>
+
+      <!-- ── VIEW: shape picker ───────────────────────────── -->
+      <div class="s3-view" id="s3-view-shapes" hidden>
+        <div class="s3-subnav">
+          <button class="s3-back-btn" id="s3-shapes-back">← Scene</button>
+          <span class="s3-subnav-title">Add Shape</span>
+        </div>
+        <p class="s3-subnav-hint">Tap a shape to add it. Return to Scene when done.</p>
+        ${PRIM_GROUPS.map(([label, prims]) => `
+          <div class="s3-shape-cat">
+            <span class="s3-cat-label">${label}</span>
+            <div class="pro-grid">${prims.map(([v, l]) =>
+              `<button class="pro-btn" data-prim="${v}">${l}</button>`).join('')}</div>
+          </div>`).join('')}
+      </div>
+
+      <!-- ── VIEW: object inspector ────────────────────────── -->
+      <div class="s3-view" id="s3-view-inspector" hidden>
+        <div class="s3-subnav">
+          <button class="s3-back-btn" id="s3-insp-back">← Scene</button>
+          <span class="s3-subnav-title" id="s3-insp-title">Object</span>
+        </div>
+        <div id="s3-inspector"></div>
+      </div>`;
+
+    /* ── navigation ──────────────────────────────────────── */
+    showView = id => {
+      pane.querySelectorAll('.s3-view').forEach(v => { v.hidden = v.id !== id; });
+    };
+
+    pane.querySelector('#s3-add-shape').addEventListener('click', () => showView('s3-view-shapes'));
+    pane.querySelector('#s3-shapes-back').addEventListener('click', () => showView('s3-view-main'));
+    pane.querySelector('#s3-insp-back').addEventListener('click', () => showView('s3-view-main'));
+
+    /* ── shape picker ────────────────────────────────────── */
     pane.querySelectorAll('[data-prim]').forEach(b => b.addEventListener('click', () => {
       S().addPrimitive(b.dataset.prim);
+      U.toast(b.textContent + ' added');
     }));
-    $('#s3-import').addEventListener('click', () => $('#file-input').click());   // routes .glb/.gltf/.hdr back to scene3d
+
+    /* ── imports ─────────────────────────────────────────── */
+    $('#s3-import').addEventListener('click', () => $('#file-input').click());
     $('#s3-hdr-file').addEventListener('click', () => $('#file-input').click());
-    $('#s3-ph-model').addEventListener('click', () => phPicker('models', async (id, name) => {
+    pane.querySelector('#s3-ph-model').addEventListener('click', () => phPicker('models', async (id, name) => {
       U.toast('Importing ' + name + '…', 60000);
       try { await GF.library.importModel(id, name, '1k'); U.toast('Imported ' + name); }
       catch (e) { U.toast('Import failed: ' + e.message); }
     }));
-    $('#s3-ph-hdri').addEventListener('click', () => phPicker('hdris', async (id, name) => {
+    pane.querySelector('#s3-ph-hdri').addEventListener('click', () => phPicker('hdris', async (id, name) => {
       U.toast('Loading ' + name + '…', 60000);
       try { await S().setEnvironment(await GF.library.hdriUrl(id, '1k')); }
       catch (e) { U.toast('HDRI failed: ' + e.message); }
     }));
-    $('#s3-env-clear').addEventListener('click', () => S().clearEnvironment());
-    $('#s3-bg').addEventListener('change', e => S().setBackground(e.target.value, $('#s3-bg-color').value));
-    $('#s3-bg-color').addEventListener('input', e => S().setBackground('color', e.target.value));
-    // Export / Publish now live only in the topbar Export menu; Refresh textures moves to the palette.
+    pane.querySelector('#s3-env-clear').addEventListener('click', () => S().clearEnvironment());
+
+    /* ── background ──────────────────────────────────────── */
+    const bgSel = $('#s3-bg'), bgCol = $('#s3-bg-color');
+    if (bgSel) bgSel.addEventListener('change', () => S().setBackground(bgSel.value, bgCol ? bgCol.value : '#0c0e11'));
+    if (bgCol) bgCol.addEventListener('input', () => S().setBackground('color', bgCol.value));
+
+    /* ── commands ────────────────────────────────────────── */
     if (GF.commands && !GF.commands.has('scene.refreshTex'))
-      GF.commands.register({ id: 'scene.refreshTex', title: 'Refresh textures', group: '3D', run: () => { S().refreshAll(); U.toast('Textures refreshed'); } });
+      GF.commands.register({ id: 'scene.refreshTex', title: 'Refresh textures', group: '3D',
+        run: () => { S().refreshAll(); U.toast('Textures refreshed'); } });
 
     S().setStatusCallback(msg => { const el = $('#s3-status'); if (el) el.textContent = msg; });
     S().onChange(() => { refresh(); });
 
-    // Lighting controls
+    /* ── lighting ────────────────────────────────────────── */
     const shadowCk = $('#s3-shadows');
     if (shadowCk) shadowCk.addEventListener('change', () => {
       S().setShadows(shadowCk.checked);
@@ -146,7 +192,11 @@ GF.scene3dUI = (function () {
   function renderObjectsInto(list) {
     if (!list) return;
     list.innerHTML = '';
-    S().listObjects().forEach(o => {
+    const objs = S().listObjects();
+    // empty hint
+    const hint = $('#s3-empty-obj');
+    if (hint) hint.style.display = objs.length ? 'none' : '';
+    objs.forEach(o => {
       const li = document.createElement('li');
       li.className = 'layer-item' + (o.selected ? ' on' : '');
       const name = document.createElement('span');
@@ -161,7 +211,13 @@ GF.scene3dUI = (function () {
       del.className = 'icon-btn sm danger';
       del.textContent = '✕'; del.title = 'Remove';
       del.addEventListener('click', e => { e.stopPropagation(); S().removeObject(o.id); });
-      li.addEventListener('click', () => S().select(o.id));
+      // clicking the object name selects AND opens the inspector sub-panel
+      li.addEventListener('click', () => {
+        S().select(o.id);
+        const titleEl = $('#s3-insp-title');
+        if (titleEl) titleEl.textContent = o.name;
+        if (showView) showView('s3-view-inspector');
+      });
       li.appendChild(name); li.appendChild(vis); li.appendChild(del);
       list.appendChild(li);
     });
@@ -191,11 +247,13 @@ GF.scene3dUI = (function () {
       imgs.map(i => `<option value="${i.key}"${cur === i.key ? ' selected' : ''}>Image: ${i.name}</option>`).join('');
 
     host.innerHTML = `
-      <h3 class="panel-h">Transform — ${t.name}</h3>
-      <div class="s3-grid">
-        ${num('s3-px', 'X', t.px, 0.1)}${num('s3-py', 'Y', t.py, 0.1)}${num('s3-pz', 'Z', t.pz, 0.1)}
-        ${num('s3-rx', 'RX°', t.rx, 5)}${num('s3-ry', 'RY°', t.ry, 5)}${num('s3-rz', 'RZ°', t.rz, 5)}
-        ${num('s3-sx', 'SX', t.sx, 0.1)}${num('s3-sy', 'SY', t.sy, 0.1)}${num('s3-sz', 'SZ', t.sz, 0.1)}
+      <div class="s3-insp-section">
+        <div class="s3-insp-label">Transform</div>
+        <div class="s3-grid">
+          ${num('s3-px', 'X', t.px, 0.1)}${num('s3-py', 'Y', t.py, 0.1)}${num('s3-pz', 'Z', t.pz, 0.1)}
+          ${num('s3-rx', 'RX°', t.rx, 5)}${num('s3-ry', 'RY°', t.ry, 5)}${num('s3-rz', 'RZ°', t.rz, 5)}
+          ${num('s3-sx', 'SX', t.sx, 0.1)}${num('s3-sy', 'SY', t.sy, 0.1)}${num('s3-sz', 'SZ', t.sz, 0.1)}
+        </div>
       </div>
       ${S().hasModelAnimations && S().hasModelAnimations() ? `
       <h3 class="panel-h">Animation</h3>
@@ -205,7 +263,7 @@ GF.scene3dUI = (function () {
         <button class="text-btn ghost" id="s3-anim-pause">⏸ Pause</button>
         <button class="text-btn ghost" id="s3-anim-stop">⏹ Reset</button>
       </div>` : ''}
-      <h3 class="panel-h">Material</h3>
+      <div class="s3-insp-label">Material</div>
       ${t.kind === 'model' ? `<label class="ck"><input type="checkbox" id="s3-keep" ${t.mat.keepOriginal ? 'checked' : ''}> Keep the model's own materials</label>` : ''}
       <div id="s3-mat" ${t.kind === 'model' && t.mat.keepOriginal ? 'hidden' : ''}>
         <label class="mini">Texture<select id="s3-map">${srcOpts(t.mat.mapSource)}</select></label>
