@@ -215,6 +215,16 @@
   <span id="load-label">Loading quaternius_Robot.glb…</span>
 </div>
 
+<!-- Import map — required so three-bundle.js can resolve 'three' and 'three/addons/' -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+
 <!-- Three.js bundle (vendored) -->
 <script type="module" src="ui/three-bundle.js"></script>
 
