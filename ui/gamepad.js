@@ -151,7 +151,6 @@ GF.gamepad = (function () {
   }
 
   function frame(t) {
-    raf = requestAnimationFrame(frame);
     const dt = Math.min(0.05, (t - last) / 1000) || 0.016; last = t;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     let gp = padIndex != null ? pads[padIndex] : null;
@@ -159,7 +158,10 @@ GF.gamepad = (function () {
       gp = Array.prototype.find.call(pads, p => p && p.connected);
       padIndex = gp ? gp.index : null;
     }
-    if (!gp) return;
+    /* BUG-022 fix: stop the RAF loop when no controller is connected.
+       Restart via gamepadconnected event. Saves battery on mobile. */
+    if (!gp) { raf = null; return; }
+    raf = requestAnimationFrame(frame);
     if (!connected) activate(gp);
 
     if (paletteOpen()) {
@@ -216,6 +218,8 @@ GF.gamepad = (function () {
     GF.commands.register({ id: 'hotbar.slot1', title: 'Run hotbar slot 1', group: 'View', palette: false, run: () => slot(0) });
     GF.commands.register({ id: 'hotbar.slot2', title: 'Run hotbar slot 2', group: 'View', palette: false, run: () => slot(1) });
     loadPrefs();
+    /* BUG-022 fix: start RAF loop on connect, stop on disconnect */
+    window.addEventListener('gamepadconnected', () => { if (!raf) raf = requestAnimationFrame(frame); });
     window.addEventListener('gamepaddisconnected', e => {
       if (padIndex === e.gamepad.index) {
         padIndex = null; connected = false;
@@ -223,7 +227,9 @@ GF.gamepad = (function () {
         GF.util.toast('Controller disconnected');
       }
     });
-    if (!raf) raf = requestAnimationFrame(frame);
+    /* Check if a gamepad is already connected at init time */
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    if (Array.prototype.find.call(pads, p => p && p.connected)) { if (!raf) raf = requestAnimationFrame(frame); }
   }
 
   return { init, _shape: shape, isConnected: () => connected,

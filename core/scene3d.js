@@ -36,6 +36,9 @@ GF.scene3d = (function () {
   let compCanvas = null;         // persistent canvas backing the 'composite' texture
   let texDirty = false, lastTexAt = 0;
   let nextImageId = 1;
+  /* BUG-027 fix: pre-allocated scratch vectors for the animate() loop
+     to avoid 2× new THREE.Vector3() allocations at 60fps */
+  let _scratchSz = null, _scratchCt = null;  // initialized after THREE loads
   let clock = null;
   const mixers = new Map();
   let ambientLight = null, keyLight = null, rimLight = null;
@@ -110,7 +113,7 @@ GF.scene3d = (function () {
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.shadowMap.enabled = shadowsEnabled;
-    renderer.shadowMap.type = T.PCFSoftShadowMap;
+    renderer.shadowMap.type = T.PCFShadowMap;  /* BUG-028: PCFSoftShadowMap deprecated in r182 */
     host.appendChild(renderer.domElement);
 
     scene = new T.Scene();
@@ -169,8 +172,9 @@ GF.scene3d = (function () {
       if (o) {
         boxHelper.box.setFromObject(o.node);
         if (selFill) {
-          const sz = boxHelper.box.getSize(new THREE.Vector3());
-          const ct = boxHelper.box.getCenter(new THREE.Vector3());
+          if (!_scratchSz) { _scratchSz = new THREE.Vector3(); _scratchCt = new THREE.Vector3(); }
+          const sz = boxHelper.box.getSize(_scratchSz);
+          const ct = boxHelper.box.getCenter(_scratchCt);
           selFill.position.copy(ct);
           selFill.scale.set(sz.x || 0.01, sz.y || 0.01, sz.z || 0.01);
         }
@@ -502,7 +506,11 @@ GF.scene3d = (function () {
       });
       new GLTFLoader(mgr).load(url, g => {
         const node = g.scene;
-        node.traverse(ch => { if (ch.isMesh) { ch.castShadow = true; ch.receiveShadow = true; } });
+        /* BUG-030 fix: reject GLBs with no meshes instead of creating a
+           phantom invisible object in the scene list. */
+        let hasMesh = false;
+        node.traverse(ch => { if (ch.isMesh) { hasMesh = true; ch.castShadow = true; ch.receiveShadow = true; } });
+        if (!hasMesh) { setStatus('Model has no geometry'); U.toast('Model has no visible geometry'); resolve(null); return; }
         const box = new T.Box3().setFromObject(node);
         const size = box.getSize(new T.Vector3()), center = box.getCenter(new T.Vector3());
         const scl = 2 / (Math.max(size.x, size.y, size.z) || 1);

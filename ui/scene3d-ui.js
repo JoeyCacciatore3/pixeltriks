@@ -396,7 +396,8 @@ GF.scene3dUI = (function () {
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
       const k = e.key.toLowerCase();
       if (k === 'delete' || k === 'backspace') { const id = S().selectedId(); if (id != null) { e.preventDefault(); S().removeObject(id); } }
-      else if (k === 'f') { e.preventDefault(); S().frame(); }
+      /* BUG-017: removed duplicate 'f' binding — forge-ui.js already binds
+         'f' → scene3d.frameSelected via the command registry. */
     });
   }
 

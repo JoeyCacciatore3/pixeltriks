@@ -186,7 +186,8 @@ GF.assetsUI = (function () {
     const presets = GF.texture.listPresets();
     const menu = document.createElement('div');
     menu.className = 'gen-menu tb-dropdown-menu';
-    menu.style.cssText = 'position:absolute;bottom:100%;left:0;z-index:999;max-height:280px;overflow-y:auto;';
+    /* BUG-023 fix: z-index 75 sits below modals (80) and palette (90) */
+    menu.style.cssText = 'position:absolute;bottom:100%;left:0;z-index:75;max-height:280px;overflow-y:auto;';
     const allBtn = document.createElement('div');
     allBtn.className = 'tb-dropdown-item';
     allBtn.textContent = 'All materials (15)';

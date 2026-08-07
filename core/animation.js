@@ -56,7 +56,8 @@ GF.animation = (function () {
 
     if (currentTime >= duration) {
       if (loopMode === 'loop') { currentTime = currentTime % duration; }
-      else if (loopMode === 'pingpong') { currentTime = duration - (currentTime - duration); }
+      /* BUG-026 fix: clamp after reversal to prevent negative time on large dt */
+      else if (loopMode === 'pingpong') { currentTime = Math.max(0, duration - (currentTime - duration)); }
       else { currentTime = duration; pause(); }
     }
 

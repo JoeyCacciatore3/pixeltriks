@@ -346,7 +346,8 @@ GF.editmesh = (function () {
     const s = new Set();
     if (selMode === 'vertex') selV.forEach(v => s.add(v));
     else if (selMode === 'edge') selE.forEach(k => { const e = edges.get(k); if (e) { s.add(e.a); s.add(e.b); } });
-    else selF.forEach(f => faces[f].forEach(v => s.add(v)));
+    /* BUG-020 fix: guard against stale/out-of-bounds face indices */
+    else selF.forEach(f => { if (faces[f]) faces[f].forEach(v => s.add(v)); });
     return [...s];
   }
 
@@ -535,7 +536,9 @@ GF.editmesh = (function () {
   /* ---- Dissolve: remove elements, keeping the surface ---- */
   function dissolve() {
     if (!active) { U.toast('Enter edit mode (Tab) first'); return; }
-    if (selMode === 'edge' && selE.size) op('dissolve edges', () => { [...selE].forEach(k => { const e = edges.get(k); if (e) dissolveEdge(e.a, e.b); }); selE.clear(); });
+    /* BUG-018 fix: dissolve edges in reverse face-index order so earlier
+       splices don't shift the indices of later edges. */
+    if (selMode === 'edge' && selE.size) op('dissolve edges', () => { const keys = [...selE].sort((a, b) => { const ea = edges.get(a), eb = edges.get(b); const fa = ea ? Math.max(...facesOnEdge(ea.a, ea.b)) : 0, fb = eb ? Math.max(...facesOnEdge(eb.a, eb.b)) : 0; return fb - fa; }); keys.forEach(k => { const e = edges.get(k); if (e) dissolveEdge(e.a, e.b); }); selE.clear(); });
     else if (selMode === 'face' && selF.size >= 2) op('dissolve faces', () => { dissolveFaces([...selF]); selF.clear(); });
     else U.toast('Select edges (or 2+ faces) to dissolve');
   }
@@ -563,9 +566,12 @@ GF.editmesh = (function () {
     const key = startKey || (selMode === 'edge' && selE.size ? [...selE][0] : null);
     const e0 = key ? edges.get(key) : null;
     if (!e0) { U.toast('Select an edge, then loop cut'); return; }
+    /* BUG-019 fix: check preconditions before op() so a failed check
+       doesn't push an empty undo entry via commit(). */
+    let curFaceCheck = facesOnEdge(e0.a, e0.b).find(i => faces[i].length === 4);
+    if (curFaceCheck === undefined) { U.toast('Loop cut needs a strip of quads'); return; }
     op('loop cut', () => {
-      let curFace = facesOnEdge(e0.a, e0.b).find(i => faces[i].length === 4);
-      if (curFace === undefined) { U.toast('Loop cut needs a strip of quads'); return; }
+      let curFace = curFaceCheck;
       const ring = [], seen = new Set(); let entry = [e0.a, e0.b], guard = 0;
       while (curFace !== undefined && guard++ < 100000) {
         const f = faces[curFace];
@@ -742,6 +748,8 @@ GF.editmesh = (function () {
     cancelModal();
     active = false;
     disposeOverlays();
+    /* BUG-021 fix: dispose GPU textures accumulated during this edit session */
+    zoneTexCache.forEach(t => { if (t && t.dispose) t.dispose(); }); zoneTexCache.clear();
     // bake the edited geometry back onto the object node
     if (node) { const oldGeo = node.geometry; node.geometry = buildDisplayGeometry(); if (oldGeo) oldGeo.dispose(); }
     removeKeys();

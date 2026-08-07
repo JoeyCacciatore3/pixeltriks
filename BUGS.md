@@ -197,56 +197,56 @@
 - **Problem:** Both files bind separate handlers for the `f` key, both call
   `frame()`. Neither checks `e.defaultPrevented`.
 - **Fix:** Remove one binding, or check `defaultPrevented`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — removed duplicate f-key handler from scene3d-ui.js
 
 ### BUG-018: dissolveEdge batch splice shifts face indices
 - **File:** `core/editmesh.js:527, 539`
 - **Problem:** Multi-edge dissolve splices faces during iteration. `faceZone`
   can desync — zones shift to wrong faces.
 - **Fix:** Collect all changes first, apply in reverse index order.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — edges sorted by descending face index before dissolve
 
 ### BUG-019: loopcut/subdivide push no-op undo entries
 - **File:** `core/editmesh.js:557, 570`
 - **Problem:** Early-return (via toast) inside `op()` callback still calls
   `commit()`, pushing an empty undo entry that does nothing when undone.
 - **Fix:** Check preconditions before calling `op()`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — preconditions checked before op() call
 
 ### BUG-020: affectedVerts() crashes on stale face selection
 - **File:** `core/editmesh.js:349`
 - **Problem:** `selectElements()` API accepts unchecked indices. Out-of-bounds
   face index → `faces[f]` is undefined → `.forEach` throws TypeError.
 - **Fix:** Validate indices in `selectElements()`, or guard in `affectedVerts`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — guard against undefined faces[f] in affectedVerts
 
 ### BUG-021: zoneTexCache never cleared on exit
 - **File:** `core/editmesh.js:37`
 - **Problem:** `CanvasTexture` objects persist across edit sessions, accumulating
   GPU memory.
 - **Fix:** Dispose and clear in `exit()`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — textures disposed and cache cleared in exit()
 
 ### BUG-022: Gamepad RAF loop runs permanently
 - **File:** `ui/gamepad.js:226`
 - **Problem:** `requestAnimationFrame(frame)` loops every frame even with no
   controller connected. Prevents mobile browser throttling.
 - **Fix:** Only loop on `gamepadconnected`, stop on disconnect.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — RAF loop starts on gamepadconnected, stops when none found
 
 ### BUG-023: z-index 999 on generate menu escapes stacking
 - **File:** `ui/assets-ui.js:183`
 - **Problem:** Generate menu floats above modals (z:80) and command palette
   (z:90).
 - **Fix:** Use z-index consistent with the app's layer system.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — z-index changed from 999 to 75
 
 ### BUG-024: transform-manager.js is completely orphaned
 - **File:** `core/transform-manager.js` (98 lines)
 - **Problem:** No file references `GF.transformManager`. Dead code loaded at
   boot, cached by service worker. `pt:transform` event dispatched to nobody.
 - **Fix:** Remove the file, or integrate it into the transform pipeline.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — file removed, references cleaned from index.html and sw.js
 
 ### BUG-025: Service worker runtime-caches everything unbounded
 - **File:** `sw.js:46-49`
@@ -254,26 +254,26 @@
   cached indefinitely — including Poly Haven API responses, CDN textures,
   HDRIs (100+ MB each). No size cap, no TTL, no same-origin restriction.
 - **Fix:** Only runtime-cache same-origin, add max-entries or TTL policy.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — only same-origin requests runtime-cached
 
 ### BUG-026: Animation pingpong can produce negative time
 - **File:** `core/animation.js:59`
 - **Problem:** Large `dt` (backgrounded tab) makes `currentTime - duration`
   exceed `duration`, producing negative result. No clamp.
 - **Fix:** Clamp to `[0, duration]` after direction reversal.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — Math.max(0, ...) clamp after reversal
 
 ### BUG-027: Vector3 allocation every frame in animate()
 - **File:** `core/scene3d.js:167-170`
 - **Problem:** `new THREE.Vector3()` called twice per frame for selection-box
   updates. GC pressure at 60fps.
 - **Fix:** Pre-allocate scratch vectors at module scope.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — pre-allocated _scratchSz and _scratchCt
 
 ### BUG-028: PCFSoftShadowMap deprecated
 - **File:** `core/scene3d.js:108`
 - **Problem:** Deprecated in Three.js r182 for WebGL. Use `PCFShadowMap`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — changed to PCFShadowMap
 
 ### ~~BUG-029: THREE.Clock deprecated since r183~~ — FALSE POSITIVE
 - **Verification:** Clock is used correctly for `getDelta()` feeding animation
@@ -285,7 +285,7 @@
 - **Problem:** GLB with no meshes still creates a scene entry. User sees an
   invisible, unselectable item in the object list.
 - **Fix:** Check for meshes before adding to scene. Toast a warning if empty.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — meshless GLBs rejected with toast
 
 ---
 
