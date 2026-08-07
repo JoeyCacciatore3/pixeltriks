@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- BUG-038 fix: Content Security Policy — allow self + Google Fonts + data URIs + blob -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob: data:; connect-src *; worker-src 'self' blob:;">
 <meta name="theme-color" content="#0e0f13">
 <meta name="color-scheme" content="dark light">
 <title>PixelTriks — Free Browser-Based 3D Game Asset Studio</title>
@@ -117,17 +119,18 @@
   <!-- RIGHT PANEL (desktop) / BOTTOM SHEET (mobile) -->
   <aside id="panel" data-tab="scene">
     <div class="panel-grip"></div>
+    <!-- BUG-036 fix: added aria-selected, aria-controls, tabindex -->
     <div class="panel-tabs" role="tablist">
-      <button class="ptab" data-tab="scene" role="tab">Props</button>
-      <button class="ptab" data-tab="assets" role="tab">Assets</button>
+      <button class="ptab" data-tab="scene" role="tab" aria-selected="true" aria-controls="pane-scene" tabindex="0">Props</button>
+      <button class="ptab" data-tab="assets" role="tab" aria-selected="false" aria-controls="pane-assets" tabindex="-1">Assets</button>
     </div>
 
     <div class="panel-body">
       <!-- PROPERTIES TAB (3D scene — content built by ui/scene3d-ui.js) -->
-      <div class="ptab-pane" data-pane="scene"></div>
+      <div class="ptab-pane" data-pane="scene" id="pane-scene" role="tabpanel"></div>
 
       <!-- ASSETS TAB (imported models / textures / materials — built by ui/assets-ui.js) -->
-      <div class="ptab-pane" data-pane="assets" hidden>
+      <div class="ptab-pane" data-pane="assets" id="pane-assets" role="tabpanel" hidden>
         <div id="asset-section"></div>
       </div>
     </div>

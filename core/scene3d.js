@@ -28,12 +28,12 @@ GF.scene3d = (function () {
 
   const objects = [];            // [{id, name, kind, prim, node, visible, mat, material, _origMats}]
   let selectedId = null, nextId = 1;
-  let interact = 'orbit';        // camera control mode (only orbit now)
+  /* BUG-031: removed dead `interact` variable — was set but never read */
   const bg = { mode: 'default', color: '#0c0e11' };   // default = dark; snapshot renders transparent unless 'color'
 
   const texCache = new Map();    // source-string -> { tex, srcCanvas }
   const images = new Map();      // 'image:<id>' -> canvas
-  let compCanvas = null;         // persistent canvas backing the 'composite' texture
+  /* BUG-031: removed dead `compCanvas` — remnant of 2D editor */
   let texDirty = false, lastTexAt = 0;
   let nextImageId = 1;
   /* BUG-027 fix: pre-allocated scratch vectors for the animate() loop
@@ -341,11 +341,17 @@ GF.scene3d = (function () {
   /* =================================================================
      Studio lights — intensity / color / shadow controls
      ================================================================= */
+  /* BUG-032 fix: light changes are now undoable */
   function setStudioLight(name, patch) {
     const lights = { ambient: ambientLight, key: keyLight, rim: rimLight };
     const light = lights[name]; if (!light) return;
+    const before = { intensity: light.intensity, color: '#' + light.color.getHexString() };
     if (patch.intensity !== undefined) light.intensity = patch.intensity;
     if (patch.color !== undefined) light.color.set(patch.color);
+    const after = { intensity: light.intensity, color: '#' + light.color.getHexString() };
+    hist.push('light ' + name,
+      () => { light.intensity = before.intensity; light.color.set(before.color); },
+      () => { light.intensity = after.intensity; light.color.set(after.color); });
   }
   function setShadows(enabled) {
     shadowsEnabled = !!enabled;
@@ -768,7 +774,7 @@ GF.scene3d = (function () {
     emit();
   }
   function selected() { return byId(selectedId); }
-  function setInteract(mode) { interact = mode; if (controls) controls.enabled = true; }   // camera orbit always on
+  function setInteract() { if (controls) controls.enabled = true; }   /* BUG-031: removed dead `interact` write */
 
   /* Imported-model animation playback (mixers). Models load paused; these drive
      the actions when the user hits ▶ / ⏸ / ⏹. */
@@ -830,13 +836,7 @@ GF.scene3d = (function () {
     });
     el.addEventListener('pointercancel', () => { down = null; });
   }
-  function planePoint(e, plane) {
-    const T = THREE, r = renderer.domElement.getBoundingClientRect();
-    const ndc = new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    const ray = new T.Raycaster(); ray.setFromCamera(ndc, camera);
-    const pt = new T.Vector3();
-    return ray.ray.intersectPlane(plane, pt) ? pt : null;
-  }
+  /* BUG-031: removed dead planePoint() — editmesh.js has its own */
   /** Orbit the camera around the controls target (gamepad right stick). */
   function orbitCamera(dYaw, dPitch) {
     if (!THREE || !camera || !controls) return;
@@ -1045,4 +1045,9 @@ if (GF.api && GF.api.register) {
   });
   R('scene3d.frameSelected', '', 'Frame the selected object (or whole scene) in view', () => GF.scene3d.frame());
   R('scene3d.exportGLB', 'selection?("scene"|"selected")', 'Export the 3D scene as a .glb file', a => GF.scene3d.exportGLB(a || {}));
+  /* BUG-033 fix: register missing API commands */
+  R('scene3d.select', 'id', 'Select a 3D object by id', a => GF.scene3d.select(a.id));
+  R('scene3d.setEnvironment', 'url', 'Set the HDR environment map', a => GF.scene3d.setEnvironment(a.url));
+  R('scene3d.clearEnvironment', '', 'Remove the HDR environment map', () => GF.scene3d.clearEnvironment());
+  R('scene3d.setBackground', 'mode?("default"|"color"), color?', 'Set background mode', a => GF.scene3d.setBackground(a || {}));
 }

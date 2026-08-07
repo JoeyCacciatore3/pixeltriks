@@ -110,27 +110,12 @@ GF.util = (function () {
     toastTimer = setTimeout(() => el.classList.remove('show'), ms || 2400);
   }
 
-  /** Run heavy work after the toast paints, so the UI shows feedback first. */
-  function busy(msg, fn) {
-    toast(msg, 60000);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const out = fn();
-          document.getElementById('toast').classList.remove('show');
-          resolve(out);
-        } catch (e) {
-          toast('Error: ' + e.message);
-          reject(e);
-        }
-      }, 30);
-    });
-  }
+  /* BUG-039: removed dead busy() — was defined but never called */
 
   /* BUG-016 fix: HTML-escape helper for strings inserted via innerHTML.
      Prevents XSS from plugin command names, model file names, etc. */
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   return { clamp, $, $$, makeCanvas, ctx2d, luminance, hexToRgb, rgbToHex,
-           rgbToHsl, hslToRgb, downloadBlob, canvasToBlob, blobToCanvas, toast, busy, esc };
+           rgbToHsl, hslToRgb, downloadBlob, canvasToBlob, blobToCanvas, toast, esc };
 })();

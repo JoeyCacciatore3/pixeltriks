@@ -155,6 +155,9 @@ GF.editmeshUI = (function () {
   function show(on) {
     if (panel) panel.hidden = !on;
     document.body.classList.toggle('editing', !!on);
+    /* BUG-035 fix: reset _texFilled so the dropdown rebuilds next time
+       edit mode opens (presets may have changed between sessions) */
+    if (!on) _texFilled = false;
   }
 
   /* ── ops list render ─────────────────────────────────────── */
@@ -538,7 +541,7 @@ GF.editmeshUI = (function () {
           min-width: 130px; flex-shrink: 0;
         }
         .em-status { display: none; }
-        .em-zones  { min-width: 180px; flex-shrink: 0; }
+        #em-zones-section { min-width: 180px; flex-shrink: 0; } /* BUG-034 fix: was .em-zones (dead) */
         body.editing #scene3d-host { margin-left: 0; }
       }
     `;

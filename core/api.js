@@ -23,9 +23,10 @@ GF.api = (function () {
   const cmd = (name, params, doc, fn, ui) => { C[name] = { params, doc, fn, ui }; };
 
   /* --- edit: undo / redo always route to the 3D scene's own history stack --- */
-  cmd('undo', '', 'Undo', () => GF.scene3d.hist.undo(),
+  /* BUG-040 fix: guard against scene3d not yet loaded (fragile load order) */
+  cmd('undo', '', 'Undo', () => { if (GF.scene3d && GF.scene3d.hist) GF.scene3d.hist.undo(); },
       { group: 'Edit', label: 'Undo', hint: 'Ctrl+Z' });
-  cmd('redo', '', 'Redo', () => GF.scene3d.hist.redo(),
+  cmd('redo', '', 'Redo', () => { if (GF.scene3d && GF.scene3d.hist) GF.scene3d.hist.redo(); },
       { group: 'Edit', label: 'Redo', hint: 'Ctrl+Y' });
 
   /* --- introspection --- */

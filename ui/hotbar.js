@@ -197,8 +197,9 @@ GF.hotbar = (function () {
     window.addEventListener('pt:sceneselect', refresh);
     window.addEventListener('pt:animstate', refresh);
 
-    // Slow poll as safety net
-    setInterval(refresh, 2000);
+    /* BUG-043 fix: use a rescheduling timeout instead of setInterval so it
+       can be skipped when the page is hidden (saves battery on mobile) */
+    (function poll() { setTimeout(() => { if (!document.hidden) refresh(); poll(); }, 2000); })();
   }
 
   /* ─── Public ─── */

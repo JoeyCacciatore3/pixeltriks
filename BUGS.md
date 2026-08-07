@@ -296,47 +296,47 @@
 - `interact` (line 31): set but never read for branching.
 - `compCanvas` (line 36): always null. Remnant of removed 2D editor.
 - `planePoint` (line 782-788): defined, never called. editmesh has its own.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — removed dead interact, compCanvas, planePoint
 
 ### BUG-032: setStudioLight has no undo history
 - **File:** `core/scene3d.js:332-337`
 - Light changes bypass `hist.push`. Not undoable.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — light changes now push undo entries
 
 ### BUG-033: API registry missing select, setEnvironment, clearEnvironment
 - **File:** `core/scene3d.js:970-997`
 - These are on the return object but not registered as API commands.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — added select, setEnvironment, clearEnvironment, setBackground to API
 
 ### BUG-034: Mobile CSS .em-zones selector is dead
 - **File:** `ui/editmesh-ui.js:541`
 - Uses class `.em-zones` but the element has id `em-zones-section`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — CSS selector changed to #em-zones-section
 
 ### BUG-035: _texFilled flag prevents texture preset updates
 - **File:** `ui/editmesh-ui.js:223, 246`
 - Set once, never reset. If presets change, dropdown never rebuilds.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — _texFilled reset when edit mode exits
 
 ### BUG-036: Panel tabs missing ARIA attributes
 - **File:** `index.html:121-122`
 - `role="tab"` buttons lack `aria-selected`, `aria-controls`, `tabindex`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — added aria-selected, aria-controls, tabindex, role=tabpanel
 
 ### BUG-037: PWA manifest purpose field — deprecated format
 - `"purpose": "any maskable"` should be split into two icon entries.
 - Missing raster fallbacks (192×192, 512×512 PNG).
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — split into two icon entries with separate purpose
 
 ### BUG-038: No CSP meta tag
 - No `Content-Security-Policy` on either page. Google Fonts is the only
   external resource.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — CSP meta tag added to index.html
 
 ### BUG-039: util.busy() is defined but never called
 - **File:** `core/util.js:114-128`
 - Dead code.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — busy() removed from util.js
 
 ### BUG-040: api.js undo/redo assumes scene3d.hist exists at registration
 - **File:** `core/api.js:26-27`
@@ -344,7 +344,7 @@
   `cmd()` call executes at parse time and would throw if `scene3d.js`
   loaded after `api.js`. Currently safe due to script order in index.html,
   but fragile — no defensive guard.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — defensive guard on GF.scene3d existence
 
 ### ~~BUG-041: publish.js error handler crashes if #load removed~~ — FALSE POSITIVE
 - **Verification:** GLTFLoader fires exactly one callback (success OR error),
@@ -356,12 +356,13 @@
 - **File:** `ui/editmesh-ui.js:65-76`
 - Commands registered with `hint` metadata but no `bind()`. The remap
   dialog can't remap G/R/S/E/I/M — they use a separate keydown handler.
-- **Status:** `[ ]`
+- **Status:** `[~]` deferred — requires reworking the modal transform interaction
+  model in editmesh.js (keys need to be context-sensitive based on modal state)
 
 ### BUG-043: setInterval(refresh, 2000) in hotbar never cleared
 - **File:** `ui/hotbar.js:199`
 - Runs forever. Short-circuits if context unchanged, but still polls.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — replaced setInterval with self-rescheduling setTimeout + document.hidden check
 
 ---
 
