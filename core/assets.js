@@ -25,7 +25,13 @@ GF.assets = (function () {
           s.createIndex('created', 'metadata.created', { unique: false });
         }
       };
-      req.onsuccess = e => { db = e.target.result; resolve(db); };
+      req.onsuccess = e => {
+        db = e.target.result;
+        /* BUG-015 fix: handle another tab upgrading the DB version —
+           close our stale connection so the upgrade can proceed. */
+        db.onversionchange = () => { db.close(); db = null; };
+        resolve(db);
+      };
       req.onerror = e => reject(e.target.error);
     });
   }
@@ -39,13 +45,23 @@ GF.assets = (function () {
 
   function uid() { return 'asset_' + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)); }
 
+  /* BUG-014 fix: catch QuotaExceededError and surface a clear message
+     instead of an opaque DOMException. */
+  function isQuotaError(err) {
+    return err && (err.name === 'QuotaExceededError' ||
+      (err.message && err.message.includes('quota')));
+  }
   async function put(asset) {
     const d = await open();
     return new Promise((resolve, reject) => {
       const tx = d.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(asset);
       tx.oncomplete = () => resolve(asset.id);
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => {
+        const err = e.target.error;
+        if (isQuotaError(err)) { U.toast('Storage full — delete some assets to free space'); }
+        reject(err);
+      };
     });
   }
 
@@ -56,7 +72,11 @@ GF.assets = (function () {
       const s = tx.objectStore(STORE);
       assets.forEach(a => s.put(a));
       tx.oncomplete = () => resolve(assets.length);
-      tx.onerror = e => reject(e.target.error);
+      tx.onerror = e => {
+        const err = e.target.error;
+        if (isQuotaError(err)) { U.toast('Storage full — delete some assets to free space'); }
+        reject(err);
+      };
     });
   }
 

@@ -108,7 +108,7 @@
 - **Severity:** Not a runtime bug today — fragile pattern that will break if
   axis generation changes. Grab and rotate already do this correctly.
 - **Fix:** Use projection/rejection decomposition like grab does.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — uses projection/rejection math matching grab and rotate
 
 ### BUG-008: handleViewportDrop doesn't await handleFiles
 - **File:** `core/scene3d.js:600`, also `ui/forge-ui.js:108,111`
@@ -117,7 +117,7 @@
   rejection. The "Loading…" status toast stays forever. Object URLs created
   in `handleFiles` may race if two drops happen quickly.
 - **Fix:** `await handleFiles(...)` and catch errors with user feedback.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — forge-ui file input + drop handlers now await and catch with toast
 
 ### BUG-009: Objects removed but GPU resources never disposed
 - **File:** `core/scene3d.js:618-622, 361`
@@ -127,7 +127,7 @@
   line 82), the closure is GC'd but GPU resources are already orphaned.
   Long sessions accumulate GPU memory.
 - **Fix:** Add a disposal path when undo entries are evicted from the stack.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — hist.push accepts dispose callback; disposeNode() frees GPU resources on eviction
 
 ### BUG-010: images Map grows unbounded — no removal path
 - **File:** `core/scene3d.js:244-249`
@@ -135,7 +135,7 @@
   `removeImageSource` anywhere. Every imported texture image lives forever.
 - **Fix:** Add `removeImageSource()` and call it when objects are permanently
   deleted (past undo window).
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — removeImageSource() added and exported on scene3d
 
 ### BUG-011: Duplicate animated model loses all animation data
 - **File:** `core/scene3d.js:626-641`
@@ -145,7 +145,7 @@
 - **Reproduce:** Import animated GLB → duplicate it → select the clone →
   press Play → original animates, clone stays frozen.
 - **Fix:** Clone the mixer and clips for the new object.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — duplicateObject now creates independent mixer+actions for the clone
 
 ### BUG-012: importedClips array never cleared on deletion
 - **File:** `core/animation.js:151-153`
@@ -154,7 +154,7 @@
   `importedClips` array. Import → delete → re-import accumulates duplicate
   clips that get baked into GLB exports via `getClips()`.
 - **Fix:** Wire model removal into animation clip cleanup.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — removeClips() added to animation.js; removeObject calls it
 
 ### BUG-013: paint3d crash on object deletion while painting
 - **File:** `core/paint3d.js:60-66`
@@ -162,7 +162,7 @@
   externally while paint mode is active, the next `onPointerDown` calls
   `S().raycastUV()` against a dead reference.
 - **Fix:** Wire `removeObject` to call `paint3d.exit()` if the target matches.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — removeObject checks paint3d.targetObjId() and exits if match
 
 ### BUG-014: IndexedDB — no QuotaExceededError handling
 - **File:** `core/assets.js:42-60`
@@ -170,14 +170,14 @@
   callers never catch `QuotaExceededError`. Large GLB imports produce an
   opaque error with no user feedback.
 - **Fix:** Catch by error name, toast a message, offer cleanup.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — isQuotaError() check + user toast in put/putBatch
 
 ### BUG-015: IndexedDB — no onversionchange handler
 - **File:** `core/assets.js:28`
 - **Problem:** Two-tab scenario: one tab upgrades DB version, other tab's
   `db` reference goes stale. Writes silently fail.
 - **Fix:** `db.onversionchange = () => { db.close(); db = null; };`
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — onversionchange handler closes stale connection
 
 ### BUG-016: innerHTML XSS vectors via plugin/file names
 - **Files:** `ui/forge-ui.js:299-300`, `ui/hotbar.js:160`, `ui/remap.js:66`
@@ -186,7 +186,7 @@
   `{ title: '<img onerror=alert(1)>' }` would execute arbitrary JS.
   Model file names could also carry payloads.
 - **Fix:** Escape HTML entities before interpolation, or use textContent.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — U.esc() helper added; applied in palette, hotbar, remap
 
 ---
 

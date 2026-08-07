@@ -105,10 +105,17 @@ window.GF = window.GF || {};
   function pickFile() { const fi = $('#file-input'); if (fi) fi.click(); }
   function wireDropAndFiles() {
     const fi = $('#file-input');
-    if (fi) fi.addEventListener('change', () => { if (fi.files.length && S()) S().handleFiles(fi.files); fi.value = ''; });
-    ['dragover', 'drop'].forEach(t => document.addEventListener(t, e => {
+    /* BUG-008 fix: await handleFiles and catch errors so corrupt files
+       produce user feedback instead of unhandled rejections. */
+    if (fi) fi.addEventListener('change', async () => {
+      if (fi.files.length && S()) { try { await S().handleFiles(fi.files); } catch (e) { U.toast('Import failed: ' + e.message); } }
+      fi.value = '';
+    });
+    ['dragover', 'drop'].forEach(t => document.addEventListener(t, async e => {
       e.preventDefault();
-      if (t === 'drop' && e.dataTransfer.files.length && S()) S().handleFiles(e.dataTransfer.files);
+      if (t === 'drop' && e.dataTransfer.files.length && S()) {
+        try { await S().handleFiles(e.dataTransfer.files); } catch (e2) { U.toast('Import failed: ' + e2.message); }
+      }
     }));
   }
 
@@ -300,8 +307,10 @@ window.GF = window.GF || {};
       palItems = all.map(c => ({ c, s: fuzzyScore(q, c.label + ' ' + c.group) })).filter(m => m.s >= 0)
         .sort((a, b) => a.s - b.s).slice(0, 50).map(m => m.c);
       palIdx = 0;
+      /* BUG-016 fix: escape command labels/groups/hints before innerHTML
+         to prevent XSS via plugin-registered command names. */
       list.innerHTML = palItems.length ? palItems.map((c, i) =>
-        `<li class="cmdk-item${i === 0 ? ' on' : ''}" data-i="${i}" role="option"><span class="cmdk-grp">${c.group}</span><span class="cmdk-label">${c.label}</span>${c.hint ? `<span class="kbd">${c.hint}</span>` : ''}</li>`).join('')
+        `<li class="cmdk-item${i === 0 ? ' on' : ''}" data-i="${i}" role="option"><span class="cmdk-grp">${U.esc(c.group)}</span><span class="cmdk-label">${U.esc(c.label)}</span>${c.hint ? `<span class="kbd">${U.esc(c.hint)}</span>` : ''}</li>`).join('')
         : `<li class="cmdk-empty">No matching actions</li>`;
       list.querySelectorAll('.cmdk-item').forEach(li => {
         li.addEventListener('mousemove', () => setActive(+li.dataset.i));

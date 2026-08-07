@@ -154,6 +154,16 @@ GF.animation = (function () {
     if (clips[0] && clips[0].duration) duration = Math.max(duration, clips[0].duration);
     emit();
   }
+  /* BUG-012 fix: remove imported clips so they don't accumulate across
+     import/delete cycles and get baked into GLB exports as ghosts. */
+  function removeClips(clips) {
+    if (!clips || !clips.length) return;
+    const rm = new Set(clips);
+    for (let i = importedClips.length - 1; i >= 0; i--) {
+      if (rm.has(importedClips[i])) importedClips.splice(i, 1);
+    }
+    emit();
+  }
 
   function getClips() {
     if (!window.__THREE_BUNDLE) return importedClips.slice();
@@ -201,7 +211,7 @@ GF.animation = (function () {
     setDuration, getDuration, setTime, getTime, setLoop, getLoop,
     play, pause, stop, isPlaying: () => playing,
     addKeyframe, removeKeyframe, getKeyframes, recordKeyframe,
-    importClips, getClips, hasAnimation,
+    importClips, removeClips, getClips, hasAnimation,
     onChange, emit
   };
 })();

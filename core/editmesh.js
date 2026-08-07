@@ -412,8 +412,19 @@ GF.editmesh = (function () {
       aff.forEach((v, i) => verts[v].copy(m.orig[i]).sub(m.centroidLocal).applyQuaternion(q).add(m.centroidLocal));
     } else if (m.kind === 'scale') {
       const f = Math.exp((m.startMouse.y - mouse.y) * 0.006);
-      const s = m.axis ? new THREE.Vector3(m.axis.x ? f : 1, m.axis.y ? f : 1, m.axis.z ? f : 1) : new THREE.Vector3(f, f, f);
-      aff.forEach((v, i) => verts[v].copy(m.orig[i]).sub(m.centroidLocal).multiply(s).add(m.centroidLocal));
+      /* BUG-007 fix: use projection math like grab/rotate instead of truthy
+         component check. The old pattern (m.axis.x ? f : 1) produced shear
+         if the axis had non-unit components (e.g. diagonal local axes). */
+      if (m.axis) {
+        aff.forEach((v, i) => {
+          const offset = m.orig[i].clone().sub(m.centroidLocal);
+          const proj = m.axis.clone().multiplyScalar(offset.dot(m.axis));
+          const rej = offset.clone().sub(proj);
+          verts[v].copy(m.centroidLocal).add(rej).add(proj.multiplyScalar(f));
+        });
+      } else {
+        aff.forEach((v, i) => verts[v].copy(m.orig[i]).sub(m.centroidLocal).multiplyScalar(f).add(m.centroidLocal));
+      }
     }
     refreshPositions();
   }

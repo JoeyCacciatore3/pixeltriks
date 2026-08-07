@@ -157,8 +157,10 @@ GF.hotbar = (function () {
       const c = GF.commands.get(id);
       if (!c) continue;   // init() asserted all ids — this guards mid-boot races only
       const cls = 'ab-btn' + (c.hotbar && c.hotbar.class ? ' ' + c.hotbar.class : '');
-      html += '<button class="' + cls + '" data-hotbar="' + id + '" title="' + c.title + '">' +
-        '<span class="ab-icon">' + c.icon + '</span><span class="ab-label">' + c.title + '</span>' +
+      /* BUG-016 fix: escape command titles before innerHTML insertion */
+      const E = GF.util.esc;
+      html += '<button class="' + cls + '" data-hotbar="' + id + '" title="' + E(c.title) + '">' +
+        '<span class="ab-icon">' + E(c.icon) + '</span><span class="ab-label">' + E(c.title) + '</span>' +
         '</button>';
     }
 

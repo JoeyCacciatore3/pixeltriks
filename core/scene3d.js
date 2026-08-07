@@ -76,16 +76,21 @@ GF.scene3d = (function () {
   /* =================================================================
      Undo — command stack (closures) for scene-graph mutations
      ================================================================= */
+  /* BUG-009 fix: history entries can carry an optional `dispose` callback
+     that fires when the entry is evicted from the stack (past undo window).
+     This lets removeObject / addPrimitive free GPU resources (geometry,
+     material, textures) once they can no longer be undone/redone. */
   const hist = (function () {
     const un = [], re = [];
+    function evict(e) { if (e && typeof e.dispose === 'function') try { e.dispose(); } catch (_) {} }
     return {
-      push(label, undo, redo) { un.push({ label, undo, redo }); if (un.length > 50) un.shift(); re.length = 0; emit(); },
+      push(label, undo, redo, dispose) { un.push({ label, undo, redo, dispose }); if (un.length > 50) evict(un.shift()); re.forEach(evict); re.length = 0; emit(); },
       undo() { const e = un.pop(); if (!e) return; e.undo(); re.push(e); emit(); },
       redo() { const e = re.pop(); if (!e) return; e.redo(); un.push(e); emit(); },
       canUndo() { return un.length > 0; },
       canRedo() { return re.length > 0; },
       labels() { return un.map(e => e.label); },
-      clear() { un.length = 0; re.length = 0; }
+      clear() { un.forEach(evict); re.forEach(evict); un.length = 0; re.length = 0; }
     };
   })();
 
@@ -249,6 +254,9 @@ GF.scene3d = (function () {
     return key;
   }
   function listImageSources() { return [...images.entries()].map(([k, c]) => ({ key: k, name: c._srcName })); }
+  /* BUG-010 fix: provide a removal path for image sources so they don't
+     accumulate forever. Called when objects using them are permanently gone. */
+  function removeImageSource(key) { images.delete(key); texCache.delete(key); }
 
   function refreshTextures(force) {
     if (!renderer || (!force && !isActive())) return;
@@ -359,6 +367,19 @@ GF.scene3d = (function () {
   }
   function attach(o) { sceneRoot.add(o.node); if (!objects.includes(o)) objects.push(o); o.node.visible = o.visible; emit(); }
   function detach(o) { sceneRoot.remove(o.node); const i = objects.indexOf(o); if (i >= 0) objects.splice(i, 1); if (selectedId === o.id) select(null); emit(); }
+  /* BUG-009: dispose GPU resources for an object that is permanently gone
+     (past the undo window). Traverses the Three.js subtree and frees
+     geometry, material, and texture allocations. */
+  function disposeNode(node) {
+    if (!node) return;
+    node.traverse(ch => {
+      if (ch.geometry) ch.geometry.dispose();
+      if (ch.material) {
+        const mats = Array.isArray(ch.material) ? ch.material : [ch.material];
+        mats.forEach(m => { if (m.map) m.map.dispose(); if (m.normalMap) m.normalMap.dispose(); m.dispose(); });
+      }
+    });
+  }
 
   /** Faceted look for crystals/gems: flat per-face normals instead of the
       smooth spherical shading PolyhedronGeometry ships with. */
@@ -621,11 +642,18 @@ GF.scene3d = (function () {
        Previously mixers.delete ran before the undo closure captured
        anything — undoing a deletion left the model with dead animation. */
     const stashedMixer = mixers.has(id) ? mixers.get(id) : null;
-    if (stashedMixer) { stashedMixer.mixer.stopAllAction(); mixers.delete(id); }
+    if (stashedMixer) {
+      stashedMixer.mixer.stopAllAction(); mixers.delete(id);
+      /* BUG-012 fix: remove imported clips so they don't ghost into exports */
+      if (GF.animation && GF.animation.removeClips) GF.animation.removeClips(stashedMixer.clips);
+    }
+    /* BUG-013 fix: exit paint3d if we're deleting the object being painted */
+    if (GF.paint3d && GF.paint3d.isActive() && GF.paint3d.targetObjId() === id) GF.paint3d.exit();
     detach(o);
     hist.push('remove ' + o.name,
       () => { attach(o); applyMaterial(o); if (stashedMixer) mixers.set(o.id, stashedMixer); },
-      () => { if (mixers.has(o.id)) { mixers.get(o.id).mixer.stopAllAction(); mixers.delete(o.id); } detach(o); });
+      () => { if (mixers.has(o.id)) { mixers.get(o.id).mixer.stopAllAction(); mixers.delete(o.id); } detach(o); },
+      () => { disposeNode(o.node); if (o.material) o.material.dispose(); });
   }
   /** Duplicate an object — primitive or imported model — with its transform
       and material, offset so the copy is visible. Returns the new id. */
@@ -641,6 +669,15 @@ GF.scene3d = (function () {
     o.node.traverse(ch => { if (ch.isMesh && ch.material === src.material) ch.material = o.material; });
     if (o.node.isMesh && o.node.material === src.material) o.node.material = o.material;
     o.node.position.x += 0.5;
+    /* BUG-011 fix: clone animation mixer + clips for the duplicate so it
+       has independent, working animation. Previously only the mesh was
+       cloned — the mixer stayed on the original, leaving the copy dead. */
+    if (mixers.has(src.id)) {
+      const srcMix = mixers.get(src.id);
+      const mixer = new THREE.AnimationMixer(o.node);
+      const actions = srcMix.clips.map(clip => mixer.clipAction(clip));
+      mixers.set(o.id, { mixer, clips: srcMix.clips, actions, playing: false });
+    }
     attach(o); applyMaterial(o); select(o.id);
     hist.push('duplicate ' + src.name, () => detach(o), () => { attach(o); applyMaterial(o); });
     return o.id;
@@ -948,7 +985,7 @@ GF.scene3d = (function () {
     playAnimations, pauseAnimations, stopAnimations, hasModelAnimations,
     rendererEl: () => renderer ? renderer.domElement : null,
     // materials / textures
-    setMaterial, addImageSource, listImageSources, refreshAll,
+    setMaterial, addImageSource, removeImageSource, listImageSources, refreshAll,
     // lighting
     setStudioLight, setShadows, getStudioLights,
     // environment

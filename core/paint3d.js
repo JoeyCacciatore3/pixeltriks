@@ -184,7 +184,8 @@ GF.paint3d = (function () {
   return {
     enter, exit, isActive, setBrush, getBrush,
     onPointerDown, onPointerMove, onPointerUp,
-    clear, getCanvas, getRoughCanvas, onChange
+    clear, getCanvas, getRoughCanvas, onChange,
+    targetObjId: () => targetId  // BUG-013: expose for removal notification
   };
 })();
 

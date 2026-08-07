@@ -63,7 +63,8 @@ GF.remap = (function () {
     const sigs = Object.keys(binds).sort((a, b) => title(binds[a]).localeCompare(title(binds[b])));
     let html = '<h3 class="panel-h first">Keyboard</h3><table class="remap-table">';
     sigs.forEach(sig => {
-      html += `<tr><td>${title(binds[sig])}</td><td><span class="kbd">${fmt(sig)}</span></td>
+      /* BUG-016 fix: escape command titles before innerHTML insertion */
+      html += `<tr><td>${GF.util.esc(title(binds[sig]))}</td><td><span class="kbd">${GF.util.esc(fmt(sig))}</span></td>
         <td><button class="text-btn ghost remap-change" data-sig="${sig}">Change</button></td></tr>`;
     });
     html += '</table>';

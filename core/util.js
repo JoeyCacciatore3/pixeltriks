@@ -127,6 +127,10 @@ GF.util = (function () {
     });
   }
 
+  /* BUG-016 fix: HTML-escape helper for strings inserted via innerHTML.
+     Prevents XSS from plugin command names, model file names, etc. */
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
   return { clamp, $, $$, makeCanvas, ctx2d, luminance, hexToRgb, rgbToHex,
-           rgbToHsl, hslToRgb, downloadBlob, canvasToBlob, blobToCanvas, toast, busy };
+           rgbToHsl, hslToRgb, downloadBlob, canvasToBlob, blobToCanvas, toast, busy, esc };
 })();
