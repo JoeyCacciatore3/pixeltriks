@@ -235,12 +235,16 @@ window.GF = window.GF || {};
     if (u) u.disabled = !(s && s.hist.canUndo());
     if (r) r.disabled = !(s && s.hist.canRedo());
   }
+  /* BUG-001 fix: check WebGL2 once at boot, cache the result.
+     Creating a canvas+context on every call exhausted the browser's
+     WebGL context limit (~8-16) and crashed the 3D renderer. */
+  let _gpuLabel = null;
   function updateStatusBar() {
     const sbObjects = $('#sb-objects'), sbMode = $('#sb-mode'), sbMem = $('#sb-mem'), sbGpu = $('#sb-gpu');
     if (sbObjects) { const n = S() ? S().count() : 0; sbObjects.textContent = '◧ ' + n + ' object' + (n !== 1 ? 's' : ''); }
     if (sbMode) sbMode.textContent = document.body.classList.contains('editing') ? '✎ EDIT MODE' : '● ' + (document.body.dataset.mode || '3d').toUpperCase();
     if (sbMem) sbMem.textContent = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : '—';
-    if (sbGpu) { const gl = document.createElement('canvas').getContext('webgl2'); sbGpu.textContent = gl ? '⬡ WebGL2' : '⬡ WebGL'; }
+    if (sbGpu) { if (_gpuLabel === null) { const c = document.createElement('canvas'); const gl = c.getContext('webgl2'); _gpuLabel = gl ? '⬡ WebGL2' : '⬡ WebGL'; } sbGpu.textContent = _gpuLabel; }
   }
   function setDims() {}
 

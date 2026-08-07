@@ -24,7 +24,7 @@
 - **Reproduce:** Add and remove ~20 objects in a session, watch the console for
   `WebGL context lost` warnings.
 - **Fix:** Check once at boot, cache the boolean result.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — cached `_gpuLabel` checked once, reused on every call
 
 ### BUG-002: Undo during modal transform corrupts mesh geometry
 - **File:** `core/editmesh.js` — keyHandler (lines 776-803), modal state
@@ -39,7 +39,7 @@
   moving, press Ctrl+Z → click to confirm → observe deformed/broken mesh.
 - **Fix:** Either `cancelModal()` before any undo fires, or block global undo
   while `modal` is truthy (add early return in keyHandler for Ctrl/Cmd+Z).
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — keyHandler now blocks Ctrl/Cmd shortcuts while modal is active
 
 ### BUG-003: removeObject undo loses animation mixer
 - **File:** `core/scene3d.js:618-622`
@@ -51,7 +51,7 @@
 - **Reproduce:** Import an animated GLB → delete the model → Ctrl+Z to undo →
   press Play → nothing happens, no error in console.
 - **Fix:** Stash the mixer entry in the undo closure and restore it on undo.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — mixer stashed before delete, restored on undo, re-deleted on redo
 
 ### BUG-004: enter() without exit() leaks previous editing session
 - **File:** `core/editmesh.js:702-723`
@@ -66,7 +66,7 @@
 - **Reproduce:** Via console: `GF.editmesh.enter(1)` then `GF.editmesh.enter(2)`
   without exiting first → Object 1 is permanently corrupted.
 - **Fix:** Add `if (active) exit();` at the top of `enter()`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — enter() now calls exit() if already active
 
 ### BUG-005: Blob URL memory leak in asset thumbnails
 - **File:** `ui/assets-ui.js:103`
@@ -79,7 +79,7 @@
   `performance.memory.usedJSHeapSize` — it grows monotonically.
 - **Fix:** Track previous URLs and revoke them before creating new ones, or
   use the existing `loadImg` helper.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — blob URLs revoked via data-blob marker before grid rebuild
 
 ### BUG-006: Service worker fetch handler returns undefined on cache miss
 - **File:** `sw.js:50`
@@ -90,7 +90,7 @@
   offline message.
 - **Fix:** Return `new Response('Offline', { status: 503 })` or remove the
   dead `.catch(() => hit)`.
-- **Status:** `[ ]`
+- **Status:** `[x]` fixed — returns proper 503 response; cache bumped to forge-v43
 
 ---
 

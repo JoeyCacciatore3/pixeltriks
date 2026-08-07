@@ -617,9 +617,15 @@ GF.scene3d = (function () {
 
   function removeObject(id) {
     const o = byId(id); if (!o) return;
-    if (mixers.has(id)) { mixers.get(id).mixer.stopAllAction(); mixers.delete(id); }
+    /* BUG-003 fix: stash the mixer entry so undo can restore it.
+       Previously mixers.delete ran before the undo closure captured
+       anything — undoing a deletion left the model with dead animation. */
+    const stashedMixer = mixers.has(id) ? mixers.get(id) : null;
+    if (stashedMixer) { stashedMixer.mixer.stopAllAction(); mixers.delete(id); }
     detach(o);
-    hist.push('remove ' + o.name, () => { attach(o); applyMaterial(o); }, () => detach(o));
+    hist.push('remove ' + o.name,
+      () => { attach(o); applyMaterial(o); if (stashedMixer) mixers.set(o.id, stashedMixer); },
+      () => { if (mixers.has(o.id)) { mixers.get(o.id).mixer.stopAllAction(); mixers.delete(o.id); } detach(o); });
   }
   /** Duplicate an object — primitive or imported model — with its transform
       and material, offset so the copy is visible. Returns the new id. */

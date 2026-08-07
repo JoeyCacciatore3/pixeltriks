@@ -92,6 +92,11 @@ GF.assetsUI = (function () {
       return;
     }
 
+    /* BUG-005 fix: revoke previous thumbnail blob URLs before rebuilding.
+       Each refresh() created new URLs that were never revoked, leaking memory. */
+    grid.querySelectorAll('img[data-blob]').forEach(img => {
+      try { URL.revokeObjectURL(img.src); } catch (_) {}
+    });
     grid.innerHTML = '';
     assets.forEach(a => {
       const card = document.createElement('div');
@@ -102,6 +107,7 @@ GF.assetsUI = (function () {
       if (a.thumbnail) {
         const img = document.createElement('img');
         img.src = URL.createObjectURL(a.thumbnail);
+        img.dataset.blob = '1';   // mark for revocation on next refresh
         img.alt = a.name;
         card.appendChild(img);
       } else {

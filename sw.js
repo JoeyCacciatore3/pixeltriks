@@ -1,7 +1,7 @@
 /* PixelTriks — service worker (offline app shell).
    Registers only over http(s); a no-op when the app is opened from file://. */
 'use strict';
-const CACHE = 'forge-v42';
+const CACHE = 'forge-v43';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png',
   './ui/forge.css', './ui/forge-ui.js', './ui/scene3d-ui.js', './ui/assets-ui.js',
@@ -41,12 +41,14 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // cache-first for the app shell, falling back to network (and caching new GETs)
+  /* BUG-006 fix: the old .catch(() => hit) returned undefined on cache miss +
+     network failure because `hit` was null (cache didn't match). Now returns
+     a proper 503 response so the page gets a clear offline signal. */
   e.respondWith(
     caches.match(e.request).then(hit => hit || fetch(e.request).then(resp => {
       const copy = resp.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return resp;
-    }).catch(() => hit))
+    }).catch(() => new Response('Offline — resource not cached', { status: 503, statusText: 'Service Unavailable' })))
   );
 });

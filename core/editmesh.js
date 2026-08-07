@@ -701,6 +701,10 @@ GF.editmesh = (function () {
   /* ---------------- lifecycle ---------------- */
   function enter(id) {
     if (!GF.scene3d) return false;
+    /* BUG-004 fix: if already editing, clean up the previous session first.
+       Direct enter() calls (API, automation) could leak overlays, key handlers,
+       and leave the old object with corrupted display geometry. */
+    if (active) exit();
     refs = GF.scene3d.editRefs(); THREE = refs.THREE;
     if (!THREE || !refs.camera) { U.toast('3D engine still loading'); return false; }
     const o = GF.scene3d.byId(id != null ? id : GF.scene3d.selectedId());
@@ -786,6 +790,10 @@ GF.editmesh = (function () {
       if ((e.ctrlKey || e.metaKey) && !modal && k === 'r') { loopcut(); e.preventDefault(); e.stopPropagation(); return; }
       if ((e.ctrlKey || e.metaKey) && !modal && k === 'x') { dissolve(); e.preventDefault(); e.stopPropagation(); return; }
       if ((e.ctrlKey || e.metaKey) && !modal && k === 'b') { bevel(); e.preventDefault(); e.stopPropagation(); return; }
+      // BUG-002 fix: if a modal transform is active, block Ctrl/Cmd shortcuts
+      // (especially undo) — scene-level undo during grab/rotate/scale corrupts
+      // the mesh because restore() overwrites verts while modal holds stale refs.
+      if ((e.ctrlKey || e.metaKey) && modal) { e.preventDefault(); e.stopPropagation(); return; }
       // otherwise let the shell keep its Ctrl/Cmd shortcuts (undo ⌘Z, export ⌘S) — don't hijack
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (k === '1') { setMode('vertex'); }
